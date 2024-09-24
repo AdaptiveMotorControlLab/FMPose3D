@@ -160,6 +160,15 @@ def print_json(path):
         print(data.keys())
         print(data)
 
+def search_file_by_id(path, id):
+    with open(path, "r") as f:
+        data = json.load(f)
+        
+    image = next((image for image in data["images"] if image["id"] == id), None)
+
+    print("image", image["file_name"])
+
+    print("image", image)
 
 if __name__ == "__main__":
     # main(project_root=Path("/mediaPFM/data/datasets/final_datasets/v7"))
@@ -167,8 +176,10 @@ if __name__ == "__main__":
     
     # Path to the JSON file
     # json_file_path = "/mediaPFM/data/datasets/final_datasets/v7/annotations/pfm_test_apr15.json"
-    json_file_path = "/home/ti/projects/PrimatePose/ti_data/primate_test_1.1.json"
+    # json_file_path = "/home/ti/projects/PrimatePose/ti_data/primate_test_1.1.json"
     # json_file_path_sample = "/home/ti/projects/PrimatePose/ti_data/data/pfm_test_10_items.json"
     # inspect_json(json_file_path)
     # test_image(json_file_path)
-    extract_json(json_file_path)
+    # extract_json(json_file_path)
+    test_json_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
+    search_file_by_id(test_json_path, 82506)
