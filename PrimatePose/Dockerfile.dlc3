@@ -1,33 +1,20 @@
 FROM nvidia/cuda:12.0.0-runtime-ubuntu20.04
 
 # install libgl1 which is used for OpenCV
+
+# Set non-interactive mode and timezone
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Zurich
-RUN apt-get update && apt-get install -y libgl1-mesa-glx
-RUN apt update && apt install -y ffmpeg git-all
 
-RUN apt install bash
-# RUN apt install vim && apt install zsh && apt install tmux
-# RUN apt install -y vim zsh tmux
-# RUN apt install vim
-# Update the package list and install packages
-RUN apt-get update && \
-    apt-get install -y vim zsh tmux && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Update and install essential packages
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y libgl1-mesa-glx ffmpeg git-all vim zsh tmux bash sudo wget curl python3-pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Jupyter Notebook
+RUN pip3 install --no-cache-dir jupyter && jupyter notebook --generate-config && \
+    echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
 
-# Install pip3 and Jupyter notebook
-RUN apt-get update && \
-    apt-get install -y python3-pip && \
-    pip3 install jupyter && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# install jupyter notebook
-# RUN pip3 install jupyter 
-RUN jupyter notebook --generate-config
-RUN echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
 
 # make a group for users that can run conda
 RUN groupadd conda -g 1221
@@ -35,36 +22,50 @@ RUN groupadd conda -g 1221
 # install miniconda, which also gives you python 3.9
 # make the installation dir /opt/conda and make it accessible to the conda group
 # help from github.com/ContinuumIO/docker-images/blob/master/miniconda3/debian/Dockerfile
-ARG CONDA_V=py39_23.5.2-0
+ARG CONDA_V=py310_23.5.2-0
 ARG CONDA_REPO="https://repo.anaconda.com/miniconda"
 ARG MINICONDA_URL="${CONDA_REPO}/Miniconda3-${CONDA_V}-Linux-x86_64.sh"
-ARG SHA256SUM="9829d95f639bd0053b2ed06d1204e60644617bf37dd5cc57523732e0e8d64516"
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-RUN wget "${MINICONDA_URL}" -O miniconda.sh -q \
-    && echo "${SHA256SUM} miniconda.sh" > shasum \
-    && sha256sum --check --status shasum \
-    && mkdir -p /opt \
-    && mkdir -m 770 /opt/conda \
-    && chgrp -R conda /opt/conda \
-    && bash miniconda.sh -f -b -p /opt/conda \
-    && rm miniconda.sh shasum \
-    && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
-    && echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \
-    && echo "conda activate base" >> ~/.bashrc \
-    && find /opt/conda/ -follow -type f -name '*.a' -delete \
-    && find /opt/conda/ -follow -type f -name '*.js.map' -delete \
-    && /opt/conda/bin/conda clean -afy
+RUN wget "${MINICONDA_URL}" -O miniconda.sh -q && \
+    bash miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh && \
+    /opt/conda/bin/conda clean -afy
+
+# ARG SHA256SUM="9829d95f639bd0053b2ed06d1204e60644617bf37dd5cc57523732e0e8d64516"
+# RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+# RUN wget "${MINICONDA_URL}" -O miniconda.sh -q \
+#     && echo "${SHA256SUM} miniconda.sh" > shasum \
+#     && sha256sum --check --status shasum \
+#     && mkdir -p /opt \
+#     && mkdir -m 770 /opt/conda \
+#     && chgrp -R conda /opt/conda \
+#     && bash miniconda.sh -f -b -p /opt/conda \
+#     && rm miniconda.sh shasum \
+#     && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
+#     && echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \
+#     && echo "conda activate base" >> ~/.bashrc \
+#     && find /opt/conda/ -follow -type f -name '*.a' -delete \
+#     && find /opt/conda/ -follow -type f -name '*.js.map' -delete \
+#     && /opt/conda/bin/conda clean -afy
 
 # Setup the conda path, make conda writable for all users
 ENV PATH=/opt/conda/bin:${PATH}
 
+# Create conda environment with Python 3.10
+RUN conda create -n dlc3 python=3.10 -y && \
+    echo "conda activate dlc3" >> ~/.bashrc
+
+
 # install conda and pip packages
 COPY ./requirements.txt /requirements.txt
-RUN conda install -c anaconda pytables=3.7.0 && \
-    pip install --upgrade pip setuptools && \
-    pip install torch==2.2.1 torchvision --index-url https://download.pytorch.org/whl/cu121 && \
-    pip install -r /requirements.txt && \
-    pip install pytest PySide6==6.3.1
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir -r /requirements.txt && \
+    pip install --no-cache-dir pytest PySide6==6.3.1
+
+# RUN conda install -c anaconda pytables=3.7.0 && \
+#     pip install --upgrade pip setuptools && \
+#     pip install torch==2.2.1 torchvision --index-url https://download.pytorch.org/whl/cu121 && \
+#     pip install -r /requirements.txt && \
+#     pip install pytest PySide6==6.3.1
     #  einops
 
     # install DLC (omitted as we install a editable version in the container)
@@ -75,19 +76,39 @@ RUN conda install -c anaconda pytables=3.7.0 && \
 # RUN chmod 777 /opt/conda/lib/python3.9/site-packages/deeplabcut/pose_estimation_tensorflow/models/pretrained/
 
 # Create a home folder for the user
-ARG USERNAME=lucas
+ARG USERNAME=ti_wang
+ARG PASSWORD=aaa
 ARG UID=1005
 ARG GID=1005
 RUN groupadd -g ${GID} ${USERNAME} && \
-    useradd -rm -s /bin/bash -u "${UID}" -g "${GID}" -G conda "${USERNAME}"
+    useradd -rm -s /bin/bash -u "${UID}" -g "${GID}" -G conda,sudo "${USERNAME}" && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Set the default shell to zsh for the user 'brave'
+RUN chsh -s /bin/zsh ${USERNAME}
 
-USER "${USERNAME}"
+# Switch to the 'brave' user
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
 
-# USER root
+# Install Oh My Zsh for the 'brave' user
+# RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+# # Set up Oh My Zsh plugins (e.g., zsh-syntax-highlighting and zsh-autosuggestions)
+# RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
+#     git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
+#     sed -i 's/plugins=(git)/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/g' ~/.zshrc
+# Set zsh as the default shell for the container
+# RUN echo "source ~/.zshrc" >> ~/.bashrc
+
+
+USER root
+
+RUN chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+
+# Set the container to start with zsh
+CMD ["zsh"]
 
 # [if production mode -define the entrypont]
-ENTRYPOINT ["bash"]
+# ENTRYPOINT ["bash"]
 
 # CMD ["bash"] 

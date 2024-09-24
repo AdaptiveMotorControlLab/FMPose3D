@@ -21,18 +21,18 @@ CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
 PORT :=$(shell ./find_ports.sh )
 
 # [USER: ADJUST PATH]
-HOST_SRC := ./
+HOST_SRC := /home/ti_wang/.
 # DOCKER_SRC := /app
-DOCKER_SRC := /home/mac/.
+DOCKER_SRC := /home/ti_wang/.
 
 # [USER: ADJUST PATH]
-HOST_DATA := /mediaPFM/data/.
+HOST_DATA := /mnt/tiwang/.
 DOCKER_DATA := /data/.
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
 	--volume $(HOST_SRC):$(DOCKER_SRC) \
-	--volume $(HOST_DATA):$(DOCKER_SRC)
+	--volume $(HOST_DATA):$(DOCKER_DATA) \
 #add more if needed
 
 run: build_check
@@ -61,9 +61,11 @@ run: build_check
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
 
 # [USER: ADJUST TAG]
-IMG_TAG := test1.3
+
+
+IMG_TAG := test1.6
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
-IMG_NAME := deeplabcut3
+IMG_NAME := dlc3
 
 DOCKERFILE := Dockerfile.dlc3
 BUILD_ARGS := \
@@ -84,14 +86,14 @@ build_check:
 	fi
 
 exec:
-	docker exec -it ti_deeplabcut_test /bin/bash
+	docker exec -it $(CONTAINER_NAME) /bin/bash
 
 start:
-	docker start ti_deeplabcut_test
+	docker start $(CONTAINER_NAME)
 
 
 st:
-	streamlit run streamlit-annotation-verifier.py
+	streamlit run streamlit-annotation-verifier_ti.py
 #######################
 # BUILD CORE WITH SRC #
 #######################
