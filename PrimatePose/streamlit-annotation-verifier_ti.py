@@ -1,3 +1,4 @@
+# for v7
 import streamlit as st
 import json
 import os
@@ -292,7 +293,7 @@ def main():
     # File uploader for annotation JSON
     # annotation_file = st.file_uploader("Upload annotation JSON file", type="json")
    
-    with open("/home/ti/projects/PrimatePose/ti_data/data/pfm_test_10_items.json", "r") as f:
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/anipose_val.json", "r") as f:
         annotation_file = json.load(f)
         
     if annotation_file is not None:
@@ -310,7 +311,9 @@ def main():
         # Image directory input
         image_dir = st.text_input("Enter the path to the image directory:")
         
-        image_dir = "/mediaPFM/data/datasets/final_datasets/v7/test"
+        # image_dir = "/mediaPFM/data/datasets/final_datasets/v7/test"
+        
+        image_dir = "/mnt/tiwang/v8_coco/images"
         
         if image_dir and os.path.isdir(image_dir):
             # Navigation and verification
@@ -332,8 +335,8 @@ def main():
             images = st.session_state.data['images']
             print("images:", images)
             
-            # imageid2dataset = {image['id']: image['source_dataset'] for image in images}
-            imageid2dataset = {image['id']: image['dataset_id'] for image in images}
+            imageid2dataset = {image['id']: image['source_dataset'] for image in images}
+            # imageid2dataset = {image['id']: image['dataset_id'] for image in images}
             
             image_id = annotation["image_id"]
             image_info = [img for img in st.session_state.data["images"] if img["id"] == image_id][0]
@@ -344,8 +347,8 @@ def main():
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
                 # Visualize annotation 
-                # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["categories"])
-                img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
+                img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["categories"])
+                # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
              
                 # Display image with annotation
                 st.image(img_with_annotation, caption=f"{imageid2dataset[image_id]}   Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}", use_column_width=True)
