@@ -8,7 +8,7 @@ ENV TZ=Europe/Zurich
 
 # Update and install essential packages
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y libgl1-mesa-glx ffmpeg git-all vim zsh tmux bash sudo wget curl wandb gpustat streamlit python3-pip && \
+    apt-get install -y libgl1-mesa-glx ffmpeg git-all vim zsh tmux bash sudo wget curl wandb gpustat htop streamlit python3-pip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Jupyter Notebook
