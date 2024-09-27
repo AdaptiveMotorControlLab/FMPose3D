@@ -201,31 +201,28 @@ def visualize_annotation(img, annotation, color_map, categories):
     cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     
     print("________________________")
-    # print("categories:", categories.keys())
-    if "keypoints" in annotation:
-        
-        keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
 
-        # print("keypoints:", keypoints)
-        # test
+    if "keypoints" in annotation:        
+        keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         keypoint_names = categories[0]["keypoints"]  # Get keypoint names from categories
         # keypoint_names = categories  # Get keypoint names from categories
         # except:
         #     print("error")
-        #     print(categories[0])     
+        #     print(categories[0])
     
         # Calculate scaling factor based on image size
         img_height, img_width = img.shape[:2]
         scale_factor = max(img_width, img_height) / 1000
-        print("scale_factor:", scale_factor)
+        # print("scale_factor:", scale_factor)
         # Set minimum and maximum limits for scaling factor
         # scale_factor = max(0.5, min(scale_factor, 2))
-
+        
+        existing_text_positions = []  # Track existing text positions to avoid overlap
+        
         for i, (x_kp, y_kp, v) in enumerate(keypoints):
             if v > 0:
-                print("x_kp:", x_kp)
                 keypoint_label = keypoint_names[i]
-                
+                # draw the keypoint
                 cv2.circle(
                     img,
                     center=(int(x_kp), int(y_kp)),
@@ -234,31 +231,66 @@ def visualize_annotation(img, annotation, color_map, categories):
                     thickness=-1,
                 )
                 
-                bright = compute_brightness(img, int(x1), int(y1))
+                # bright = compute_brightness(img, int(x1), int(y1))
                 # txt_color = (10, 10, 10) if bright > 128 else (255, 255, 255)
                 # txt_color = (10, 10, 10) if bright > 128 else (235, 235, 215)
                
                 # Get the background color at the text position
                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
-                print("bg_color:", bg_color)
                 txt_color = get_contrasting_color(bg_color)
                 
                 # adjust font scale and thickness based on scale factor
-                scale_factor = max(0.5, min(scale_factor, 2))
-                font_scale = 0.5 * scale_factor
+                font_scale = max(0.4, min(scale_factor, 1.5))
                 thickness = max(1, int(2 * scale_factor))
-                y_text = int(y1) - int(15 * scale_factor)
                 
-                cv2.putText(
-                    img,
-                    keypoint_label,
-                    (int(x_kp), y_text),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    font_scale,
-                    txt_color,
-                    thickness + 2,
-                    cv2.LINE_AA,
-                )
+                y_text = int(y_kp) - int(15 * scale_factor)
+                x_text = int(x_kp) - int(10 * scale_factor)
+                # Ensure text does not go out of image bounds
+                x_text = min(max(0, x_text), img_width - 100)
+                y_text = min(max(0, y_text), img_height - 10)
+            
+                # Avoid overlapping text: Adjust position if it overlaps with previously drawn text
+                for (existing_x, existing_y) in existing_text_positions:
+                    if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
+                        y_text += int(20 * scale_factor)  # Move text slightly downward if overlap detected
+                # Record this position
+                existing_text_positions.append((x_text, y_text))
+                
+                # cv2.putText(
+                #     img,
+                #     keypoint_label,
+                #     (int(x_kp), y_text),
+                #     cv2.FONT_HERSHEY_SIMPLEX,
+                #     font_scale,
+                #     txt_color,
+                #     thickness + 0,
+                #     cv2.LINE_AA,
+                # )
+                
+                # Draw the black text as an outline
+                # cv2.putText(
+                #     img,
+                #     keypoint_label,
+                #     (int(x_kp), y_text),
+                #     cv2.FONT_HERSHEY_SIMPLEX,
+                #     font_scale,
+                #     (0, 0, 0),  # Black text as the outline
+                #     thickness + 2,  # The outline is thicker than the main text
+                #     cv2.LINE_AA,
+                # )
+                
+                # # Draw the white text on top
+                # cv2.putText(
+                #     img,
+                #     keypoint_label,
+                #     (int(x_kp), y_text),
+                #     cv2.FONT_HERSHEY_SIMPLEX,
+                #     font_scale,
+                #     txt_color,  # The original white text
+                #     thickness,
+                #     cv2.LINE_AA,
+                # )
+                
     return img
 
 def load_annotation_data(file):
@@ -299,7 +331,7 @@ def main():
     # File uploader for annotation JSON
     # annotation_file = st.file_uploader("Upload annotation JSON file", type="json")
    
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/ap10k_val.json", "r") as f:
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled.json", "r") as f:
         annotation_file = json.load(f)
         
     if annotation_file is not None:
@@ -339,7 +371,7 @@ def main():
             annotation = st.session_state.data["annotations"][st.session_state.current_index]
 
             images = st.session_state.data['images']
-            print("images:", images)
+            # print("images:", images)
             
             imageid2dataset = {image['id']: image['source_dataset'] for image in images}
             # imageid2dataset = {image['id']: image['dataset_id'] for image in images}
