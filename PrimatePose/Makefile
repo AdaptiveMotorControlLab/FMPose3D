@@ -10,7 +10,7 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 GPU := GPU12
 
 # [USER: ADJUST TAG]
-TAG := _test #_train|_test|_daemon 
+TAG := _test1.7 #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
@@ -27,7 +27,7 @@ DOCKER_SRC := /home/ti_wang/.
 
 # [USER: ADJUST PATH]
 HOST_DATA := /mnt/tiwang/.
-DOCKER_DATA := /data/.
+DOCKER_DATA := /mnt/tiwang/.
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
@@ -46,7 +46,7 @@ run: build_check
 	[ssh -NL 8889:localhost:$(PORT) ssh_host &] \
 	to use jupyter notebook \
 	 (change ssh_host to your server name from ssh config)"
-	@docker run --gpus all -it -p $(PORT):8878 --name $(CONTAINER_NAME) \
+	@docker run --shm-size=128G --gpus all -it -p $(PORT):8878 --name $(CONTAINER_NAME) \
 							$(VOLUMES) \
 							$(IMG_NAME):$(IMG_TAG)
 	# --rm 
@@ -63,7 +63,7 @@ run: build_check
 # [USER: ADJUST TAG]
 
 
-IMG_TAG := test1.6
+IMG_TAG := test1.7
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
 IMG_NAME := dlc3
 
@@ -91,9 +91,9 @@ exec:
 start:
 	docker start $(CONTAINER_NAME)
 
-
 st:
-	streamlit run streamlit-annotation-verifier_ti.py
+	streamlit run streamlit-annotation-verifier_ti_v8.py
+
 #######################
 # BUILD CORE WITH SRC #
 #######################
@@ -119,4 +119,3 @@ help:
 	@echo "  2. Adjust VOLUMES to include the necessary volumes for your project in dokce space."
 	@echo "  3. Set SRC_PATH in the 'build_production' target to the correct source code path."
 	@echo "  4. Modify IMG_TAG in the 'build' and 'build_production' targets based on your project type (e.g., test, dev, final)."
-
