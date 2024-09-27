@@ -50,15 +50,51 @@ def sample_json(nums, input_json_file, output_json_file):
     with open(output_json_file, 'w') as f:
         json.dump(sampled_data, f, indent=4)
 
+def select_sample_by_image_id(source_json_file, image_id, target_json_file):
+    # Load the JSON data from the source file
+    with open(source_json_file, 'r') as file:
+        data = json.load(file)
+
+    # Filter the images by the specified image_id
+    filtered_images = [image for image in data['images'] if image['id'] == image_id]
+
+    # If the image_id does not exist in the dataset, print a warning and exit
+    if not filtered_images:
+        print(f"No image found with image_id: {image_id}")
+        return
+
+    # Filter annotations by the specified image_id
+    filtered_annotations = [annotation for annotation in data['annotations'] if annotation['image_id'] == image_id]
+
+    # If there are no annotations for the image_id, print a warning
+    if not filtered_annotations:
+        print(f"No annotations found for image_id: {image_id}")
+
+    # Construct the target JSON structure with the filtered data
+    filtered_data = {
+        "images": filtered_images,
+        "annotations": filtered_annotations,
+        "categories": data["categories"]  # Retain the full categories list
+    }
+
+    # Save the filtered data to the target JSON file
+    with open(target_json_file, 'w') as target_file:
+        json.dump(filtered_data, target_file, indent=2)
+
+    print(f"Filtered data has been saved to {target_json_file}")
 
 if __name__ == "__main__":
-
 
     # Print the JSON structure
     # print_json_structure(data)
 
-
-    nums = 2
-    input_path = '/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val.json'
-    output_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_{nums}.json' 
+    nums = 50
+    subset = "ap10k_val"
+    input_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}.json'
+    output_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}_sampled_nums_{nums}.json' 
     sample_json(nums, input_path, output_path)
+    
+    # image_id = 36681
+    # source_json_file = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}.json'
+    # target_json_file = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}_{image_id}.json'
+    # select_sample_by_image_id(source_json_file, image_id, target_json_file)
