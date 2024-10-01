@@ -157,8 +157,9 @@ def print_json(path):
            
     with open(path, "r") as f:
         data = json.load(f)
-        print(data.keys())
-        print(data)
+        # print(data.keys())
+        # print(data)
+        print(data["categories"])
 
 def search_file_by_id(path, id):
     with open(path, "r") as f:
@@ -169,6 +170,8 @@ def search_file_by_id(path, id):
     print("image", image["file_name"])
 
     print("image", image)
+
+
 
 if __name__ == "__main__":
     # main(project_root=Path("/mediaPFM/data/datasets/final_datasets/v7"))
@@ -182,4 +185,5 @@ if __name__ == "__main__":
     # test_image(json_file_path)
     # extract_json(json_file_path)
     test_json_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
-    search_file_by_id(test_json_path, 82506)
+    print_json(test_json_path)
+    # search_file_by_id(test_json_path, 82506)
