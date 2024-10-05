@@ -4,3 +4,4 @@ data/
 rsync_from_amgm0.sh
 rsync_to_amgm0.sh
 env.sh
+test.py
