@@ -30,10 +30,10 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 24,
-    dataloader_workers: int = 1,
+    batch_size: int = 32,
+    dataloader_workers: int = 12,
     detector_batch_size: int = 24,
-    detector_dataloader_workers: int = 1,
+    detector_dataloader_workers: int = 12,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
     setup_file_logging(log_path)
@@ -77,19 +77,20 @@ def main(
         )
         updates["detector"] = updates_detector
 
-    loader.update_model_cfg(updates)
+    loader.update_model_cfg(updates) # update model_cfg with the updates dictionary
 
-    print (loader.model_cfg)
+    print ("loader.model_cfg:", loader.model_cfg)
     
     pose_task = Task(loader.model_cfg["method"])
     
     if pose_task == Task.TOP_DOWN:
         logger_config = None
         
-        if loader.model_cfg.get("logger"):
+        if loader.model_cfg.get("logger"): # None
             logger_config = copy.deepcopy(loader.model_cfg["logger"])
             logger_config["run_name"] += "-detector"
 
+        print("############################################")
         print("logger_config:", logger_config)
         print("flag : 86")
 
@@ -101,16 +102,16 @@ def main(
         # break
 
         # skipping detector training if a detector_path is given
-        # if args.detector_path is None and detector_epochs > 0:
-        #     train(
-        #         loader=loader,
-        #         run_config=loader.model_cfg["detector"],
-        #         task=Task.DETECT,
-        #         device=device,
-        #         gpus=gpus,
-        #         logger_config=logger_config,
-        #         snapshot_path=detector_path,
-        #     )
+        if args.detector_path is None and detector_epochs > 0:
+            train(
+                loader=loader,
+                run_config=loader.model_cfg["detector"],
+                task=Task.DETECT,
+                device=device,
+                gpus=gpus,
+                logger_config=logger_config,
+                snapshot_path=detector_path,
+            )
 
     if epochs > 0:
         train(
@@ -122,6 +123,9 @@ def main(
             logger_config=loader.model_cfg.get("logger"),
             snapshot_path=snapshot_path,
         )
+
+import os
+import shutil
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -138,6 +142,14 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     args = parser.parse_args()
+    
+    train_dir = os.path.dirname(args.pytorch_config)
+    debug_dir = os.path.dirname(train_dir)
+
+    # backup the train.sh file
+    shutil.copy("/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary/train.sh", debug_dir+"/train.sh")
+    shutil.copy("/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary/train.py", debug_dir+"/train.py")
+        
     main(
         args.project_root,
         args.train_file,
