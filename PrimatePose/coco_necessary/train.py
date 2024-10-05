@@ -31,9 +31,9 @@ def main(
     snapshot_path: str | None,
     detector_path: str | None,
     batch_size: int = 24,
-    dataloader_workers: int = 12,
+    dataloader_workers: int = 1,
     detector_batch_size: int = 24,
-    detector_dataloader_workers: int = 12,
+    detector_dataloader_workers: int = 1,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
     setup_file_logging(log_path)
@@ -100,17 +100,17 @@ def main(
                              )
         # break
 
-        # skipping detector training if a detector_path is given 
-        if args.detector_path is None and detector_epochs > 0:
-            train(
-                loader=loader,
-                run_config=loader.model_cfg["detector"],
-                task=Task.DETECT,
-                device=device,
-                gpus=gpus,
-                logger_config=logger_config,
-                snapshot_path=detector_path,
-            )
+        # skipping detector training if a detector_path is given
+        # if args.detector_path is None and detector_epochs > 0:
+        #     train(
+        #         loader=loader,
+        #         run_config=loader.model_cfg["detector"],
+        #         task=Task.DETECT,
+        #         device=device,
+        #         gpus=gpus,
+        #         logger_config=logger_config,
+        #         snapshot_path=detector_path,
+        #     )
 
     if epochs > 0:
         train(
