@@ -1,9 +1,11 @@
-# 
+# instruction
+# 1. split the v8 json file into train, test, val from V7 format
+
 import json
 import os
 from collections import defaultdict
 
-def split(input_file, output_dir):
+def split(input_file, output_dir, model):
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
@@ -87,7 +89,7 @@ def split(input_file, output_dir):
 
     # Save each split dataset to a separate JSON file
     for source_dataset, data in split_data.items():
-        output_file = os.path.join(output_dir, f"{source_dataset}_val.json")
+        output_file = os.path.join(output_dir, f"{source_dataset}_{model}.json")
         with open(output_file, 'w') as f:
             json.dump(data, f, indent=4)
         print(f"Saved {source_dataset} data to {output_file}")
@@ -128,30 +130,24 @@ if __name__ == "__main__":
     # Define your input and output paths
     # input_file = '/mnt/tiwang/primate_data/primate_test_1.2.json'
 
-    # eval 
-    # input_file = '/mnt/tiwang/v7/annotations/pfm_val_apr15.json'
-    # output_dir = '/mnt/tiwang/primate_data/splitted_val_datasets/'
+    model = "test" # train test val
+     # val
+    input_file = f'/mnt/tiwang/v7/annotations/pfm_{model}_apr15.json'
+    output_dir = f'/mnt/tiwang/primate_data/splitted_{model}_datasets/'
 
-    # test 
-    # input_file = '/mnt/tiwang/v7/annotations/pfm_test_apr15.json'
-    # output_dir = '/mnt/tiwang/primate_data/splitted_test_datasets/'
-    # val
-    input_file = '/mnt/tiwang/v7/annotations/pfm_val_apr15.json'
-    output_dir = '/mnt/tiwang/primate_data/splitted_val_datasets/'
-    # train
-    # input_file = '/mnt/tiwang/v7/annotations/pfm_train_apr15.json'
-    # output_dir = '/mnt/tiwang/primate_data/splitted_train_datasets/'
-    # split(input_file, output_dir)
+    print(input_file)
+    split(input_file, output_dir, model)
 
     # extract_json(json_file_path)
     # print_json(json_file_path)
     # search_file_by_id(json_file_path, 1
     
     # json_dir = "/mnt/tiwang/primate_data/splitted_val_datasets/oms_val.json" 
-    json_dir = "/mnt/tiwang/primate_data/splitted_val_datasets/kinka_val.json"
+    # json_dir = "/mnt/tiwang/primate_data/splitted_val_datasets/kinka_val.json"
+    
     data_dir_base = "/mnt/tiwang/v8_coco/images/"
 
-    check_image_exist_in_json(json_dir, data_dir_base)
+    # check_image_exist_in_json(json_dir, data_dir_base)
 
     # check all json for each subdataset
     # json_dir = "/mnt/tiwang/primate_data/splitted_val_datasets"
