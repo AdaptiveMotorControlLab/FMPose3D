@@ -65,10 +65,18 @@ def main(
     output: str,
     model_arch: str,
     multi_animal: bool,
+    debug: bool,
 ):
-    print("model_arch:", model_arch)
     
     output_path = Path(output)
+    project_name = output_path.name
+    
+    if debug==True:    
+        # output_path = Path(output)
+        parent_path = output_path.parent
+        output_path = parent_path / "Debug" / project_name
+        # output_path = Path(output)
+          
     if output_path.exists():
         raise RuntimeError(
             f"The output path must not exist yet, as otherwise we would risk overwriting"
@@ -78,6 +86,7 @@ def main(
     train_dict = COCOLoader.load_json(project_root, train_file)
     num_individuals, bodyparts = COCOLoader.get_project_parameters(train_dict)
     dlc_path = af.get_deeplabcut_path()
+  
     output_path.mkdir(parents=True)
     train_dir = output_path / "train"
     test_dir = output_path / "test"
@@ -111,12 +120,15 @@ if __name__ == "__main__":
     parser.add_argument("model_arch")
     parser.add_argument("--train_file", default="train.json")
     parser.add_argument("--multi_animal", action="store_true")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    
     args = parser.parse_args()
-    print("YES")
+
     main(
         args.project_root,
         args.train_file,
         args.output,
         args.model_arch,
         args.multi_animal,
+        args.debug,
     )
