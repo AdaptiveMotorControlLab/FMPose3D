@@ -34,6 +34,7 @@ def main(
     dataloader_workers: int = 12,
     detector_batch_size: int = 24,
     detector_dataloader_workers: int = 12,
+    debug: bool = False,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
     setup_file_logging(log_path)
@@ -94,13 +95,21 @@ def main(
         print("logger_config:", logger_config)
         print("flag : 86")
 
-        logger_config = dict(type = "WandbLogger",
-                             project_name = "primatepose",
-                             tags = ["debug_Resnet"],
-                             group = "Dubug",
-                             )
-        # break
-
+        if args.debug:
+            logger_config = dict(type = "WandbLogger",
+                                project_name = "primatepose",
+                                #  tags = ["Debug"],
+                                group = "Dubug_v8",
+                                run_name = "debug_ak_val_testprint",
+                                )
+        else:
+            logger_config = dict(type = "WandbLogger",
+                                project_name = "primatepose",
+                                tags = ["eval"],
+                                group = "eval_v8",
+                                run_name = "eval_",
+                                )
+        
         # skipping detector training if a detector_path is given
         if args.detector_path is None and detector_epochs > 0:
             train(
@@ -123,7 +132,7 @@ def main(
             logger_config=loader.model_cfg.get("logger"),
             snapshot_path=snapshot_path,
         )
-
+        
 import os
 import shutil
 
@@ -141,6 +150,8 @@ if __name__ == "__main__":
     parser.add_argument("--detector-save-epochs", type=int, default=None)
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
+    parser.add_argument("--debug", action="store_true")
+    
     args = parser.parse_args()
     
     train_dir = os.path.dirname(args.pytorch_config)
@@ -163,4 +174,5 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
+        args.debug,
     )

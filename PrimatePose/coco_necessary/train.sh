@@ -3,19 +3,22 @@
 # train_file=/mnt/tiwang/primate_data/primate_test_1.1.json
 # test_file=/mnt/tiwang/primate_data/primate_test_1.1.json
 # for mml
-file=pfm_val_v8
+file=ap10k_val
 proj_root=/mnt/tiwang/v8_coco
-# train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}.json
-# test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}.json
-
+train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}.json
+test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}.json
 # train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
 # test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
 
-train_file=/mnt/tiwang/primate_data/${file}.json
-test_file=/mnt/tiwang/primate_data/${file}.json
-# train_file=//home/ti/projects/PrimatePose/ti_data/data/pfm_test_8_items.json
-# test_file=/home/ti/projects/PrimatePose/ti_data/data/pfm_test_8_items.json
-pytorch_config=/home/ti_wang/Ti_workspace/PrimatePose/project/debug_${file}/train/pytorch_config.yaml
-# pytorch_config=/home/ti_wang/Ti_workspace/PrimatePose/project/debug5_nan/train/pytorch_config.yaml
-
-CUDA_VISIBLE_DEVICES=1 python train.py $proj_root $pytorch_config --train_file $train_file --test_file $test_file --device cuda --gpus 0
+# train_file=/mnt/tiwang/primate_data/${file}.json
+# test_file=/mnt/tiwang/primate_data/${file}.json
+debug=1
+if [ "$debug" -eq 1 ]; then
+    pytorch_config=/home/ti_wang/Ti_workspace/PrimatePose/project/Debug/${file}/train/pytorch_config.yaml
+    echo "Debug mode is ON, using debug pytorch_config: $pytorch_config"
+    CUDA_VISIBLE_DEVICES=0 python train.py --debug $proj_root $pytorch_config --train_file $train_file --test_file $test_file --device cuda --gpus 0
+else
+    pytorch_config=/home/ti_wang/Ti_workspace/PrimatePose/project/${file}/train/pytorch_config.yaml
+    echo "Debug mode is OFF, using default pytorch_config: $pytorch_config"
+    CUDA_VISIBLE_DEVICES=0 python train.py --debug $proj_root $pytorch_config --train_file $train_file --test_file $test_file --device cuda --gpus 0
+fi
