@@ -107,7 +107,7 @@ def main(
                                 project_name = "primatepose",
                                 tags = ["eval"],
                                 group = "eval_v8",
-                                run_name = "eval_",
+                                run_name = "train_on_eval",
                                 )
         
         # skipping detector training if a detector_path is given
