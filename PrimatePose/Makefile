@@ -1,5 +1,7 @@
 # [USER:/ADJUST PATH]
-PROJECT_NAME := $(shell basename $(shell pwd))
+# PROJECT_NAME := $(shell basename $(shell pwd))
+PROJECT_NAME :=pfm
+
 # PROJECT_NAME := 
 project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 #######
@@ -7,27 +9,29 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 #######
 # [USER: ADJUST GPU]
 #if use GPU precise number and underscore: example: "GPU1_" or "GPU1_2_"
-GPU := GPU12
+GPU := GPU_1_2_
 
 # [USER: ADJUST TAG]
-TAG := _test1.7 #_train|_test|_daemon 
+TAG := _test_3.2_torch #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
 #_train: with src code inside normally
 
-# CONTAINER_NAME := $(GPU)$(project_name_lo)$(TAG)
-CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
-PORT :=$(shell ./find_ports.sh )
+CONTAINER_NAME := $(GPU)$(project_name_lo)$(TAG)
+# CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
+PORT :=$(shell ./find_ports.sh)
 
 # [USER: ADJUST PATH]
-HOST_SRC := /home/ti_wang/.
-# DOCKER_SRC := /app
-DOCKER_SRC := /home/ti_wang/.
+HOST_SRC := /home/ti_wang
+DOCKER_SRC := /app
+# DOCKER_SRC := /home/ti_wang/.
 
 # [USER: ADJUST PATH]
-HOST_DATA := /mnt/tiwang/.
-DOCKER_DATA := /mnt/tiwang/.
+# HOST_DATA := /mnt/data/tiwang
+HOST_DATA := /mnt/
+DOCKER_DATA := /mnt/
+# tiwang/.
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
@@ -42,16 +46,17 @@ run: build_check
 		exit 1; \
 	fi
 	@echo "Selected available port: $(PORT)"
-	@echo "Open 2nd host terminal and run:\
-	[ssh -NL 8889:localhost:$(PORT) ssh_host &] \
-	to use jupyter notebook \
-	 (change ssh_host to your server name from ssh config)"
-	@docker run --shm-size=128G --gpus all -it -p $(PORT):8878 --name $(CONTAINER_NAME) \
+	docker run --shm-size=110G --gpus all -it -p $(PORT):8889 --name $(CONTAINER_NAME) \
 							$(VOLUMES) \
 							$(IMG_NAME):$(IMG_TAG)
-	# --rm 
 	# @echo "Container exited and removed by default. Delete --rm option in current Makefile and adjustthis message, if you need to keep the container alive (docker restart)."
 
+# ##
+# --rm
+# 	@echo "Open 2nd host terminal and run:\
+# 	[ssh -NL 8889:localhost:$(PORT) ssh_host &] \
+# 	to use jupyter notebook \
+# 	 (change ssh_host to your server name from ssh config)"
 ##############
 # BUILD CORE #
 ##############
@@ -62,12 +67,12 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-
-IMG_TAG := test1.7
+IMG_TAG := test3.2_torch
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
 IMG_NAME := dlc3
 
-DOCKERFILE := Dockerfile.dlc3
+DOCKERFILE := Dockerfile
+
 BUILD_ARGS := \
         --build-arg uid=$(shell id -u) \
         --build-arg gid=$(shell id -g) \
