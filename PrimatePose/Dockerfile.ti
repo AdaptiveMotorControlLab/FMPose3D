@@ -10,14 +10,16 @@ WORKDIR /
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     vim zsh tmux wget curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo libglib2.0-0 \
+    tree \
     && apt-get -y autoclean \
     && apt-get -y autoremove \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && apt-get clean
+    && apt-get clean \
+    && apt-get update 
 
 # install pip packages
 COPY ./requirements.txt /requirements.txt
-RUN pip install --no-cache-dir --upgrade pip setuptools && \
+RUN pip install --no-cache-dir --upgrade pip setuptools gpustat nvitop && \
     pip install --no-cache-dir -r /requirements.txt && \
     pip install --no-cache-dir pytest PySide6==6.3.1
 
@@ -36,8 +38,15 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
 && git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions \
 && git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \
 && sed -i 's/^plugins=(.*)$/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+
+RUN echo "export PATH=$PATH:/home/${user_name}/.local/bin" >> /home/${user_name}/.zshrc
+
 USER root
-ENV HOME=/root
+# change the permission of DeepLabCut package
+RUN chmod -R +w /opt/conda/lib/python3.10/site-packages/deeplabcut
+USER root
+USER ${user_name}
+# ENV HOME=/root
 WORKDIR /app
 
 CMD ["zsh"]
