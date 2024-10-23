@@ -22,6 +22,5 @@ tf_slim==1.1.0
 torch==2.3.1
 tqdm
 Pillow>=7.1
-deeplabcut==3.0.0rc4
+deeplabcut==3.0.0rc5
 wandb
-gpustat
