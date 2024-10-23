@@ -43,7 +43,7 @@ RUN echo "export PATH=$PATH:/home/${user_name}/.local/bin" >> /home/${user_name}
 
 USER root
 # change the permission of DeepLabCut package
-RUN chmod -R +w /opt/conda/lib/python3.10/site-packages/deeplabcut
+RUN chmod -R 777 /opt/conda/lib/python3.10/site-packages/deeplabcut
 USER root
 USER ${user_name}
 # ENV HOME=/root
