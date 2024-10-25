@@ -12,7 +12,6 @@ from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
 
 import wandb
-
 # wandb.init(project="primatepose", tags=["debug_SSDLite"])
 # wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
 
@@ -29,9 +28,9 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 16,
+    batch_size: int = 64,
     dataloader_workers: int = 12,
-    detector_batch_size: int = 16,
+    detector_batch_size: int = 64,
     detector_dataloader_workers: int = 12,
     debug: bool = False,
 ):
@@ -92,7 +91,7 @@ def main(
 
         print("############################################")
         print("logger_config:", logger_config)
-        print("flag : 86")
+        # print("flag : 86")
 
         if args.debug:
             logger_config = dict(type = "WandbLogger",
@@ -105,8 +104,8 @@ def main(
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
-                                group = "Training_v8",
-                                run_name = "Val_pin_memory_false_workers_0",
+                                group = "Training_ap10k_v8",
+                                run_name = "train",
                                 )
         
         # skipping detector training if a detector_path is given
@@ -137,8 +136,8 @@ import shutil
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("project_root")
-    parser.add_argument("pytorch_config")
+    parser.add_argument("--project_root")
+    parser.add_argument("--pytorch_config")
     parser.add_argument("--train_file", default="train.json")
     parser.add_argument("--test_file", default="test.json")
     parser.add_argument("--device", default=None)
@@ -150,15 +149,15 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     parser.add_argument("--debug", action="store_true")
-    
+
     args = parser.parse_args()
     
     train_dir = os.path.dirname(args.pytorch_config)
     debug_dir = os.path.dirname(train_dir)
 
     # backup the train.sh file
-    shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.sh", debug_dir+"/train.sh")
-    shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.py", debug_dir+"/train.py")
+    # shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.sh", debug_dir+"/train.sh")
+    # shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.py", debug_dir+"/train.py")
         
     main(
         args.project_root,
@@ -173,5 +172,5 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
-        args.debug,
+        debug=args.debug
     )

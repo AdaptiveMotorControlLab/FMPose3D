@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import copy
 from pathlib import Path
-
 from deeplabcut.pose_estimation_pytorch import COCOLoader, utils
 from deeplabcut.pose_estimation_pytorch.apis.train import train
 from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
@@ -32,7 +31,7 @@ def main(
     detector_path: str | None,
     batch_size: int = 32,
     dataloader_workers: int = 12,
-    detector_batch_size: int = 24,
+    detector_batch_size: int = 12,
     detector_dataloader_workers: int = 12,
     debug: bool = False,
 ):
@@ -105,11 +104,11 @@ def main(
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
-                                tags = ["eval"],
-                                group = "eval_v8",
-                                run_name = "train_on_eval",
+                                tags = ["FasterRCNN"],
+                                group = "Training_v8",
+                                run_name = "Train_12",
                                 )
-        
+            
         # skipping detector training if a detector_path is given
         if args.detector_path is None and detector_epochs > 0:
             train(
@@ -158,8 +157,8 @@ if __name__ == "__main__":
     debug_dir = os.path.dirname(train_dir)
 
     # backup the train.sh file
-    shutil.copy("/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary/train.sh", debug_dir+"/train.sh")
-    shutil.copy("/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary/train.py", debug_dir+"/train.py")
+    shutil.copy("/app/coco_necessary/train.sh", debug_dir+"/train.sh")
+    shutil.copy("/app/coco_necessary/train.py", debug_dir+"/train.py")
         
     main(
         args.project_root,
@@ -174,5 +173,5 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
-        args.debug,
+        debug=args.debug,
     )
