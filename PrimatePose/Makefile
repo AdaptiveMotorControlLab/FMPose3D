@@ -1,42 +1,47 @@
 # [USER:/ADJUST PATH]
 # PROJECT_NAME := $(shell basename $(shell pwd))
-PROJECT_NAME :=pfm
+PROJECT_NAME :=dlc3
 
-# PROJECT_NAME := 
+# PROJECT_NAME :=
 project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 #######
 # RUN #
 #######
 # [USER: ADJUST GPU]
 #if use GPU precise number and underscore: example: "GPU1_" or "GPU1_2_"
-GPU := GPU_1_2_
+# GPU := GPU_1_2_
 
-# [USER: ADJUST TAG]
-TAG := _test_3.2_torch #_train|_test|_daemon 
+# [USER: AD_JUST TAG]
+TAG := _pfm_4.1 #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
 #_train: with src code inside normally
 
-CONTAINER_NAME := $(GPU)$(project_name_lo)$(TAG)
-# CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
+# CONTAINER_NAME := $(GPU)$(project_name_lo)$(TAG)
+CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
 PORT :=$(shell ./find_ports.sh)
 
-# [USER: ADJUST PATH]
-HOST_SRC := /home/ti_wang
-DOCKER_SRC := /app
-# DOCKER_SRC := /home/ti_wang/.
-
-# [USER: ADJUST PATH]
-# HOST_DATA := /mnt/data/tiwang
+# server7 path
+HOST_SRC := /home/ti_wang/Ti_workspace/PrimatePose
 HOST_DATA := /mnt/
+HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
+
+# amgm0 path
+# HOST_SRC :=/home/ti/projects/PrimatePose
+# HOST_DATA :=/media/data/ti/data
+# HOST_DLC :=/home/ti/projects/DeepLabCut
+
+# docker volumes
+DOCKER_SRC := /app
 DOCKER_DATA := /mnt/
-# tiwang/.
+DOCKER_DLC := /app/DeepLabCut
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
 	--volume $(HOST_SRC):$(DOCKER_SRC) \
 	--volume $(HOST_DATA):$(DOCKER_DATA) \
+	--volume $(HOST_DLC):$(DOCKER_DLC) \
 #add more if needed
 
 run: build_check
@@ -48,8 +53,9 @@ run: build_check
 	@echo "Selected available port: $(PORT)"
 	docker run --shm-size=110G --gpus all -it -p $(PORT):8889 --name $(CONTAINER_NAME) \
 							$(VOLUMES) \
-							$(IMG_NAME):$(IMG_TAG)
-	# @echo "Container exited and removed by default. Delete --rm option in current Makefile and adjustthis message, if you need to keep the container alive (docker restart)."
+							$(IMG_NAME):$(IMG_TAG) tail -f /dev/null
+
+# @echo "Container exited and removed by default. Delete --rm option in current Makefile and adjustthis message, if you need to keep the container alive (docker restart)."
 
 # ##
 # --rm
@@ -67,11 +73,11 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-IMG_TAG := test3.2_torch
+IMG_TAG := 4.0
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
-IMG_NAME := dlc3
+IMG_NAME := dlc3_sudo
 
-DOCKERFILE := Dockerfile
+DOCKERFILE := Dockerfile.ti
 
 BUILD_ARGS := \
         --build-arg uid=$(shell id -u) \
