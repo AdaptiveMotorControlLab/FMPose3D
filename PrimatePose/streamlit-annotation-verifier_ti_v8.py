@@ -7,6 +7,20 @@ import numpy as np
 from PIL import Image
 import tempfile
 
+
+# Define the skeleton
+PFM_SKELETON = [
+    [3, 5], [4, 5], [6, 3], [7, 4],
+    [5, 12], [13, 12], [14, 12], [2, 17],
+    [19, 13], [20, 14], [21, 19], [22, 20],
+    [23, 21], [24, 22], [25, 12], [26, 12],
+    [25, 27], [26, 27], [25, 28], [26, 29],
+    [27, 28], [27, 29], [28, 30], [29, 31],
+    [30, 32], [31, 33], [27, 34], [34, 35],
+    [35, 36], [36, 37]
+]
+
+
 TOPVIEWMOUSE_COLOR_MAP = {
     "nose": (255, 0, 0),
     "left_ear": (0, 255, 0),
@@ -193,7 +207,7 @@ def get_contrasting_color(bg_color):
     else:
         return (255, 255, 255)  # Use white text
     
-def visualize_annotation(img, annotation, color_map, categories):
+def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None):
     # Bounding box visualization
     bbox = annotation["bbox"]
     x1, y1, width, height = bbox
@@ -201,7 +215,7 @@ def visualize_annotation(img, annotation, color_map, categories):
     cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     
     print("________________________")
-
+    id = annotation["id"]
     if "keypoints" in annotation:        
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         keypoint_names = categories[0]["keypoints"]  # Get keypoint names from categories
@@ -236,6 +250,10 @@ def visualize_annotation(img, annotation, color_map, categories):
                 # txt_color = (10, 10, 10) if bright > 128 else (235, 235, 215)
                
                 # Get the background color at the text position
+                print("x_kp:", x_kp, "y_kp:", y_kp)
+                print("img.shape:", img.shape)
+                print("image_id", image_id)
+                print("id", id)
                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
                 txt_color = get_contrasting_color(bg_color)
                 
@@ -290,7 +308,21 @@ def visualize_annotation(img, annotation, color_map, categories):
                 #     thickness,
                 #     cv2.LINE_AA,
                 # )
-                
+                # Draw skeleton
+                for connection in skeleton:
+                    idx1, idx2 = connection
+                    x1_kp, y1_kp, v1 = keypoints[idx1 - 1]
+                    x2_kp, y2_kp, v2 = keypoints[idx2 - 1]
+                    if v1 > 0 and v2 > 0:
+                        keypoint_label1 = keypoint_names[idx1 - 1]
+                        color = color_map.get(keypoint_label1, (255, 255, 255))
+                        cv2.line(
+                            img,
+                            (int(x1_kp), int(y1_kp)),
+                            (int(x2_kp), int(y2_kp)),
+                            color,
+                            thickness=int(2 * scale_factor)
+                        )                
     return img
 
 def load_annotation_data(file):
@@ -325,13 +357,17 @@ def main():
         st.session_state.color_map = BIRD_COLOR_MAP
     elif color_map_option == "Quadruped":
         st.session_state.color_map = QUADRUPED_COLOR_MAP    
-    else:
-        st.session_state.color_map = PRIMATE_COLOR_MAP    
+    elif color_map_option == "Primate":
+        st.session_state.color_map = PRIMATE_COLOR_MAP
+        st.session_state.skeleton = PFM_SKELETON    
         
     # File uploader for annotation JSON
     # annotation_file = st.file_uploader("Upload annotation JSON file", type="json")
    
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled.json", "r") as f:
+    # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
+    #     annotation_file = json.load(f)
+        
+    with open("/app/data/primate_data/splitted_val_datasets/chimpact_val_sampled_id_138359.json", "r") as f:
         annotation_file = json.load(f)
         
     if annotation_file is not None:
@@ -351,7 +387,7 @@ def main():
         
         # image_dir = "/mediaPFM/data/datasets/final_datasets/v7/test"
         
-        image_dir = "/mnt/tiwang/v8_coco/images"
+        image_dir = "/mnt/data/tiwang/v8_coco/images"
         
         if image_dir and os.path.isdir(image_dir):
             # Navigation and verification
@@ -385,7 +421,7 @@ def main():
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
                 # Visualize annotation 
-                img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["categories"])
+                img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["categories"], st.session_state.skeleton, image_id)
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
              
                 # Display image with annotation
@@ -405,6 +441,7 @@ def main():
 
             else:
                 st.error(f"Image file not found: {image_path}")
+                print(f"Image file not found: {image_path}")
         else:
             st.error("Please enter a valid image directory path.")
     else:
