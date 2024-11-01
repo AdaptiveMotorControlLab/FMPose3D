@@ -41,6 +41,7 @@ def get_base_config(
         pose_config_path=pose_config_path,
         net_type=model_architecture,
         top_down=top_down,
+        detector_type="fasterrcnn_mobilenet_v3_large_fpn"
     )
 
 
