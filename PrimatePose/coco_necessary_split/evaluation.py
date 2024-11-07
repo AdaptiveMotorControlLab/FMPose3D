@@ -6,12 +6,22 @@ import argparse
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Rectangle
+
 import numpy as np
 import torch
+import os
 from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from analyse_json.split_v8_json import get_file_name_from_image_id
 
 def pycocotools_evaluation(
     kpt_oks_sigmas: list[int],
@@ -55,6 +65,58 @@ def pycocotools_evaluation(
     finally:
         print(80 * "-")
 
+from PIL import Image
+def visualize_predictions(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json"):
+    """
+    Visualize a specified number of samples from COCO predictions and save the plots.
+
+    Args:
+        json_path (str): Path to the JSON file with COCO predictions.
+        image_dir (str): Directory where the images corresponding to image IDs are stored.
+        num_samples (int): Number of samples to visualize. Defaults to 5.
+    """
+    # Load the coco_predictions JSON file
+    with open(json_path, "r") as f:
+        coco_predictions = json.load(f)
+
+    # Determine the output directory for saving images
+    output_dir = os.path.join(os.path.dirname(json_path), "predictions_visualizations")
+    os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+
+    # Iterate through the first few samples and plot each one
+    for i, prediction in enumerate(coco_predictions[:num_samples]):
+        # Extract data from the prediction
+        image_id = prediction["image_id"]
+        category_id = prediction["category_id"]
+        keypoints = np.array(prediction["keypoints"]).reshape(-1, 3)  # reshape for (x, y, visibility)
+        score = prediction["score"]
+        bbox = prediction["bbox"]
+        bbox_score = prediction["bbox_scores"][0] if prediction["bbox_scores"] else None
+
+        # Load the corresponding image
+        file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
+        image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
+        image = Image.open(image_path)
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.imshow(image)
+        ax.set_title(f"Image ID: {image_id}, bbox_score: {bbox_score:.2f}, Score: {score:.2f}")
+
+        # Plot bounding box
+        rect = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="red", facecolor="none")
+        ax.add_patch(rect)
+        # ax.text(bbox[0], bbox[1] - 10, f"Score: {bbox_score:.2f}" if bbox_score else "No bbox score", color="red")
+
+        # Plot keypoints
+        for kp in keypoints:
+            if kp[2] > 0:  # visibility flag
+                ax.plot(kp[0], kp[1], "bo", markersize=5)  # blue points for visible keypoints
+
+        # Save the figure to the output directory
+        output_path = os.path.join(output_dir, f"predict_{file_name}")
+        plt.savefig(output_path)
+        plt.close(fig)
+
+    print(f"Visualizations saved in: {output_dir}")
 
 def main(
     project_root: str,
@@ -109,20 +171,22 @@ def main(
         predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
         with open(predictions_file, "w") as f:
             json.dump(coco_predictions, f, indent=4)
+        
+        visualize_predictions(json_path=predictions_file, num_samples=50, test_file_json=test_file)
+        
+        # annotation_types = ["keypoints"]
+        # if detector_runner is not None:
+        #     annotation_types.append("bbox")
 
-        annotation_types = ["keypoints"]
-        if detector_runner is not None:
-            annotation_types.append("bbox")
-
-        ground_truth = loader.load_data(mode=mode)
-        for annotation_type in annotation_types:
-            kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
-            pycocotools_evaluation(
-                ground_truth=ground_truth,
-                predictions=coco_predictions,
-                kpt_oks_sigmas=kpt_oks_sigmas,
-                annotation_type=annotation_type,
-            )
+        # ground_truth = loader.load_data(mode=mode)
+        # for annotation_type in annotation_types:
+        #     kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
+        #     pycocotools_evaluation(
+        #         ground_truth=ground_truth,
+        #         predictions=coco_predictions,
+        #         kpt_oks_sigmas=kpt_oks_sigmas,
+        #         annotation_type=annotation_type,
+        #     )
 
         print(80 * "-")
         print(f"{mode} results")
