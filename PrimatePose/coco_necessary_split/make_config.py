@@ -43,6 +43,7 @@ def get_base_config(
         pose_config_path=pose_config_path,
         net_type=model_architecture,
         top_down=top_down,
+        detector_type="fasterrcnn_mobilenet_v3_large_fpn"
     )
 
 
@@ -105,6 +106,12 @@ def main(
         individuals= [f"individual{i}" for i in range(num_individuals)],
         multi_animal=multi_animal,
     )
+    # for HRNet
+    if pytorch_cfg["model"]["backbone"]["type"] == "HRNet":
+        pytorch_cfg["model"]["backbone"]["freeze_bn_stats"] = False
+    else:
+        print("The model is not HRNet, so the freeze_bn_stats is not set to False")
+    
     af.write_plainconfig(str(train_dir / "pytorch_config.yaml"), pytorch_cfg)
     make_inference_config(
         dlc_path,
