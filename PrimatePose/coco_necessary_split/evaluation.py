@@ -98,7 +98,7 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
         image = Image.open(image_path)
         fig, ax = plt.subplots(figsize=(8, 8))
-        ax.imshow(image)
+        # ax.imshow(image)
         ax.set_title(f"Image ID: {image_id}, bbox_score: {bbox_score:.2f}, Score: {score:.2f}")
 
         # Plot bounding box
@@ -164,6 +164,7 @@ def main(
             detector_runner=detector_runner,
             pcutoff=pcutoff,
         )
+        print("finished evaluating")
         coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
         model_name = Path(snapshot_path).stem
         if detector_path is not None:
@@ -172,21 +173,21 @@ def main(
         with open(predictions_file, "w") as f:
             json.dump(coco_predictions, f, indent=4)
         
-        visualize_predictions(json_path=predictions_file, num_samples=50, test_file_json=test_file)
+        # visualize_predictions(json_path=predictions_file, num_samples=5, test_file_json=test_file)
         
-        # annotation_types = ["keypoints"]
-        # if detector_runner is not None:
-        #     annotation_types.append("bbox")
+        annotation_types = ["keypoints"]
+        if detector_runner is not None:
+            annotation_types.append("bbox")
 
-        # ground_truth = loader.load_data(mode=mode)
-        # for annotation_type in annotation_types:
-        #     kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
-        #     pycocotools_evaluation(
-        #         ground_truth=ground_truth,
-        #         predictions=coco_predictions,
-        #         kpt_oks_sigmas=kpt_oks_sigmas,
-        #         annotation_type=annotation_type,
-        #     )
+        ground_truth = loader.load_data(mode=mode)
+        for annotation_type in annotation_types:
+            kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
+            pycocotools_evaluation(
+                ground_truth=ground_truth,
+                predictions=coco_predictions,
+                kpt_oks_sigmas=kpt_oks_sigmas,
+                annotation_type=annotation_type,
+            )
 
         print(80 * "-")
         print(f"{mode} results")
