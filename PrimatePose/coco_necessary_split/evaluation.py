@@ -23,6 +23,59 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from analyse_json.split_v8_json import get_file_name_from_image_id
 
+PRIMATE_COLOR_MAP = {
+    "head": (0, 180, 0), # wait
+    "neck": (0, 0, 180), # wait
+    "nose": (255, 0, 0), # "
+    "mouth_front_top": (0, 255, 0), # "upper_jaw"
+    "mouth_front_bottom": (0, 0, 255), # "lower_jaw"
+    "mouth_back_right": (255, 255, 0), # "mouth_end_right"
+    "mouth_back_left": (255, 0, 255), # "mouth_end_left"
+    "right_ear": (128, 0, 0), # "right_earbase"
+    "left_ear": (0, 128, 128), # "left_earbase": (0, 128, 128),
+    "neck": (255, 128, 0), # "neck_base"
+    "upper_back": (128, 255, 0), # "neck_end"
+    "throat_base": (0, 255, 128), # "throat_base"
+    "upper_back": (255, 0, 128), # "back_base"
+    "lower_back": (255, 128, 128), # "back_end"
+    "torso_mid_back": (128, 255, 255), # "back_middle"
+    "root_tail": (128, 0, 64), # "tail_base"
+    "end_tail": (64, 0, 128), # "tail_end"
+    "left_shoulder": (128, 64, 0), # "front_left_thai"
+    "left_elbow": (64, 128, 0), # "front_left_knee"
+    "left_hand": (0, 64, 128), # "front_left_paw"
+    "right_shoulder": (255, 64, 64), # "front_right_thai"
+    "right_elbow": (64, 255, 64), # "front_right_knee"
+    "left_foot": (255, 255, 64), # "back_left_paw"
+    "left_hip": (255, 64, 255), # "back_left_thai"
+    "left_knee": (192, 64, 192), # "back_left_knee"
+    "right_knee": (192, 192, 64), # "back_right_knee"
+    "right_foot": (64, 192, 192), # "back_right_paw"
+    "body_center": (192, 192, 192), #  "belly_bottom"
+    "right_hip": (128, 64, 64), # "body_middle_right"`
+    "left_hip": (64, 128, 128),  # "body_middle_left"
+    "right_hand": (64, 64, 255), # "front_right_paw"
+    "left_wrist": (128, 0, 128),
+    "right_wrist": (0, 255, 255),
+    "forehead": (0, 128, 0),
+    "center_hip": (64, 255, 255),
+    "left_ankle": (128, 128, 128),
+    "right_ankle": (0, 0, 128),
+    "mid_tail": (192, 192, 192),
+    "mid_end_tail": (0, 128, 255), 
+    "right_eye": (0, 255, 255),
+    "left_eye": (128, 0, 128),
+    # "right_earend": (0, 128, 0),
+    # "right_antler_base": (0, 0, 128),
+    # "right_antler_end": (128, 128, 0),
+    # "left_earend": (192, 192, 192),
+    # "left_antler_base": (128, 128, 128),
+    # "left_antler_end": (64, 64, 64),
+    # "throat_end": (0, 128, 255), 
+    # "front_right_paw": (64, 64, 255),
+    # "back_right_thai": (64, 255, 255),
+}
+
 def pycocotools_evaluation(
     kpt_oks_sigmas: list[int],
     ground_truth: dict,
@@ -66,7 +119,7 @@ def pycocotools_evaluation(
         print(80 * "-")
 
 from PIL import Image
-def visualize_predictions(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json"):
+def visualize_predictions(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color = None):
     """
     Visualize a specified number of samples from COCO predictions and save the plots.
 
@@ -82,6 +135,8 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
     # Determine the output directory for saving images
     output_dir = os.path.join(os.path.dirname(json_path), "predictions_visualizations")
     os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+    
+    keypoint_labels = list(PRIMATE_COLOR_MAP.keys())
 
     # Iterate through the first few samples and plot each one
     for i, prediction in enumerate(coco_predictions[:num_samples]):
@@ -98,7 +153,7 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
         image = Image.open(image_path)
         fig, ax = plt.subplots(figsize=(8, 8))
-        # ax.imshow(image)
+        ax.imshow(image)
         ax.set_title(f"Image ID: {image_id}, bbox_score: {bbox_score:.2f}, Score: {score:.2f}")
 
         # Plot bounding box
@@ -106,10 +161,12 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         ax.add_patch(rect)
         # ax.text(bbox[0], bbox[1] - 10, f"Score: {bbox_score:.2f}" if bbox_score else "No bbox score", color="red")
 
-        # Plot keypoints
-        for kp in keypoints:
+        # Plot keypoints with color-coding
+        for idx, kp in enumerate(keypoints):
             if kp[2] > 0:  # visibility flag
-                ax.plot(kp[0], kp[1], "bo", markersize=5)  # blue points for visible keypoints
+                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
+                color = PRIMATE_COLOR_MAP.get(label, "blue")  # Default to blue if label not found
+                ax.plot(kp[0], kp[1], "o", markersize=5, color=np.array(color) / 255.0)
 
         # Save the figure to the output directory
         output_path = os.path.join(output_dir, f"predict_{file_name}")
@@ -173,7 +230,8 @@ def main(
         with open(predictions_file, "w") as f:
             json.dump(coco_predictions, f, indent=4)
         
-        # visualize_predictions(json_path=predictions_file, num_samples=5, test_file_json=test_file)
+        color_map = PRIMATE_COLOR_MAP
+        visualize_predictions(json_path=predictions_file, num_samples=5, test_file_json=test_file, color=color_map)
         
         annotation_types = ["keypoints"]
         if detector_runner is not None:
