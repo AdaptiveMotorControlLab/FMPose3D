@@ -3,17 +3,19 @@ data_path_prefix="/mnt/data/tiwang"
 # server amgm0
 # data_path_prefix="/media/data/ti/data"
 
-proj_root=${data_path_prefix}+"/v8_coco"
+proj_root=${data_path_prefix}"/v8_coco"
 
-dataset_file=chimpact
-file=chimpact
+dataset_file=kinka
+file=kinka_2
 mode="train"
 debug=0
 # for splitted datasets
-train_json="/${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_file}_${mode}.json"
+train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_file}_${mode}.json"
 # for whole dataset
 # train_json="/mnt/data/tiwang/primate_data/${file}.json"
-model_arch="top_down_resnet_50"
+# model_arch="top_down_resnet_50"
+model_arch="top_down_hrnet_w32"
+
 
 if [ "$debug" -eq 1 ]; then
     out_name="/app/project/${file}_${mode}"
