@@ -96,19 +96,6 @@ def compute_brightness(img, x, y, radius=20):
     ]
     return np.mean(crop)
 
-# Define the function to get visibility status from the test file
-def get_visibility_status(test_file_json, image_id):
-    with open(test_file_json, "r") as f:
-        test_data = json.load(f)
-    # Find the entry for the given image_id and extract visibility information
-    visibility_info = {}
-    for item in test_data["annotations"]:
-        if item["image_id"] == image_id:
-            keypoints = np.array(item["keypoints"]).reshape(-1, 3)
-            visibility_info = {i: kp[2] > 0 for i, kp in enumerate(keypoints)}
-            break
-    return visibility_info
-
 def pycocotools_evaluation(
     kpt_oks_sigmas: list[int],
     ground_truth: dict,
@@ -268,7 +255,7 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         #     ori_data = json.load(f)
         
         # Load the visibility status for the current image from the test file
-        visibility_status = get_visibility_status(test_file_json, image_id)
+        visibility_status, _ = get_visibility_status(test_file_json, image_id)
         
         # Load the corresponding image
         file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
@@ -310,6 +297,116 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
 
     print(f"Visualizations saved in: {output_dir}")
 
+# Define the function to get visibility status from the test file
+def get_visibility_status(test_file_json, image_id):
+    with open(test_file_json, "r") as f:
+        test_data = json.load(f)
+    # Find the entry for the given image_id and extract visibility information
+    visibility_info = {}
+    keypoints_info = {}
+    for item in test_data["annotations"]:
+        if item["image_id"] == image_id:
+            keypoints_info["keypoints"] = np.array(item["keypoints"]).reshape(-1, 3)
+            visibility_info = {i: kp[2] > 0 for i, kp in enumerate(keypoints_info["keypoints"])}
+            keypoints_info["bbox"] = item.get("bbox", [])
+            break
+    return visibility_info, keypoints_info
+
+# Define the function to visualize predictions with skeleton connections
+def visualize_predictions_with_GT(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color=None, draw_skeleton=True):
+    """
+    Visualize a specified number of samples from COCO predictions and save the plots.
+
+    Args:
+        json_path (str): Path to the JSON file with COCO predictions.
+        image_dir (str): Directory where the images corresponding to image IDs are stored.
+        num_samples (int): Number of samples to visualize. Defaults to 5.
+        draw_skeleton (bool): Whether to draw skeleton connections between keypoints.
+    """
+    # Load the coco_predictions JSON file
+    with open(json_path, "r") as f:
+        coco_predictions = json.load(f)
+
+    # Determine the output directory for saving images
+    output_dir = os.path.join(os.path.dirname(json_path), "predictions_visualizations")
+    os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+    
+    keypoint_labels = list(PRIMATE_COLOR_MAP.keys())
+
+    # Iterate through the first few samples and plot each one
+    for i, prediction in enumerate(coco_predictions[:num_samples]):
+        # Extract data from the prediction
+        image_id = prediction["image_id"]
+        category_id = prediction["category_id"]
+        keypoints = np.array(prediction["keypoints"]).reshape(-1, 3)  # reshape for (x, y, visibility)
+        score = prediction["score"]
+        bbox = prediction["bbox"]
+        bbox_score = prediction["bbox_scores"][0] if prediction["bbox_scores"] else None
+
+        # Load the visibility status and ground truth keypoints for the current image from the test file
+        visibility_status, ground_truth = get_visibility_status(test_file_json, image_id)
+
+        # Load the corresponding image
+        file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
+        image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
+        image = Image.open(image_path)
+        
+        # Create a figure with two subplots: one for Ground Truth, one for Inference
+        fig, (ax_gt, ax_pred) = plt.subplots(1, 2, figsize=(16, 8))
+        
+        # Set up Ground Truth (left plot)
+        ax_gt.imshow(image)
+        ax_gt.set_title(f"Ground Truth: Image ID {image_id}")
+        gt_bbox = ground_truth.get("bbox", [])
+        if gt_bbox:
+            rect_gt = Rectangle((gt_bbox[0], gt_bbox[1]), gt_bbox[2], gt_bbox[3], linewidth=2, edgecolor="green", facecolor="none")
+            ax_gt.add_patch(rect_gt)
+        
+        for idx, (x_kp, y_kp, v) in enumerate(ground_truth["keypoints"]):
+            if visibility_status.get(idx, False):
+                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
+                color = PRIMATE_COLOR_MAP.get(label, "blue")
+                ax_gt.plot(x_kp, y_kp, "o", markersize=5, color=np.array(color) / 255.0)
+
+        if draw_skeleton:
+            for connection in PFM_SKELETON:
+                idx1, idx2 = connection
+                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
+                    x1, y1 = ground_truth["keypoints"][idx1 - 1][:2]
+                    x2, y2 = ground_truth["keypoints"][idx2 - 1][:2]
+                    color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
+                    ax_gt.plot([x1, x2], [y1, y2], color=np.array(color) / 255.0, linewidth=2)
+
+        # Set up Inference Result (right plot)
+        ax_pred.imshow(image)
+        ax_pred.set_title(f"Inference Result: Image ID {image_id}")
+        rect_pred = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="red", facecolor="none")
+        ax_pred.add_patch(rect_pred)
+        
+        for idx, kp in enumerate(keypoints):
+            # if kp[2] > 0:
+            if visibility_status.get(idx, False):
+                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
+                color = PRIMATE_COLOR_MAP.get(label, "blue")
+                ax_pred.plot(kp[0], kp[1], "o", markersize=5, color=np.array(color) / 255.0)
+
+        if draw_skeleton:
+            for connection in PFM_SKELETON:
+                idx1, idx2 = connection
+                # if keypoints[idx1 - 1, 2] > 0 and keypoints[idx2 - 1, 2] > 0:
+                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
+                    x1, y1 = keypoints[idx1 - 1][:2]
+                    x2, y2 = keypoints[idx2 - 1][:2]
+                    color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
+                    ax_pred.plot([x1, x2], [y1, y2], color=np.array(color) / 255.0, linewidth=2)
+
+        # Save the figure to the output directory
+        output_path = os.path.join(output_dir, f"compare_{file_name}")
+        plt.savefig(output_path)
+        plt.close(fig)
+
+    print(f"Visualizations saved in: {output_dir}")
+    
 def main(
     project_root: str,
     train_file: str,
@@ -366,7 +463,8 @@ def main(
             json.dump(coco_predictions, f, indent=4)
         
         color_map = PRIMATE_COLOR_MAP
-        visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
+        # visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
+        visualize_predictions_with_GT(json_path=predictions_file, num_samples=50, test_file_json=test_file, color=color_map, draw_skeleton=True)
         
         annotation_types = ["keypoints"]
         if detector_runner is not None:
