@@ -359,7 +359,7 @@ def visualize_predictions_with_GT(json_path="path_to_your_predictions_file.json"
         ax_gt.set_title(f"Ground Truth: Image ID {image_id}")
         gt_bbox = ground_truth.get("bbox", [])
         if gt_bbox:
-            rect_gt = Rectangle((gt_bbox[0], gt_bbox[1]), gt_bbox[2], gt_bbox[3], linewidth=2, edgecolor="green", facecolor="none")
+            rect_gt = Rectangle((gt_bbox[0], gt_bbox[1]), gt_bbox[2], gt_bbox[3], linewidth=2, edgecolor="red", facecolor="none")
             ax_gt.add_patch(rect_gt)
         
         for idx, (x_kp, y_kp, v) in enumerate(ground_truth["keypoints"]):
@@ -380,7 +380,7 @@ def visualize_predictions_with_GT(json_path="path_to_your_predictions_file.json"
         # Set up Inference Result (right plot)
         ax_pred.imshow(image)
         ax_pred.set_title(f"Inference Result: Image ID {image_id}")
-        rect_pred = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="red", facecolor="none")
+        rect_pred = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="green", facecolor="none")
         ax_pred.add_patch(rect_pred)
         
         for idx, kp in enumerate(keypoints):
