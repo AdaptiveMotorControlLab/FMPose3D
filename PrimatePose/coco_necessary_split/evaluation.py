@@ -96,6 +96,19 @@ def compute_brightness(img, x, y, radius=20):
     ]
     return np.mean(crop)
 
+# Define the function to get visibility status from the test file
+def get_visibility_status(test_file_json, image_id):
+    with open(test_file_json, "r") as f:
+        test_data = json.load(f)
+    # Find the entry for the given image_id and extract visibility information
+    visibility_info = {}
+    for item in test_data["annotations"]:
+        if item["image_id"] == image_id:
+            keypoints = np.array(item["keypoints"]).reshape(-1, 3)
+            visibility_info = {i: kp[2] > 0 for i, kp in enumerate(keypoints)}
+            break
+    return visibility_info
+
 def pycocotools_evaluation(
     kpt_oks_sigmas: list[int],
     ground_truth: dict,
@@ -251,6 +264,12 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         bbox = prediction["bbox"]
         bbox_score = prediction["bbox_scores"][0] if prediction["bbox_scores"] else None
 
+        # with open(test_file_json, 'r') as f:
+        #     ori_data = json.load(f)
+        
+        # Load the visibility status for the current image from the test file
+        visibility_status = get_visibility_status(test_file_json, image_id)
+        
         # Load the corresponding image
         file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
         image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
@@ -266,7 +285,8 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
 
         # Plot keypoints with color-coding
         for idx, kp in enumerate(keypoints):
-            if kp[2] > 0:  # visibility flag
+            # if kp[2] > 0:  # visibility flag
+            if visibility_status.get(idx, False):  # visibility flag
                 label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
                 color = PRIMATE_COLOR_MAP.get(label, "blue")  # Default to blue if label not found
                 ax.plot(kp[0], kp[1], "o", markersize=5, color=np.array(color) / 255.0)
@@ -275,7 +295,9 @@ def visualize_predictions(json_path="path_to_your_predictions_file.json", image_
         if draw_skeleton:
             for connection in PFM_SKELETON:
                 idx1, idx2 = connection
-                if keypoints[idx1 - 1, 2] > 0 and keypoints[idx2 - 1, 2] > 0:  # Check visibility
+                # if keypoints[idx1 - 1, 2] > 0 and keypoints[idx2 - 1, 2] > 0:  # Check 
+                # Only draw line if both keypoints are visible
+                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
                     x1, y1 = keypoints[idx1 - 1][:2]
                     x2, y2 = keypoints[idx2 - 1][:2]
                     color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
@@ -344,7 +366,7 @@ def main(
             json.dump(coco_predictions, f, indent=4)
         
         color_map = PRIMATE_COLOR_MAP
-        visualize_predictions(json_path=predictions_file, num_samples=20, test_file_json=test_file, color=color_map)
+        visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
         
         annotation_types = ["keypoints"]
         if detector_runner is not None:
