@@ -2,7 +2,7 @@ import json
 import random
 
 # Specify your JSON file path
-json_file_path = '/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val.json'
+# json_file_path = '/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val.json'
 
 def print_json_structure(data, indent=0):
     # Check if data is a dictionary
@@ -89,9 +89,9 @@ if __name__ == "__main__":
     # print_json_structure(data)
 
     nums = 50
-    subset = "ap10k_val"
-    input_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}.json'
-    output_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/{subset}_sampled_nums_{nums}.json' 
+    subset = "oms_test"
+    input_path = f'/mnt/data/tiwang/primate_data/splitted_test_datasets/{subset}.json'
+    output_path = f'/mnt/data/tiwang/primate_data/samples/{subset}_sampled_nums_{nums}.json' 
     sample_json(nums, input_path, output_path)
     
     # image_id = 36681
