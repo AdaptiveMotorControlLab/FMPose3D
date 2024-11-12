@@ -22,9 +22,14 @@ TAG := _pfm_4.1 #_train|_test|_daemon
 CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
 PORT :=$(shell ./find_ports.sh)
 
-# server7 path
+# # server7 path
+# HOST_SRC := /home/ti_wang/Ti_workspace/PrimatePose
+# HOST_DATA := /home/ti_wang
+# HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
+
+# server8 path
 HOST_SRC := /home/ti_wang/Ti_workspace/PrimatePose
-HOST_DATA := /mnt/
+HOST_DATA := /home/ti_wang
 HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # amgm0 path
@@ -32,7 +37,7 @@ HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 # HOST_DATA :=/media/data/ti/data
 # HOST_DLC :=/home/ti/projects/DeepLabCut
 
-# docker volumes
+# docker volumes 
 DOCKER_SRC := /app
 DOCKER_DATA := /mnt/
 DOCKER_DLC := /app/DeepLabCut
