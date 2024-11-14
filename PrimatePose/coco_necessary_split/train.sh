@@ -1,5 +1,7 @@
 # server 7
 data_path_prefix="/mnt/data/tiwang"
+# server 8
+# data_path_prefix="/mnt/ti_wang"
 # server amgm0
 # data_path_prefix="/media/data/ti/data"
 
@@ -7,8 +9,9 @@ proj_root=${data_path_prefix}"/v8_coco"
 
 debug=0
 gpu_id="1"
-dataset_file=oap
-file=oap_hrnet
+name=lote
+dataset_file=${name}
+file=${name}_hrnet
 # file=chimpact_hrnet_onlyPose
 mode="train"
 # for splitted datasets
