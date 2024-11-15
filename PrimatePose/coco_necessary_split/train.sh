@@ -7,12 +7,11 @@ data_path_prefix="/mnt/data/tiwang"
 
 proj_root=${data_path_prefix}"/v8_coco"
 
+gpu_id="0"
 debug=0
-gpu_id="1"
-name=lote
+name=chimpact
+file=${name}_hrnet_OnlyPose
 dataset_file=${name}
-file=${name}_hrnet
-# file=chimpact_hrnet_onlyPose
 mode="train"
 # for splitted datasets
 train_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json

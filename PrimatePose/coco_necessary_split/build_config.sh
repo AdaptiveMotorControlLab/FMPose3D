@@ -5,17 +5,17 @@ data_path_prefix="/mnt/data/tiwang"
 
 proj_root=${data_path_prefix}"/v8_coco"
 
-dataset_file=kinka
-file=kinka_2
-mode="train"
 debug=0
+name=chimpact
+file=${name}_hrnet_OnlyPose
+dataset_file=${name}
+mode="train"
 # for splitted datasets
 train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_file}_${mode}.json"
 # for whole dataset
 # train_json="/mnt/data/tiwang/primate_data/${file}.json"
 # model_arch="top_down_resnet_50"
 model_arch="top_down_hrnet_w32"
-
 
 if [ "$debug" -eq 1 ]; then
     out_name="/app/project/${file}_${mode}"
