@@ -9,17 +9,17 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 #######
 # [USER: ADJUST GPU]
 #if use GPU precise number and underscore: example: "GPU1_" or "GPU1_2_"
-# GPU := GPU_1_2_
+GPU :=_gpu_all
 
 # [USER: AD_JUST TAG]
-TAG := _pfm_4.1 #_train|_test|_daemon 
+TAG :=_pfm_4.3 #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
 #_train: with src code inside normally
 
 # CONTAINER_NAME := $(GPU)$(project_name_lo)$(TAG)
-CONTAINER_NAME := ti_$(project_name_lo)$(TAG)
+CONTAINER_NAME := ti_$(project_name_lo)$(TAG) # $(GPU)
 PORT :=$(shell ./find_ports.sh)
 
 # # server7 path
@@ -28,7 +28,7 @@ PORT :=$(shell ./find_ports.sh)
 # HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # server8 path
-HOST_SRC := /home/ti_wang/Ti_workspace/PrimatePose
+HOST_SRC := /home/ti_wang/Ti_workspace
 HOST_DATA := /home/ti_wang
 HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
@@ -39,7 +39,7 @@ HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # docker volumes 
 DOCKER_SRC := /app
-DOCKER_DATA := /mnt/
+DOCKER_DATA := /home/ti_wang
 DOCKER_DLC := /app/DeepLabCut
 
 # [USER: ADJUST VOLUMES]
@@ -78,9 +78,9 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-IMG_TAG := 4.0
+IMG_TAG := 4.1
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
-IMG_NAME := dlc3_sudo
+IMG_NAME := dlc3
 
 DOCKERFILE := Dockerfile.ti
 
