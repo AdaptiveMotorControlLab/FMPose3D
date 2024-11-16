@@ -22,7 +22,7 @@ RUN mkdir /app /logs /data /notebooks
 RUN groupadd -g ${gid} ${user_name} \
     && useradd -m -u ${uid} -g ${gid} ${user_name} \
     && chown -R ${uid}:${gid} /home
-
+# 
 # Switch to the new user and set home directory as working directory
 USER ${user_name}
 ENV HOME=/home/${user_name}
