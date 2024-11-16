@@ -12,7 +12,7 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 GPU :=_gpu_all
 
 # [USER: AD_JUST TAG]
-TAG :=_pfm_4.4 #_train|_test|_daemon 
+TAG :=_pfm_4.3 #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
@@ -30,7 +30,7 @@ PORT :=$(shell ./find_ports.sh)
 # server8 path
 HOST_SRC := /home/ti_wang/Ti_workspace
 HOST_DATA := /home/ti_wang
-HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
+# HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # amgm0 path
 # HOST_SRC :=/home/ti/projects/PrimatePose
@@ -39,19 +39,19 @@ HOST_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # docker volumes 
 # DOCKER_SRC := /app
-# DOCKER_DATA := /home/ti_wang
+# DOCKER_DATA := /mnt
 # DOCKER_DLC := /app/DeepLabCut
 
 # Use same paths in container as on host for easier navigation
 DOCKER_SRC := /home/ti_wang/Ti_workspace
-DOCKER_DATA := /home/ti_wang
-DOCKER_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
+DOCKER_DATA := /mnt
+# DOCKER_DLC := /home/ti_wang/Ti_workspace/DeepLabCut
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
 	--volume $(HOST_SRC):$(DOCKER_SRC) \
 	--volume $(HOST_DATA):$(DOCKER_DATA) \
-	--volume $(HOST_DLC):$(DOCKER_DLC) \
+	# --volume $(HOST_DLC): $(DOCKER_DLC) \
 #add more if needed
 
 run: build_check
@@ -83,7 +83,7 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-IMG_TAG := 4.2
+IMG_TAG := 4.3
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
 IMG_NAME := dlc3
 
