@@ -9,7 +9,7 @@ WORKDIR /
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    vim zsh tmux wget curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo libglib2.0-0 \
+    vim zsh tmux wget curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo ssh libglib2.0-0 \
     tree \
     && apt-get -y autoclean \
     && apt-get -y autoremove \
