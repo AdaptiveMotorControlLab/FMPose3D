@@ -1,5 +1,6 @@
-FROM nvidia/cuda:12.0.0-runtime-ubuntu20.04
-
+# FROM nvidia/cuda:12.0.0-runtime-ubuntu20.04
+FROM pytorch/pytorch:2.4.1-cuda11.8-cudnn9-runtime
+# FROM nvidia/cuda:2.3.5-base-cuda11.7.1-cudnn8-runtime-ubuntu20.04-latest
 # install libgl1 which is used for OpenCV
 
 # Set non-interactive mode and timezone
@@ -7,14 +8,26 @@ ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Zurich
 
 # Update and install essential packages
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y libgl1-mesa-glx ffmpeg git-all vim zsh tmux bash sudo wget curl wandb gpustat htop streamlit python3-pip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# RUN apt-get clean && apt-get update && apt-get upgrade -y
+# RUN apt-get install -y libgl1-mesa-glx && \
+#     apt-get install -y vim zsh tmux bash sudo wget curl wandb gpustat htop streamlit 
+RUN apt-get clean && apt-get update && apt-get upgrade -y 
+RUN apt-get install -y libgl1-mesa-glx
+RUN apt-get install -y vim zsh tmux wget
+RUN apt-get install -y curl gpustat htop jupyter python3 python3-pip 
+#  streamlit
 
-# Install Jupyter Notebook
-RUN pip3 install --no-cache-dir jupyter && jupyter notebook --generate-config && \
-    echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
+RUN jupyter notebook --generate-config
+RUN echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
 
+# RUN apt-get update && apt-get upgrade -y && \
+#     apt-get install -y libgl1-mesa-glx git-all vim zsh tmux bash sudo wget curl wandb gpustat htop streamlit
+    #  python3-pip && \
+    # apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Jupyter Notebook--something wrong
+# RUN pip3 install --no-cache-dir jupyter && jupyter notebook --generate-config && \
+#     echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
 
 # make a group for users that can run conda
 RUN groupadd conda -g 1221
@@ -54,13 +67,13 @@ ENV PATH=/opt/conda/bin:${PATH}
 RUN conda create -n dlc3 python=3.10 -y && \
     echo "conda activate dlc3" >> ~/.bashrc
 
-
 # install conda and pip packages
 COPY ./requirements.txt /requirements.txt
 RUN pip install --no-cache-dir --upgrade pip setuptools && \
     pip install --no-cache-dir -r /requirements.txt && \
     pip install --no-cache-dir pytest PySide6==6.3.1
 
+    
 # RUN conda install -c anaconda pytables=3.7.0 && \
 #     pip install --upgrade pip setuptools && \
 #     pip install torch==2.2.1 torchvision --index-url https://download.pytorch.org/whl/cu121 && \
@@ -78,8 +91,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
 # Create a home folder for the user
 ARG USERNAME=ti_wang
 ARG PASSWORD=aaa
-ARG UID=1005
-ARG GID=1005
+ARG UID=1002
+ARG GID=1002
 RUN groupadd -g ${GID} ${USERNAME} && \
     useradd -rm -s /bin/bash -u "${UID}" -g "${GID}" -G conda,sudo "${USERNAME}" && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -92,23 +105,22 @@ USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
 # Install Oh My Zsh for the 'brave' user
-# RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-# # Set up Oh My Zsh plugins (e.g., zsh-syntax-highlighting and zsh-autosuggestions)
-# RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
-#     git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
-#     sed -i 's/plugins=(git)/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/g' ~/.zshrc
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+# Set up Oh My Zsh plugins (e.g., zsh-syntax-highlighting and zsh-autosuggestions)
+RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
+    sed -i 's/plugins=(git)/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/g' ~/.zshrc
 # Set zsh as the default shell for the container
 # RUN echo "source ~/.zshrc" >> ~/.bashrc
 
-
-USER root
+# USER root
 
 RUN chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 
 # Set the container to start with zsh
-CMD ["zsh"]
+# CMD ["zsh"]
 
 # [if production mode -define the entrypont]
 # ENTRYPOINT ["bash"]
 
-# CMD ["bash"] 
+CMD ["bash"] 
