@@ -28,10 +28,10 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 64,
-    dataloader_workers: int = 12,
-    detector_batch_size: int = 64,
-    detector_dataloader_workers: int = 12,
+    batch_size: int = 32,
+    dataloader_workers: int = 16,
+    detector_batch_size: int = 32,
+    detector_dataloader_workers: int= 16,
     debug: bool = False,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
@@ -96,20 +96,20 @@ def main(
         if args.debug:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
-                                #  tags = ["Debug"],
-                                group = "Dubug_v8",
-                                run_name = "debug_ak_val_testprint",
+                                tags = ["server8"],
+                                group = "Dubug_v8_server8",
+                                run_name = "ak_hrnet_Detector",
                                 )
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
-                                group = "Training_ap10k_v8",
-                                run_name = "train",
+                                group = "split_datasets_v8_server8",
+                                run_name = "oms_detector_fasterrcnn",
                                 )
-        
+          
         # skipping detector training if a detector_path is given
-        if args.detector_path is None and detector_epochs > 0:
+        if args.detector_path is None and detector_epochs > 0 and args.train_detector:
             train(
                 loader=loader,
                 run_config=loader.model_cfg["detector"],
@@ -119,15 +119,16 @@ def main(
                 logger_config=logger_config,
                 snapshot_path=detector_path,
             )
-
-    if epochs > 0:
+            
+    if epochs > 0 and args.train_pose:
         train(
             loader=loader,
             run_config=loader.model_cfg,
             task=pose_task,
             device=device,
             gpus=gpus,
-            logger_config=loader.model_cfg.get("logger"),
+            logger_config=logger_config,
+            # logger_config=loader.model_cfg.get("logger"),
             snapshot_path=snapshot_path,
         )
         
@@ -149,16 +150,22 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     parser.add_argument("--debug", action="store_true")
-
+    parser.add_argument("--train-pose", action="store_true", default=True, help="Whether to train pose model")
+    parser.add_argument("--train-detector", action="store_true", default=True, help="Whether to train detector model")
     args = parser.parse_args()
     
+    
+    # backup the train.sh file and the current file in the same folder    
     train_dir = os.path.dirname(args.pytorch_config)
     debug_dir = os.path.dirname(train_dir)
-
-    # backup the train.sh file
-    # shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.sh", debug_dir+"/train.sh")
-    # shutil.copy("/app/Ti_workspace/PrimatePose/coco_necessary/train.py", debug_dir+"/train.py")
-        
+    print("debug_dir:", debug_dir)
+    current_file_path = os.path.abspath(__file__)
+    current_dir = os.path.dirname(current_file_path)
+    train_sh_path = os.path.join(current_dir, "train.sh")
+    
+    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    
     main(
         args.project_root,
         args.train_file,
