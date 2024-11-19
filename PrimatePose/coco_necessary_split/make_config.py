@@ -112,6 +112,14 @@ def main(
     else:
         print("The model is not HRNet, so the freeze_bn_stats is not set to False")
     
+    # pytorch_cfg["detector"]["train_settings"]["epochs"] = False
+
+    # Set save_epochs=1 and eval_interval=1 for both detector and runner
+    pytorch_cfg["detector"]["runner"]["snapshots"]["save_epochs"] = 1
+    pytorch_cfg["detector"]["runner"]["eval_interval"] = 1
+    pytorch_cfg["runner"]["snapshots"]["save_epochs"] = 1
+    pytorch_cfg["runner"]["eval_interval"] = 1
+    
     af.write_plainconfig(str(train_dir / "pytorch_config.yaml"), pytorch_cfg)
     make_inference_config(
         dlc_path,
