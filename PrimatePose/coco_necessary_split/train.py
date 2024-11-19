@@ -98,14 +98,14 @@ def main(
                                 project_name = "primatepose",
                                 tags = ["server8"],
                                 group = "Dubug_v8_server8",
-                                run_name = "ak_hrnet_Detector",
+                                run_name = args.run_name,
                                 )
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
                                 group = "split_datasets_v8_server8",
-                                run_name = "oms_detector_fasterrcnn",
+                                run_name = args.run_name,
                                 )
           
         # skipping detector training if a detector_path is given
@@ -150,8 +150,9 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--train-pose", action="store_true", default=True, help="Whether to train pose model")
-    parser.add_argument("--train-detector", action="store_true", default=True, help="Whether to train detector model")
+    parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
+    parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
+    parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
     args = parser.parse_args()
     
     
