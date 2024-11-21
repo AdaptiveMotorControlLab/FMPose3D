@@ -412,7 +412,7 @@ def main(
         # print(f"{mode} results")
         # for k, v in scores.items():
         #     print(f"  {k}: {v}")
-
+        
 def visualize_coco_predictions_with_dlc(
     predictions, 
     num_samples=5, 
@@ -467,25 +467,20 @@ def visualize_coco_predictions_with_dlc(
             print(f"Warning: No ground truth annotations found for {image_path}")
             continue
 
-        # Convert ground truth annotations - keeping batch dimension
         gt_keypoints = np.array(gt_anns[0]['keypoints']).reshape(1, -1, 3)
-        # Create visibility mask from ground truth (keeping batch dim)
         vis_mask = gt_keypoints[:, :, 2] != -1
         num_visible = np.sum(gt_keypoints[:, :, 2] != -1)
-        print("num_visible:", num_visible)
         
         # Filter ground truth points using visibility mask
         visible_gt = gt_keypoints[vis_mask]
-        visible_gt = visible_gt[None, :, :2]  # Keep only x,y coordinates
-                
-        print("visible_gt", visible_gt.shape)
-        
+        visible_gt = visible_gt[None, :, :2]
+                        
         # Get prediction keypoints and filter using the same visibility mask
         pred_keypoints = pred_data['bodyparts']  # Keep batch dimension
         visible_pred = pred_keypoints 
         visible_pred = pred_keypoints[vis_mask].copy()
         visible_pred = np.expand_dims(visible_pred, axis=0)
-        print("visible_pred shape:", visible_pred.shape)
+        # print("visible_pred shape:", visible_pred.shape)
         
         try:
             plot_gt_and_predictions(
@@ -497,6 +492,7 @@ def visualize_coco_predictions_with_dlc(
             print(f"Successfully plotted predictions for {image_path}")
         except Exception as e:
             print(f"Error plotting predictions for {image_path}: {str(e)}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
