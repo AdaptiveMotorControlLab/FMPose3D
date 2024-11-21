@@ -17,11 +17,14 @@ from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_predictions, plot_gt_and_predictions
+
 
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from analyse_json.split_v8_json import get_file_name_from_image_id
+
 
 PRIMATE_COLOR_MAP = {
     "head": (0, 180, 0), # wait
@@ -312,101 +315,6 @@ def get_visibility_status(test_file_json, image_id):
             break
     return visibility_info, keypoints_info
 
-# Define the function to visualize predictions with skeleton connections
-def visualize_predictions_with_GT(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color=None, draw_skeleton=True):
-    """
-    Visualize a specified number of samples from COCO predictions and save the plots.
-
-    Args:
-        json_path (str): Path to the JSON file with COCO predictions.
-        image_dir (str): Directory where the images corresponding to image IDs are stored.
-        num_samples (int): Number of samples to visualize. Defaults to 5.
-        draw_skeleton (bool): Whether to draw skeleton connections between keypoints.
-    """
-    # Load the coco_predictions JSON file
-    with open(json_path, "r") as f:
-        coco_predictions = json.load(f)
-
-    # Determine the output directory for saving images
-    output_dir = os.path.join(os.path.dirname(json_path), "predictions_visualizations")
-    os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
-    
-    keypoint_labels = list(PRIMATE_COLOR_MAP.keys())
-
-    # Iterate through the first few samples and plot each one
-    for i, prediction in enumerate(coco_predictions[:num_samples]):
-        # Extract data from the prediction
-        image_id = prediction["image_id"]
-        category_id = prediction["category_id"]
-        keypoints = np.array(prediction["keypoints"]).reshape(-1, 3)  # reshape for (x, y, visibility)
-        score = prediction["score"]
-        bbox = prediction["bbox"]
-        bbox_score = prediction["bbox_scores"][0] if prediction["bbox_scores"] else None
-
-        # Load the visibility status and ground truth keypoints for the current image from the test file
-        visibility_status, ground_truth = get_visibility_status(test_file_json, image_id)
-
-        # Load the corresponding image
-        file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
-        image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
-        image = Image.open(image_path)
-        
-        # Create a figure with two subplots: one for Ground Truth, one for Inference
-        fig, (ax_gt, ax_pred) = plt.subplots(1, 2, figsize=(16, 8))
-        
-        # Set up Ground Truth (left plot)
-        ax_gt.imshow(image)
-        ax_gt.set_title(f"Ground Truth: Image ID {image_id}")
-        gt_bbox = ground_truth.get("bbox", [])
-        if gt_bbox:
-            rect_gt = Rectangle((gt_bbox[0], gt_bbox[1]), gt_bbox[2], gt_bbox[3], linewidth=2, edgecolor="red", facecolor="none")
-            ax_gt.add_patch(rect_gt)
-        
-        for idx, (x_kp, y_kp, v) in enumerate(ground_truth["keypoints"]):
-            if visibility_status.get(idx, False):
-                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
-                color = PRIMATE_COLOR_MAP.get(label, "blue")
-                ax_gt.plot(x_kp, y_kp, "o", markersize=5, color=np.array(color) / 255.0)
-
-        if draw_skeleton:
-            for connection in PFM_SKELETON:
-                idx1, idx2 = connection
-                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
-                    x1, y1 = ground_truth["keypoints"][idx1 - 1][:2]
-                    x2, y2 = ground_truth["keypoints"][idx2 - 1][:2]
-                    color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
-                    ax_gt.plot([x1, x2], [y1, y2], color=np.array(color) / 255.0, linewidth=2)
-
-        # Set up Inference Result (right plot)
-        ax_pred.imshow(image)
-        ax_pred.set_title(f"Inference Result: Image ID {image_id}")
-        rect_pred = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="green", facecolor="none")
-        ax_pred.add_patch(rect_pred)
-        
-        for idx, kp in enumerate(keypoints):
-            # if kp[2] > 0:
-            if visibility_status.get(idx, False):
-                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
-                color = PRIMATE_COLOR_MAP.get(label, "blue")
-                ax_pred.plot(kp[0], kp[1], "o", markersize=5, color=np.array(color) / 255.0)
-
-        if draw_skeleton:
-            for connection in PFM_SKELETON:
-                idx1, idx2 = connection
-                # if keypoints[idx1 - 1, 2] > 0 and keypoints[idx2 - 1, 2] > 0:
-                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
-                    x1, y1 = keypoints[idx1 - 1][:2]
-                    x2, y2 = keypoints[idx2 - 1][:2]
-                    color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
-                    ax_pred.plot([x1, x2], [y1, y2], color=np.array(color) / 255.0, linewidth=2)
-
-        # Save the figure to the output directory
-        output_path = os.path.join(output_dir, f"compare_{file_name}")
-        plt.savefig(output_path)
-        plt.close(fig)
-
-    print(f"Visualizations saved in: {output_dir}")
-    
 def main(
     project_root: str,
     train_file: str,
@@ -440,9 +348,10 @@ def main(
         detector_path=detector_path,
         detector_transform=None,
     )
-
+    
     output_path = Path(pytorch_config_path).parent.parent / "results"
     output_path.mkdir(exist_ok=True)
+    print(output_path)
     #for mode in ["train", "test"]:
     for mode in ["test"]:    
         scores, predictions = evaluate(
@@ -453,41 +362,146 @@ def main(
             detector_runner=detector_runner,
             pcutoff=pcutoff,
         )
+        
+        # if predictions:  # Check if predictions exists and is not empty
+        #     print("\nprediction structure:")
+        #     # Assuming predictions is a dict, let's print its keys and value types
+        #     for key, value in predictions.items():
+        #         if isinstance(value, np.ndarray):
+        #             print(f"{key}: numpy array with shape {value.shape} and dtype {value.dtype}")
+        #         else:
+        #             print(f"{key}: {type(value)}")
+        #             if isinstance(value, dict): 
+        #                 for k, v in value.items():
+        #                     print(f"  {k}: {v.shape}")
+                    # bodyparts: (1, 37, 3)
+                    # bboxes: (1, 4)
+                    # bbox_scores: (1,)
+
+        visualize_coco_predictions_with_dlc(predictions=predictions, num_samples=10, test_file_json=test_file, draw_skeleton=True, output_dir=output_path)
+
         print("finished evaluating")
-        coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
-        model_name = Path(snapshot_path).stem
-        if detector_path is not None:
-            model_name += Path(detector_path).stem
-        predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
-        with open(predictions_file, "w") as f:
-            json.dump(coco_predictions, f, indent=4)
         
-        color_map = PRIMATE_COLOR_MAP
-        # visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
-        visualize_predictions_with_GT(json_path=predictions_file, num_samples=50, test_file_json=test_file, color=color_map, draw_skeleton=True)
+        # coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
+        # model_name = Path(snapshot_path).stem
+        # if detector_path is not None:
+        #     model_name += Path(detector_path).stem
+        # predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
+        # with open(predictions_file, "w") as f:
+        #     json.dump(coco_predictions, f, indent=4)
         
-        annotation_types = ["keypoints"]
-        if detector_runner is not None:
-            annotation_types.append("bbox")
+        # color_map = PRIMATE_COLOR_MAP
+        # # visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
+        # # visualize_predictions_with_GT(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map, draw_skeleton=True) 
+          
+        # annotation_types = ["keypoints"]
+        # if detector_runner is not None:
+        #     annotation_types.append("bbox")
 
-        ground_truth = loader.load_data(mode=mode)
-        for annotation_type in annotation_types:
-            kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
-            pycocotools_evaluation(
-                ground_truth=ground_truth,
-                predictions=coco_predictions,
-                kpt_oks_sigmas=kpt_oks_sigmas,
-                annotation_type=annotation_type,
+        # ground_truth = loader.load_data(mode=mode)
+        # for annotation_type in annotation_types:
+        #     kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
+        #     pycocotools_evaluation(
+        #         ground_truth=ground_truth,
+        #         predictions=coco_predictions,
+        #         kpt_oks_sigmas=kpt_oks_sigmas,
+        #         annotation_type=annotation_type,
+        #     )
+            
+        # print(80 * "-")
+        # print(f"{mode} results")
+        # for k, v in scores.items():
+        #     print(f"  {k}: {v}")
+
+def visualize_coco_predictions_with_dlc(
+    predictions, 
+    num_samples=5, 
+    test_file_json="test.json", 
+    output_dir=None,
+    draw_skeleton=True
+):
+    """
+    Visualize predictions using DeepLabCut's plot_gt_and_predictions function
+    
+    Args:
+        predictions: Dictionary with image paths as keys and prediction data as values
+                    Each prediction contains:
+                    - bodyparts: numpy array of shape (1, 37, 3)
+                    - bboxes: numpy array of shape (1, 4)
+                    - bbox_scores: numpy array of shape (1,)
+        num_samples: Number of samples to visualize
+        test_file_json: Path to test set JSON file
+        draw_skeleton: Whether to draw skeleton connections
+    """
+    # Load ground truth data
+    with open(test_file_json, "r") as f:
+        ground_truth = json.load(f)
+
+    # Create output directory - use provided output_dir if specified, otherwise create default
+    if output_dir is None:
+        output_dir = os.path.join(os.path.dirname(test_file_json), "predictions_visualizations")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Sample images if requested
+    image_paths = list(predictions.keys())
+    if num_samples:
+        image_paths = image_paths[:num_samples]
+
+    # Process each image
+    for image_path in image_paths:
+        # Get predictions for this image
+        pred_data = predictions[image_path]
+        
+        # Find image info in ground truth data
+        img_info = next((img for img in ground_truth['images'] 
+                        if img['file_name'] == os.path.basename(image_path)), None)
+        if img_info is None:
+            print(f"Warning: Could not find image info for {image_path}")
+            continue
+
+        # Get ground truth annotations for this image
+        gt_anns = [ann for ann in ground_truth['annotations'] 
+                   if ann['image_id'] == img_info['id']]
+        
+        if not gt_anns:
+            print(f"Warning: No ground truth annotations found for {image_path}")
+            continue
+
+        # Convert ground truth annotations - keeping batch dimension
+        gt_keypoints = np.array(gt_anns[0]['keypoints']).reshape(1, -1, 3)
+        # visible_gt = gt_keypoints[:, :, :2]
+        # Create visibility mask from ground truth (keeping batch dim)
+        print("gt_keypoints shape:", gt_keypoints.shape)
+        vis_mask = gt_keypoints[:, :, 2] != -1
+        
+        # Filter ground truth points using visibility mask
+        visible_gt = gt_keypoints[vis_mask].reshape(-1, 3)
+        visible_gt = visible_gt[:, :2]  # Keep only x,y coordinates
+        print("visible_gt:", visible_gt)
+        
+        
+        # Get prediction keypoints and filter using the same visibility mask
+        pred_keypoints = pred_data['bodyparts']  # Keep batch dimension
+        print("pred_keypoints shape:", pred_keypoints.shape)
+        visible_pred = pred_keypoints 
+        visible_pred = pred_keypoints[vis_mask]
+        visible_pred = np.expand_dims(visible_pred, axis=0)
+        # print("visible_pred shape:", visible_pred.shape)
+        
+        try:
+            plot_gt_and_predictions(
+                image_path=image_path,
+                output_dir=output_dir,
+                gt_bodyparts=visible_gt,
+                pred_bodyparts=visible_pred
             )
-
-        print(80 * "-")
-        print(f"{mode} results")
-        for k, v in scores.items():
-            print(f"  {k}: {v}")
+            print(f"Successfully plotted predictions for {image_path}")
+        except Exception as e:
+            print(f"Error plotting predictions for {image_path}: {str(e)}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("project_root")
+    parser.add_argument("--project_root")
     parser.add_argument("--pytorch_config_path")
     parser.add_argument("--snapshot_path")
     parser.add_argument("--train_file", default="train.json")
