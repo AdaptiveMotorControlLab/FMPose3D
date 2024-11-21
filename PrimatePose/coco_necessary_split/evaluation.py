@@ -379,7 +379,7 @@ def main(
                     # bbox_scores: (1,)
 
         visualize_coco_predictions_with_dlc(predictions=predictions, num_samples=10, test_file_json=test_file, draw_skeleton=True, output_dir=output_path)
-
+        
         print("finished evaluating")
         
         # coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
@@ -469,24 +469,23 @@ def visualize_coco_predictions_with_dlc(
 
         # Convert ground truth annotations - keeping batch dimension
         gt_keypoints = np.array(gt_anns[0]['keypoints']).reshape(1, -1, 3)
-        # visible_gt = gt_keypoints[:, :, :2]
         # Create visibility mask from ground truth (keeping batch dim)
-        print("gt_keypoints shape:", gt_keypoints.shape)
         vis_mask = gt_keypoints[:, :, 2] != -1
+        num_visible = np.sum(gt_keypoints[:, :, 2] != -1)
+        print("num_visible:", num_visible)
         
         # Filter ground truth points using visibility mask
-        visible_gt = gt_keypoints[vis_mask].reshape(-1, 3)
-        visible_gt = visible_gt[:, :2]  # Keep only x,y coordinates
-        print("visible_gt:", visible_gt)
-        
+        visible_gt = gt_keypoints[vis_mask]
+        visible_gt = visible_gt[None, :, :2]  # Keep only x,y coordinates
+                
+        print("visible_gt", visible_gt.shape)
         
         # Get prediction keypoints and filter using the same visibility mask
         pred_keypoints = pred_data['bodyparts']  # Keep batch dimension
-        print("pred_keypoints shape:", pred_keypoints.shape)
         visible_pred = pred_keypoints 
-        visible_pred = pred_keypoints[vis_mask]
+        visible_pred = pred_keypoints[vis_mask].copy()
         visible_pred = np.expand_dims(visible_pred, axis=0)
-        # print("visible_pred shape:", visible_pred.shape)
+        print("visible_pred shape:", visible_pred.shape)
         
         try:
             plot_gt_and_predictions(
