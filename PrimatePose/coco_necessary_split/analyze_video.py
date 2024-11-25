@@ -77,6 +77,13 @@ PFM_SKELETON = [
 #     ["mid_tail", "mid_end_tail"],
 #     ["mid_end_tail", "end_tail"]
 # ]
+
+
+def default_confidence_to_alpha(x, pcutoff=0.6):
+    if pcutoff == 0:
+        return x
+    return np.clip((x - pcutoff) / (1 - pcutoff), 0, 1)
+
 def main(
     video_path: str | Path,
     model_config: str,
@@ -86,6 +93,7 @@ def main(
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ):
     video_path = Path(video_path)
+    model_config_path = Path(model_config)
     model_cfg = read_config_as_dict(model_config)
     
     # Ensure detector is provided for top-down approach
@@ -123,7 +131,6 @@ def main(
         task=pose_task,
         pose_runner=pose_runner,
         detector_runner=detector_runner,
-        with_identity=False,
         cropping=None,
     )
 
@@ -137,8 +144,15 @@ def main(
     cfg["individuals"] = [f"individual_{i}" for i in range(num_animals)]
     cfg["bodyparts"] = cfg["metadata"]["bodyparts"]
     cfg["uniquebodyparts"] = []
-    cfg["multianimalbodyparts"] = cfg["metadata"]["bodyparts"]
-
+    cfg["multianimalproject"] = True
+    
+    # Update metadata with individuals
+    model_cfg["metadata"]["individuals"] = cfg["individuals"]
+    
+    # Print debugging information
+    print(f"Number of animals: {num_animals}")
+    print(f"Number of bodyparts: {len(model_cfg['metadata']['bodyparts'])}")
+    
     # Create scorer name
     dlc_scorer = ""
     if detector_path is not None:
@@ -150,16 +164,27 @@ def main(
     output_path = video_path.parent
     output_h5 = output_path / (output_prefix + ".h5")
     
-    # _ = create_df_from_prediction(
-    #     pred_bodyparts=pred_bodyparts,
-    #     pred_unique_bodyparts=pred_unique_bodyparts,
-    #     dlc_scorer=dlc_scorer,
-    #     cfg=cfg,
-    #     model_cfg=model_cfg,
-    #     output_path=output_path,
-    #     output_prefix=output_prefix,
-    # )
+    # Print debugging information
+    print(f"Predictions shape: {pred_bodyparts.shape}")
+    
+    # Create DataFrame with debugging information
+    print("Creating DataFrame with:")
+    print(f"- Number of frames: {len(pred_bodyparts)}")
+    print(f"- Number of coordinates per frame: {pred_bodyparts.shape[1]}")
+    print(f"- Number of individuals in config: {len(cfg['individuals'])}")
+    
+    _ = create_df_from_prediction(
+        predictions=predictions,  # Use original predictions containing full data
+        dlc_scorer=dlc_scorer,
+        cfg=cfg,
+        model_cfg=model_cfg,
+        output_path=output_path,
+        output_prefix=output_prefix,
+        save_as_csv=False
+    )
+    
     # Create labeled video with keypoint confidences from predictions
+    
     _create_labeled_video(
         str(video_path),
         str(output_h5),
@@ -168,7 +193,7 @@ def main(
         bbox=bbox,
         output_path=str(output_path / f"{output_prefix}_labeled.mp4"),
         skeleton_edges=PFM_SKELETON,
-        confidence_to_alpha=True,  # Use confidence scores from predictions
+        confidence_to_alpha=default_confidence_to_alpha,  # Use confidence scores from predictions
     )
 
 if __name__ == "__main__":
