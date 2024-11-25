@@ -62,7 +62,7 @@ class JSONProcessor:
         if not datasets:
             print("No datasets found in the JSON data.")
             return
-
+        print(f"Number of datasets: {len(datasets)}")
         print("Datasets Content:")
         for dataset in datasets:
             print("-" * 40)
@@ -222,14 +222,94 @@ class JSONProcessor:
             json.dump(filtered_data, target_file, indent=2)
         print(f"Filtered data saved to {target_json_file}")
 
+    def print_keypoints_names(self):
+        """Print all keypoints defined in the categories."""
+        categories = self.data.get('categories', [])
+        if not categories:
+            print("No categories found in the JSON data.")
+            return
+
+        for category in categories:
+            keypoints = category.get('keypoints', [])
+            if not keypoints:
+                print(f"No keypoints found in category {category.get('name', 'unknown')}")
+                continue
+            
+            print(f"\nKeypoints for category '{category.get('name', 'unknown')}':")
+            print("-" * 40)
+            for idx, keypoint in enumerate(keypoints, 1):
+                print(f"{idx:2d}. {keypoint}")
+            print("-" * 40)
+            print(f"Total number of keypoints: {len(keypoints)}")
+
+    def merge_json_files(self, json_folder_path, output_path):
+        """Merge multiple JSON files from a folder into a single JSON file.
+        Preserves original image and annotation IDs.
+        
+        Args:
+            json_folder_path (str): Path to folder containing JSON files to merge
+            output_path (str): Path where the merged JSON file will be saved
+        """
+        merged_data = {
+            'images': [],
+            'annotations': [],
+            'categories': []  # We'll take categories from the first file
+        }
+        
+        # Get all JSON files in the folder
+        json_files = [f for f in os.listdir(json_folder_path) if f.endswith('.json')]
+        
+        if not json_files:
+            print(f"No JSON files found in {json_folder_path}")
+            return
+        
+        print(f"Found {len(json_files)} JSON files to merge")
+        
+        # Process each JSON file
+        for json_file in json_files:
+            file_path = os.path.join(json_folder_path, json_file)
+            print(f"Processing {json_file}...")
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                # Take categories from first file if not yet set
+                if not merged_data['categories'] and 'categories' in data:
+                    merged_data['categories'] = data['categories']
+                
+                # Simply append images and annotations
+                merged_data['images'].extend(data.get('images', []))
+                merged_data['annotations'].extend(data.get('annotations', []))
+                
+            except Exception as e:
+                print(f"Error processing {json_file}: {e}")
+        
+        # Save the merged JSON data to the output path
+        with open(output_path, 'w') as f:
+            json.dump(merged_data, f, indent=4)
+        print(f"Merged JSON data saved to {output_path}")
+
+
+
+
 # Example usage:
 if __name__ == "__main__":
     
-    processor = JSONProcessor("/app/data/v7/annotations/pfm_train_apr15.json")
+    # processor = JSONProcessor("/app/data/v7/annotations/pfm_train_apr15.json")
+
+    # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_v8.json")
+    # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/oms_test.json")
+    processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
 
     # Print JSON structure
-    # processor.print_structure()
-    processor.print_all_datasets_content()
+    processor.print_structure()
+    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/train_datasets_checked", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_merged.json")
+    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_datasets_checked", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
+    
+    # processor.print_all_datasets_content()
+    # processor.print_keypoints_names()
+    # processor.sample_json(nums=50, output_json_file="/home/ti_wang/data/tiwang/primate_data/samples/oms_test_sampled_50.json")
     
     # Sample a subset of JSON data
     
