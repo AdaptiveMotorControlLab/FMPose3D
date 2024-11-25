@@ -36,10 +36,10 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
 RUN echo "export PATH=$PATH:/home/${user_name}/.local/bin" >> /home/${user_name}/.zshrc
 
 # install pip packages
-COPY ./requirements.txt /requirements.txt
-RUN pip install --no-cache-dir --upgrade pip setuptools gpustat nvitop && \
-    pip install --no-cache-dir -r /requirements.txt && \
-    pip install --no-cache-dir pytest PySide6==6.3.1 streamlit
+COPY requirements.txt ${HOME}/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir -r ${HOME}/requirements.txt && \
+    pip install --no-cache-dir gpustat nvitop pytest PySide6==6.3.1 streamlit networkx isort black
     
 # RUN pip install -e /app/DeepLabCut
 # change the permission of DeepLabCut package
