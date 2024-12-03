@@ -2,33 +2,36 @@
 project_root=$(dirname $(dirname $(realpath $0)))
 data_path_prefix="/mnt/data/tiwang"
 # server 8
-# data_path_prefix="/mnt/ti_wang"
+# data_ph_prefix="/mnt/ti_wang"
 # server amgm0
 # data_path_prefix="/media/data/ti/data"
 
 data_root=${data_path_prefix}"/v8_coco"
 
-gpu_id="1"
 debug=0
-name=oms
+gpu_id="0"
+name=riken
 # file=${name}_detector_fasterrcnn
+# train_detector=1
+# file=${name}_pose_reset
 file=${name}_pose_hrnet
-dataset_file=${name}
 train_pose=1
-train_detector=0
-mode="train"
 
+dataset_file=${name}
+mode="train"
 # Generate run name based on configuration
 run_name="${file}"
 
 # for splitted datasets
 train_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json
 test_file=${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_file}_test.json
+test_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json
+
 # train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
 # test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
-
-# train_file=/mnt/data/tiwang/primate_data/${file}.json
-# test_file=/mnt/data/tiwang/primate_data/${file}.json
+# for the pfm dataset
+# train_file=${data_path_prefix}/primate_data/${file}.json
+# test_file=${data_path_prefix}/primate_data/${file}.json
 
 if [ "$debug" -eq 1 ]; then
     pytorch_config=${project_root}/project/Debug/${file}_${mode}/train/pytorch_config.yaml

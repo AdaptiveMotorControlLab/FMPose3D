@@ -17,8 +17,7 @@ from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
-from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_predictions, plot_gt_and_predictions
-
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import visualize_predictions
 
 import sys
 from pathlib import Path
@@ -225,7 +224,7 @@ def get_contrasting_color(bg_color):
 #                     )
 #     return img
 
-def visualize_predictions(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color = None,  draw_skeleton=True):
+def visualize_predictions111(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color = None,  draw_skeleton=True):
     """
     Visualize a specified number of samples from COCO predictions and save the plots.
 
@@ -362,8 +361,7 @@ def main(
             detector_runner=detector_runner,
             pcutoff=pcutoff,
         )
-        
-        # if predictions:  # Check if predictions exists and is not empty
+            # if predictions:  # Check if predictions exists and is not empty
         #     print("\nprediction structure:")
         #     # Assuming predictions is a dict, let's print its keys and value types
         #     for key, value in predictions.items():
@@ -377,18 +375,47 @@ def main(
                     # bodyparts: (1, 37, 3)
                     # bboxes: (1, 4)
                     # bbox_scores: (1,)
-
-        visualize_coco_predictions_with_dlc(predictions=predictions, num_samples=10, test_file_json=test_file, draw_skeleton=True, output_dir=output_path)
+        # 获取 ground truth 数据
+        gt_keypoints = loader.ground_truth_keypoints(mode)  # 这应该返回一个以图片路径为键的字典
+        # gt_keypoints = loader.load_data(mode=mode)
+        # Get first key from dictionary
+        # print("gt_keypoints type:", type(gt_keypoints))
+        # first_key = list(gt_keypoints.keys())[0]
+        # print(f"First key: {first_key}")
+        # print(f"First keypoint data: {gt_keypoints[first_key]}")
+        # Print structure of gt_keypoints
+        # print("\nGround truth keypoints structure:")
         
+        # Print format of gt_keypoints
+        # for key, value in gt_keypoints.items():
+        #     print(f"\nImage {key}:")
+        #     if isinstance(value, np.ndarray):
+        #         print(f"  Shape: {value.shape}")
+        #         print(f"  Type: {value.dtype}")
+        #         print(f"  Format: Each keypoint is [x, y, visibility]")
+        #         if len(value.shape) == 3:
+        #             print(f"  Number of animals: {value.shape[0]}")
+        #             print(f"  Number of keypoints per animal: {value.shape[1]}")
+        #             print(f"  Coordinates per keypoint: {value.shape[2]}")
+        #     break  # Only print first image as example
+        
+        visualize_predictions(
+            predictions=predictions,
+            ground_truth=gt_keypoints,
+            output_dir=output_path,
+            draw_skeleton=True,
+            num_samples=30,  # Added to limit visualization to 10 samples
+            random_select=True,
+        )
         print("finished evaluating")
         
-        # coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
-        # model_name = Path(snapshot_path).stem
-        # if detector_path is not None:
-        #     model_name += Path(detector_path).stem
-        # predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
-        # with open(predictions_file, "w") as f:
-        #     json.dump(coco_predictions, f, indent=4)
+        coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
+        model_name = Path(snapshot_path).stem
+        if detector_path is not None:
+            model_name += Path(detector_path).stem
+        predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
+        with open(predictions_file, "w") as f:
+            json.dump(coco_predictions, f, indent=4)
         
         # color_map = PRIMATE_COLOR_MAP
         # # visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
@@ -408,91 +435,18 @@ def main(
         #         annotation_type=annotation_type,
         #     )
             
-        # print(80 * "-")
-        # print(f"{mode} results")
-        # for k, v in scores.items():
-        #     print(f"  {k}: {v}")
+        print(80 * "-")
+        print(f"{mode} results")
         
-def visualize_coco_predictions_with_dlc(
-    predictions, 
-    num_samples=5, 
-    test_file_json="test.json", 
-    output_dir=None,
-    draw_skeleton=True
-):
-    """
-    Visualize predictions using DeepLabCut's plot_gt_and_predictions function
-    
-    Args:
-        predictions: Dictionary with image paths as keys and prediction data as values
-                    Each prediction contains:
-                    - bodyparts: numpy array of shape (1, 37, 3)
-                    - bboxes: numpy array of shape (1, 4)
-                    - bbox_scores: numpy array of shape (1,)
-        num_samples: Number of samples to visualize
-        test_file_json: Path to test set JSON file
-        draw_skeleton: Whether to draw skeleton connections
-    """
-    # Load ground truth data
-    with open(test_file_json, "r") as f:
-        ground_truth = json.load(f)
-
-    # Create output directory - use provided output_dir if specified, otherwise create default
-    if output_dir is None:
-        output_dir = os.path.join(os.path.dirname(test_file_json), "predictions_visualizations")
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Sample images if requested
-    image_paths = list(predictions.keys())
-    if num_samples:
-        image_paths = image_paths[:num_samples]
-
-    # Process each image
-    for image_path in image_paths:
-        # Get predictions for this image
-        pred_data = predictions[image_path]
+        # Define the path for the results file
+        results_file_path = output_path / "test_results.txt"
         
-        # Find image info in ground truth data
-        img_info = next((img for img in ground_truth['images'] 
-                        if img['file_name'] == os.path.basename(image_path)), None)
-        if img_info is None:
-            print(f"Warning: Could not find image info for {image_path}")
-            continue
-
-        # Get ground truth annotations for this image
-        gt_anns = [ann for ann in ground_truth['annotations'] 
-                   if ann['image_id'] == img_info['id']]
-        
-        if not gt_anns:
-            print(f"Warning: No ground truth annotations found for {image_path}")
-            continue
-
-        gt_keypoints = np.array(gt_anns[0]['keypoints']).reshape(1, -1, 3)
-        vis_mask = gt_keypoints[:, :, 2] != -1
-        num_visible = np.sum(gt_keypoints[:, :, 2] != -1)
-        
-        # Filter ground truth points using visibility mask
-        visible_gt = gt_keypoints[vis_mask]
-        visible_gt = visible_gt[None, :, :2]
-                        
-        # Get prediction keypoints and filter using the same visibility mask
-        pred_keypoints = pred_data['bodyparts']  # Keep batch dimension
-        visible_pred = pred_keypoints 
-        visible_pred = pred_keypoints[vis_mask].copy()
-        visible_pred = np.expand_dims(visible_pred, axis=0)
-        # print("visible_pred shape:", visible_pred.shape)
-        
-        try:
-            plot_gt_and_predictions(
-                image_path=image_path,
-                output_dir=output_dir,
-                gt_bodyparts=visible_gt,
-                pred_bodyparts=visible_pred
-            )
-            print(f"Successfully plotted predictions for {image_path}")
-        except Exception as e:
-            print(f"Error plotting predictions for {image_path}: {str(e)}")
-
+        # Open the file in write mode
+        with open(results_file_path, "w") as f:
+            for k, v in scores.items():
+                result_line = f"  {k}: {v}\n"
+                print(result_line.strip())  # Print to console
+                f.write(result_line)  # Write to file
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

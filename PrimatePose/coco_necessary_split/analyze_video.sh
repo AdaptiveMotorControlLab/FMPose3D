@@ -2,8 +2,8 @@
 
 # Path to your video file
 # VIDEO_PATH="/home/ti_wang/Ti_workspace/PrimatePose/data/macaque_monkey.mp4"
-# VIDEO_PATH="/home/ti_wang/Ti_workspace/PrimatePose/data/demo/demo_8s/8s_3840_2160_25fps.mp4"
-VIDEO_PATH=/home/ti_wang/Ti_workspace/PrimatePose/data/demo/monkey_2/monkey_2_3840_2160_25fps.mp4
+VIDEO_PATH="/home/ti_wang/Ti_workspace/PrimatePose/data/demo/demo_8s/8s_3840_2160_25fps.mp4"
+# VIDEO_PATH=/home/ti_wang/Ti_workspace/PrimatePose/data/demo/monkey_2/monkey_2_3840_2160_25fps.mp4
 # VIDEO_PATH=/home/ti_wang/Ti_workspace/PrimatePose/data/demo/monkey_single_1/6575012-uhd_3840_2160_25fps.mp4
 # VIDEO_PATH=/home/ti_wang/Ti_workspace/PrimatePose/data/demo/single_monkey_2/1508571-uhd_3840_2160_25fps.mp4
 # Number of animals to detect in each frame
@@ -21,7 +21,7 @@ SNAPSHOT_PATH=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_trai
 # Optional: Path to detector model if using top-down approach
 # DETECTOR_PATH="/home/ti_wang/Ti_workspace/PrimatePose/project/split/oms_detector_fasterrcnn_train/train/snapshot-detector-best-021.pt"
 # DETECTOR_PATH="/home/ti_wang/Ti_workspace/PrimatePose/project/split/mp_detector_fasterrcnn_train/train/snapshot-detector-best-024.pt"
-DETECTOR_PATH=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_merged_checked_detector_fasterrcnn_train/train/snapshot-detector-best-083.pt
+DETECTOR_PATH=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_merged_checked_detector_fasterrcnn_train/train/snapshot-detector-best-171.pt
 
 # Run video analysis
 python analyze_video.py \

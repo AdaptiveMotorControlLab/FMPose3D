@@ -48,7 +48,8 @@ def analyze_annotations(data):
         'xmin+w_out_of_bounds': 0,   # Count of bboxes where width goes out of bounds
         'ymin+h_out_of_bounds': 0,   # Count of bboxes where height goes out of bounds
         'missing_image_reference': 0,
-        'no_keypoints_annitations': 0   # Count of annotations without keypoints
+        'no_keypoints_annitations': 0,   # Count of annotations without keypoints
+        'keypoints_annotations': 0    # Count of annotations with keypoints
     }
     # Create a dictionary of image dimensions for quick lookup
     image_dims = {image['id']: (image['width'], image['height']) for image in data['images']}
@@ -78,8 +79,11 @@ def analyze_annotations(data):
         # Check if the entire bbox is out of image boundaries
         if xmax >= img_width:
             error_counts['xmin+w_out_of_bounds'] += 1
+            continue
+            
         elif ymax >= img_height:
             error_counts['ymin+h_out_of_bounds'] += 1
+            continue
         
         # Check if keypoints are missing or contain only zeros
         keypoints = annotation.get('keypoints', [])
@@ -87,6 +91,8 @@ def analyze_annotations(data):
         visibility_labels = keypoints[2::3]  # Extract visibility values (every third item)
         if all(v == -1 for v in visibility_labels):
             error_counts['no_keypoints_annitations'] += 1
+        else:
+            error_counts['keypoints_annotations'] += 1
             
     return error_counts
 

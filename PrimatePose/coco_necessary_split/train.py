@@ -107,7 +107,7 @@ def main(
                                 group = "split_datasets_v8_server8",
                                 run_name = args.run_name,
                                 )
-          
+        
         # skipping detector training if a detector_path is given
         if args.detector_path is None and detector_epochs > 0 and args.train_detector:
             train(
