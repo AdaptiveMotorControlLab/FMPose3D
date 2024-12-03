@@ -12,7 +12,6 @@ from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
 
 import wandb
-
 # wandb.init(project="primatepose", tags=["debug_SSDLite"])
 # wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
 
@@ -29,10 +28,10 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 32,
-    dataloader_workers: int = 12,
-    detector_batch_size: int = 12,
-    detector_dataloader_workers: int = 12,
+    batch_size: int = 64,
+    dataloader_workers: int = 16,
+    detector_batch_size: int = 32,
+    detector_dataloader_workers: int= 12,
     debug: bool = False,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
@@ -92,25 +91,25 @@ def main(
 
         print("############################################")
         print("logger_config:", logger_config)
-        print("flag : 86")
+        # print("flag : 86")
 
         if args.debug:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
-                                #  tags = ["Debug"],
-                                group = "Dubug_v8",
-                                run_name = "debug_ak_val_testprint",
+                                tags = ["server8"],
+                                group = "Dubug_v8_server8",
+                                run_name = args.run_name,
                                 )
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
-                                tags = ["FasterRCNN"],
-                                group = "Training_v8",
-                                run_name = "Train_12",
+                                tags = ["eval"],
+                                group = "PFM_v8_server8",
+                                run_name = args.run_name,
                                 )
-            
+          
         # skipping detector training if a detector_path is given
-        if args.detector_path is None and detector_epochs > 0:
+        if args.detector_path is None and detector_epochs > 0 and args.train_detector:
             train(
                 loader=loader,
                 run_config=loader.model_cfg["detector"],
@@ -120,15 +119,16 @@ def main(
                 logger_config=logger_config,
                 snapshot_path=detector_path,
             )
-
-    if epochs > 0:
+            
+    if epochs > 0 and args.train_pose:
         train(
             loader=loader,
             run_config=loader.model_cfg,
             task=pose_task,
             device=device,
             gpus=gpus,
-            logger_config=loader.model_cfg.get("logger"),
+            logger_config=logger_config,
+            # logger_config=loader.model_cfg.get("logger"),
             snapshot_path=snapshot_path,
         )
         
@@ -137,8 +137,8 @@ import shutil
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("project_root")
-    parser.add_argument("pytorch_config")
+    parser.add_argument("--project_root")
+    parser.add_argument("--pytorch_config")
     parser.add_argument("--train_file", default="train.json")
     parser.add_argument("--test_file", default="test.json")
     parser.add_argument("--device", default=None)
@@ -150,16 +150,23 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     parser.add_argument("--debug", action="store_true")
-    
+    parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
+    parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
+    parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
     args = parser.parse_args()
     
+    
+    # backup the train.sh file and the current file in the same folder    
     train_dir = os.path.dirname(args.pytorch_config)
     debug_dir = os.path.dirname(train_dir)
-
-    # backup the train.sh file
-    shutil.copy("/app/coco_necessary/train.sh", debug_dir+"/train.sh")
-    shutil.copy("/app/coco_necessary/train.py", debug_dir+"/train.py")
-        
+    print("debug_dir:", debug_dir)
+    current_file_path = os.path.abspath(__file__)
+    current_dir = os.path.dirname(current_file_path)
+    train_sh_path = os.path.join(current_dir, "train.sh")
+    
+    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    
     main(
         args.project_root,
         args.train_file,
@@ -173,5 +180,5 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
-        debug=args.debug,
+        debug=args.debug
     )
