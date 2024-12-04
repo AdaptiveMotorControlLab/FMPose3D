@@ -1,5 +1,7 @@
 import json
 import matplotlib.pyplot as plt
+import os 
+
 
 def visualize_error_counts(error_counts, num_annotations, filename, image_path):
     """Visualize the annotation error counts using a bar chart."""
@@ -101,14 +103,18 @@ def cal_different_kinds_of_samples(input_file, txt_path):
     logging.basicConfig(
     filename=txt_path,
     filemode='a',  # 'a' for append, 'w' for overwrite
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(message)s',
     level=logging.INFO)
     
     # Load data from the JSON file
     data = load_json(input_file)
     file_name = input_file.split('/')[-1]
     print("JSON file:", file_name)
-    logging.info("JSON file: {}".format(file_name))
+    # logging.info("JSON file: {}".format(file_name))
+    # print("JSON file: {}".format(file_name))
+    logging.info(f"===== Dataset: {file_name} =====")
+    print(f"===== Dataset: {file_name} =====")
+    
     num_annotations = len(data['annotations'])
     print("total number of annotations:", num_annotations)
     logging.info("total number of annotations: {}".format(num_annotations))
@@ -120,10 +126,20 @@ def cal_different_kinds_of_samples(input_file, txt_path):
     for category, count in error_counts.items():
         print(f"{category}: {count}")
         logging.info("{}: {}".format(category, count))
-
+        
     # Visualize the error counts using a bar chart
     # image_path = "/app/analyse_json/annotations_{}.png".format(file_name.split('.')[0])
     # visualize_error_counts(error_counts, num_annotations, file_name, image_path)
+def cal_sample_for_all_existing_datasets(input_dir, txt_path):
+    """
+    Calculate the number of different types of samples for all existing datasets.
+    """
+    # text_path = txt_path + 'all_datasets_error_counts.txt'
+    for file in os.listdir(input_dir):
+        print("file:", file)
+        print(os.path.join(input_dir, file))
+        if file.endswith('.json'):
+            cal_different_kinds_of_samples(os.path.join(input_dir, file), txt_path)
 
 def main():
     
@@ -131,8 +147,7 @@ def main():
     # input_file = '/app/data/v7/annotations/pfm_train_apr15.json'
     # input_file = '/app/data/primate_data/pfm_train_v8.json'
     # input_file = '/app/data/primate_data/splitted_test_datasets/chimpact_test.json'
-    input_file = '/app/data/primate_data/splitted_train_datasets/ak_new_train.json'
-    
+    input_file = '/app/data/primate_data/splitted_train_datasets/ak_new_train.json'   
     # Load data from the JSON file
     data = load_json(input_file)
     file_name = input_file.split('/')[-1]
@@ -146,10 +161,13 @@ def main():
     print("Annotation Errors Summary:")
     for category, count in error_counts.items():
         print(f"{category}: {count}")
-
     # Visualize the error counts using a bar chart
-    image_path = "/app/analyse_json/annotations_{}.png".format(file_name.split('.')[0])
-    visualize_error_counts(error_counts, num_annotations, file_name, image_path)
+    # image_path = "/app/analyse_json/annotations_{}.png".format(file_name.split('.')[0])
+    # visualize_error_counts(error_counts, num_annotations, file_name, image_path)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    text_dir = '/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/analyse_train_datasets/all_datasets_error_counts.txt'
+    input_dir = '/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets'
+    cal_sample_for_all_existing_datasets(input_dir, text_dir)
+    
