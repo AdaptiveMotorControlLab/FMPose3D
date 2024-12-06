@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import os
 
 def main(project_root: Path):
     for subset, ann_filename in [
@@ -171,6 +172,11 @@ def search_file_by_id(path, id):
 
     print("image", image)
 
+def print_categories(path):
+    with open(path, "r") as f:
+        data = json.load(f)
+        print(data.keys())
+        print(data["categories"])
 
 import json
 def count_datasets(json_file_path):
@@ -192,7 +198,36 @@ def count_datasets(json_file_path):
     print(f"Unique dataset_ids in annotations: {len(annotation_dataset_ids)}")
     print(f"Total datasets in 'datasets' section: {total_datasets}")
     print("-" * 40)
+   
+def extract_key_to_file(input_path, output_path, key):
+    """
+    Extract any specified key from the input JSON file and save it to a new JSON file
     
+    Args:
+        input_path: Path to the input JSON file
+        output_path: Path where to save the extracted data
+        key: The key to extract from the JSON file (e.g., 'categories', 'images', 'annotations', etc.)
+    """
+    # Read the original JSON file
+    with open(input_path, 'r') as f:
+        data = json.load(f)
+    
+    # Extract the specified key
+    if key in data:
+
+        extracted_data = {key: data[key]}  # Keep the key in the output
+
+        # Create the output directory (if it doesn't exist)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                
+        # Save to a new file
+        with open(output_path, 'w') as f:
+            json.dump(extracted_data, f, indent=4)
+        print(f"{key} has been extracted to: {output_path}")
+    else:
+        print(f"No '{key}' key found in {input_path}")
+
+
 if __name__ == "__main__":
     # test_image()
     # Path to the JSON file
@@ -207,11 +242,14 @@ if __name__ == "__main__":
     # search_file_by_id(test_json_path, 82506)
         
     # Paths to your JSON files
-    train_json_path = "/mnt/tiwang/v7/annotations/pfm_train_apr15.json"
-    valid_json_path = "/mnt/tiwang/v7/annotations/pfm_val_apr15.json"
-    test_json_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
+    train_json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/annotations/pfm_train_apr15.json"
+    # valid_json_path = "/mnt/tiwang/v7/annotations/pfm_val_apr15.json"
+    # test_json_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
     
     # Count datasets in each file
-    count_datasets(train_json_path)
-    count_datasets(valid_json_path)
-    count_datasets(test_json_path)
+    # count_datasets(train_json_path)
+    # count_datasets(valid_json_path)
+    # count_datasets(test_json_path)
+    key = "pfm_keypoints"
+    target_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/processed/{key}_pfm_train.json"
+    extract_key_to_file(train_json_path, target_path, key)
