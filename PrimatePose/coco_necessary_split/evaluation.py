@@ -360,31 +360,14 @@ def main(
             mode=mode,
             detector_runner=detector_runner,
             pcutoff=pcutoff,
-        )
-            # if predictions:  # Check if predictions exists and is not empty
-        #     print("\nprediction structure:")
-        #     # Assuming predictions is a dict, let's print its keys and value types
-        #     for key, value in predictions.items():
-        #         if isinstance(value, np.ndarray):
-        #             print(f"{key}: numpy array with shape {value.shape} and dtype {value.dtype}")
-        #         else:
-        #             print(f"{key}: {type(value)}")
-        #             if isinstance(value, dict): 
-        #                 for k, v in value.items():
-        #                     print(f"  {k}: {v.shape}")
-                    # bodyparts: (1, 37, 3)
-                    # bboxes: (1, 4)
-                    # bbox_scores: (1,)
+        ) 
+        # predictions:      
+        # bodyparts: (1, 37, 3)
+        # bboxes: (1, 4)
+        # bbox_scores: (1,)
+        
         # 获取 ground truth 数据
         gt_keypoints = loader.ground_truth_keypoints(mode)  # 这应该返回一个以图片路径为键的字典
-        # gt_keypoints = loader.load_data(mode=mode)
-        # Get first key from dictionary
-        # print("gt_keypoints type:", type(gt_keypoints))
-        # first_key = list(gt_keypoints.keys())[0]
-        # print(f"First key: {first_key}")
-        # print(f"First keypoint data: {gt_keypoints[first_key]}")
-        # Print structure of gt_keypoints
-        # print("\nGround truth keypoints structure:")
         
         # Print format of gt_keypoints
         # for key, value in gt_keypoints.items():
@@ -399,14 +382,6 @@ def main(
         #             print(f"  Coordinates per keypoint: {value.shape[2]}")
         #     break  # Only print first image as example
         
-        visualize_predictions(
-            predictions=predictions,
-            ground_truth=gt_keypoints,
-            output_dir=output_path,
-            draw_skeleton=True,
-            num_samples=30,  # Added to limit visualization to 10 samples
-            random_select=True,
-        )
         print("finished evaluating")
         
         coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
@@ -441,13 +416,31 @@ def main(
         # Define the path for the results file
         results_file_path = output_path / "test_results.txt"
         
-        # Open the file in write mode
-        with open(results_file_path, "w") as f:
+        # Print and write the results
+        print(f"\nResults from model: {snapshot_path}")
+        print("Evaluation scores:")
+        
+        # Open the file in append mode
+        with open(results_file_path, "a") as f:
+            # Write a separator line and model path
+            separator = "\n" + "="*50 + "\n"
+            f.write(separator)
+            f.write(f"Model: {snapshot_path}\n")
+            
+            # Write the scores
             for k, v in scores.items():
                 result_line = f"  {k}: {v}\n"
                 print(result_line.strip())  # Print to console
                 f.write(result_line)  # Write to file
 
+        visualize_predictions(
+            predictions=predictions,
+            ground_truth=gt_keypoints,
+            output_dir=output_path,
+            num_samples=10,  # Added to limit visualization to 10 samples
+            random_select=True,
+        )
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--project_root")

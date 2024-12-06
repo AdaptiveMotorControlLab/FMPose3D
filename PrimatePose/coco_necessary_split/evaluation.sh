@@ -5,9 +5,9 @@ data_root=${data_path_prefix}"/v8_coco"
 # data_path_prefix="${project_root}/data/tiwang"
 
 debug=0
-gpu_id="0"
+gpu_id="1"
 mode="train"
-name=ak
+name=omc
 file=${name}_pose_hrnet
 # file=${name}_pose_resnet
 # file=${name}_detector_fasterrcnn
@@ -24,8 +24,9 @@ pytorch_config_path=${pfm_root}/project/split/${file}_train/train/pytorch_config
 
 # snapshot_path=${pfm_root}/project/split/${file}_train/train/snapshot-200.pt
 snapshot_path=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_train/train/snapshot-best-056.pt
-# detector_snapshot_path=${project_root}/project/split/${file}_train/train/snapshot-detector-020.pt
+# snapshot_path=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_goodpose_merged_pose_hrnet_train/train/snapshot-best-020.pt
 
+# detector_snapshot_path=${project_root}/project/split/${file}_train/train/snapshot-detector-020.pt
 
 # detector_snapshot_path=/home/ti_wang/Ti_workspace/PrimatePose/project/split/ak_pose_hrnet_train/train/snapshot-detector-248.pt
 # detector_snapshot_path=/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_merged_checked_detector_fasterrcnn_train/train/snapshot-detector-best-083.pt
