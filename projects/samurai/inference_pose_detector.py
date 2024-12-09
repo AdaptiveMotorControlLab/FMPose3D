@@ -57,7 +57,7 @@ def initialize_models(pose_config_path, pose_snapshot_path, detector_path, devic
     pose_runner, detector_runner = get_inference_runners(
         model_config=model_cfg,
         snapshot_path=pose_snapshot_path,
-        max_individuals=1,
+        max_individuals=10,
         num_bodyparts=len(model_cfg["metadata"]["bodyparts"]),
         num_unique_bodyparts=len(model_cfg["metadata"]["unique_bodyparts"]),
         with_identity=model_cfg["metadata"].get("with_identity", False),
@@ -168,15 +168,17 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
     ret, first_frame = cap.read()
     if not ret:
         raise ValueError("Could not read first frame")
-    # Use detector to get initial bbox
+        
+    # Use detector to get all initial bboxes
     with torch.inference_mode():
         detections = detector_runner.inference([first_frame])
         if not detections or len(detections[0]['bboxes']) == 0:
             raise ValueError("No detection in first frame")
-        
+       
+        print("detections:", detections)
         first_bbox = detections[0]['bboxes'][0]  # 使用第一个检测框
         logger.info(f"Initial detection bbox: {first_bbox}")
-        
+             
     # We'll save frames instead of directly writing to video
     frame_paths = []
          
@@ -317,9 +319,13 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
 
 if __name__ == "__main__":
     # Paths
-    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/a_monkey_10frames.mp4"
+    # VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/a_monkey.mp4"
+    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps.mp4"
     BBOX_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/bbox.txt"
-    OUTPUT_DIR = "/home/ti_wang/Ti_workspace/projects/samurai/results/output"  # Changed this
+    # OUTPUT_DIR = "/home/ti_wang/Ti_workspace/projects/samurai/results/output/"  # Changed this
+
+    video_name = Path(VIDEO_PATH).stem  # Get the video file name without the extension
+    OUTPUT_DIR = f"/home/ti_wang/Ti_workspace/projects/samurai/results/output/{video_name}"
     
     # Pose estimation paths
     POSE_CONFIG = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/pytorch_config.yaml"
