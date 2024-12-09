@@ -85,42 +85,75 @@ def draw_predictions(frame, mask, bbox, keypoints, confidences):
     # Calculate appropriate point size and line thickness based on image resolution
     point_size = calculate_point_size(width, height)
     line_thickness = max(1, int(point_size / 2))
-     
-    # Draw mask
-    mask_img = np.zeros_like(frame)
-    mask_img[mask] = [255, 0, 0]  # Blue for mask   [blue, green, red]
-    frame_vis = cv2.addWeighted(frame_vis, 1, mask_img, 0.2, 0)
     
+    # Draw mask - handle tensor masks properly
+    if isinstance(mask, torch.Tensor):
+        mask = mask.detach().cpu().numpy()
+    
+    # Ensure mask is binary and correct shape
+    if mask is not None:
+        if len(mask.shape) > 2:  # If mask has extra dimensions
+            mask = mask.squeeze()  # Remove single dimensions
+        
+        # Convert to binary mask
+        mask = (mask > 0).astype(np.uint8)
+        
+        # Create 3-channel mask for visualization
+        mask_3d = np.stack([
+            mask * 255,  # Blue channel
+            mask * 0,    # Green channel
+            mask * 0     # Red channel
+        ], axis=2).astype(np.uint8)
+        
+        # Apply mask overlay
+        frame_vis = cv2.addWeighted(frame_vis, 1, mask_3d, 0.2, 0)
+
     # Draw bbox
     if isinstance(bbox, np.ndarray):
         bbox = bbox.flatten()
     x1, y1, x2, y2 = [int(coord) for coord in bbox]
-    cv2.rectangle(frame_vis, (x1, y1), (x2, y2), (0, 255, 0), line_thickness) # green bbox
+    cv2.rectangle(frame_vis, (x1, y1), (x2, y2), (0, 255, 0), line_thickness)
     
     # Draw keypoints and skeleton
     if isinstance(keypoints, np.ndarray):
-        instance_keypoints = keypoints[0]  # shape: (37, 2)
-        instance_confidences = confidences[0]  # shape: (37,)
-        
-        pcutoff=0
-        # First draw skeleton connections
-        for connection in PFM_SKELETON:
-            idx1, idx2 = connection[0]-1, connection[1]-1  # Indices start from 0
-            if (instance_confidences[idx1] > pcutoff and 
-                instance_confidences[idx2] > pcutoff):  # Only connect high confidence points
-                pt1 = tuple(map(int, instance_keypoints[idx1]))
-                pt2 = tuple(map(int, instance_keypoints[idx2]))
-                cv2.line(frame_vis, pt1, pt2, (0, 255, 255), line_thickness)  # Yellow lines
-        
-        # Then draw keypoints on top
-        for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
-            if conf > pcutoff:  # Confidence threshold
-                x, y = int(kp[0]), int(kp[1])
-                cv2.circle(frame_vis, (x, y), point_size, (0, 0, 255), -1)  # Red points
+        # Handle multiple instances if present
+        if len(keypoints.shape) == 3:  # Shape: (N, 37, 2)
+            for instance_idx in range(len(keypoints)):
+                instance_keypoints = keypoints[instance_idx]
+                instance_confidences = confidences[instance_idx]
                 
-                # Optional: Display keypoint index
-                # cv2.putText(frame_vis, str(kp_idx+1), (x+5, y+5), 
-                #            cv2.FONT_HERSHEY_SIMPLEX, 0.3*point_size/3, (0,0,255), 1)
+                # Draw skeleton connections
+                for connection in PFM_SKELETON:
+                    idx1, idx2 = connection[0]-1, connection[1]-1
+                    if (instance_confidences[idx1] > 0 and 
+                        instance_confidences[idx2] > 0):
+                        pt1 = tuple(map(int, instance_keypoints[idx1]))
+                        pt2 = tuple(map(int, instance_keypoints[idx2]))
+                        cv2.line(frame_vis, pt1, pt2, (0, 255, 255), line_thickness)
+                
+                # Draw keypoints
+                for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
+                    if conf > 0:
+                        x, y = int(kp[0]), int(kp[1])
+                        cv2.circle(frame_vis, (x, y), point_size, (0, 0, 255), -1)
+        else:  # Single instance case
+            instance_keypoints = keypoints
+            instance_confidences = confidences
+            
+            # Draw skeleton connections
+            for connection in PFM_SKELETON:
+                idx1, idx2 = connection[0]-1, connection[1]-1
+                if (instance_confidences[idx1] > 0 and 
+                    instance_confidences[idx2] > 0):
+                    pt1 = tuple(map(int, instance_keypoints[idx1]))
+                    pt2 = tuple(map(int, instance_keypoints[idx2]))
+                    cv2.line(frame_vis, pt1, pt2, (0, 255, 255), line_thickness)
+            
+            # Draw keypoints
+            for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
+                if conf > 0:
+                    x, y = int(kp[0]), int(kp[1])
+                    cv2.circle(frame_vis, (x, y), point_size, (0, 0, 255), -1)
     
     return frame_vis
 
@@ -176,171 +209,199 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
             raise ValueError("No detection in first frame")
        
         print("detections:", detections)
-        first_bbox = detections[0]['bboxes'][0]  # 使用第一个检测框
-        logger.info(f"Initial detection bbox: {first_bbox}")
-             
+        all_bboxes = detections[0]['bboxes']  # 获取所有检测到的bbox
+        first_bbox = all_bboxes[0]
+        # all_bboxes = [all_bboxes[0]]
+        logger.info(f"Detected {len(all_bboxes)} objects in first frame")
+        
+        # Initialize SAMURAI tracking
+        state = samurai_predictor.init_state(video_path, offload_video_to_cpu=True)
+        # state keys: dict_keys(['images', 'num_frames', 'offload_video_to_cpu', 'offload_state_to_cpu', 'video_height', 'video_width', 'device'  o
+        # , 'storage_device', 'point_inputs_per_obj', 'mask_inputs_per_obj', 'cached_features', 'constants', 'obj_id_to_idx', 'obj_idx_to_id', ' p/st-proce
+        # obj_ids', 'output_dict', 'output_dict_per_obj', 'temp_output_dict_per_obj', 'consolidated_frame_inds', 'tracking_has_started', 'framessm n/INSTAL
+        # _already_tracked'])  
+        
+        # Initialize each detected object with a unique obj_id
+        # add_new_points_or_box is designed to add one object at a time, with a specific obj_id. 
+        # we can call it multiple times to track multiple objects. 
+        for obj_id, bbox in enumerate(all_bboxes):
+            x, y, w, h = bbox
+            initial_bbox = (int(x), int(y), int(x+w), int(y+h))
+            _, _, masks = samurai_predictor.add_new_points_or_box(state, box=initial_bbox, frame_idx=0, obj_id=obj_id)
+            logger.info(f"Initialized tracking for object {obj_id} with bbox {initial_bbox}")
+        
+            print("masks:", masks.shape)  #  [B, 1, H, W]
+            break
+        
     # We'll save frames instead of directly writing to video
     frame_paths = []
          
-    try:
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
-            # Initialize SAMURAI tracking
-            state = samurai_predictor.init_state(video_path, offload_video_to_cpu=True)
-            x, y, w, h = first_bbox
-            initial_bbox = (int(x), int(y), int(x+w), int(y+h))
-            _, _, masks = samurai_predictor.add_new_points_or_box(state, box=initial_bbox, frame_idx=0, obj_id=0)
-            # print("masks:", type(masks))
-            # print("masks:", masks.shape)
-            # Process frames one by one
-            for frame_idx, object_ids, masks in samurai_predictor.propagate_in_video(state):
-                # Print progress
-                if frame_idx % 10 == 0:
-                    print(f"Processing frame {frame_idx}/{total_frames}")
-                
-                # Get mask and bbox from SAMURAI
-                mask = masks[0][0].cpu().numpy() > 0.0
-                non_zero_indices = np.argwhere(mask)
-                
-                if len(non_zero_indices) == 0:
-                    x, y, w, h = first_bbox
-                    bbox = np.array([[x, y, w, h]])  # Already in COCO format
-                else:
-                    y_min, x_min = non_zero_indices.min(axis=0).tolist()
-                    y_max, x_max = non_zero_indices.max(axis=0).tolist()
-                    # Convert to COCO format
-                    bbox = np.array([[
-                        x_min,
-                        y_min,
-                        x_max - x_min,  # width
-                        y_max - y_min   # height
-                    ]])
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        # Process frames one by one            
+        for frame_idx, object_ids, masks in samurai_predictor.propagate_in_video(state):
+            try:
+                logger.info(f"Processing frame {frame_idx}/{total_frames}")
+                logger.info(f"Object IDs: {object_ids}")
+                logger.info(f"Masks shape: {masks.shape if masks is not None else 'None'}")
                 
                 # Read current frame
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                 ret, frame = cap.read()
                 if not ret:
+                    logger.error(f"Failed to read frame {frame_idx}")
                     break
                 
-                # Create context for current frame - correct format
-                context = {"bboxes": bbox}  # Changed this line
-                frame_with_context = (frame, context)
+                frame_vis = frame.copy()
                 
-                # Run pose estimation on single frame
-                predictions = pose_runner.inference([frame_with_context])
+                # Ensure masks is on CPU and in correct format
+                if torch.is_tensor(masks):
+                    # 确保在进行任何布尔操作之前转换为numpy
+                    masks = masks.detach().cpu().numpy()
                 
-                # if predictions:
-                #     print("First prediction type:", type(predictions[0]))
-                #     print("First prediction keys:", predictions[0].keys() if isinstance(predictions[0], dict) else "Not a dict") # dict_keys(['bodyparts', 'bboxes'])
-                #     print("First prediction content:", predictions[0])
-                
-                if predictions and len(predictions) > 0:
+                # Process each object
+                for idx, obj_id in enumerate(object_ids):
                     try:
-                        # 每10帧打印一次
-                        if frame_idx % 10 == 0:
-                            num_instances = predictions[0]["bodyparts"].shape[0]
-                            print(f"Frame {frame_idx}: Detected {num_instances} instances")
+                        # Get mask for current object and ensure it's numpy
+                        current_mask = masks[idx, 0]
                         
-                        keypoints = predictions[0]["bodyparts"][..., :2]
-                        confidences = predictions[0]["bodyparts"][..., 2]
+                        # 使用numpy操作而不是tensor操作
+                        binary_mask = (current_mask > 0.0).astype(np.uint8)
+                        non_zero_indices = np.argwhere(binary_mask)
                         
-                        x, y, w, h = bbox[0]
-                        vis_bbox = [x, y, x+w, y+h]
+                        if len(non_zero_indices) > 0:
+                            y_min, x_min = non_zero_indices.min(axis=0)
+                            y_max, x_max = non_zero_indices.max(axis=0)
+                            bbox = np.array([[
+                                int(x_min),
+                                int(y_min),
+                                int(x_max - x_min),  # width
+                                int(y_max - y_min)   # height
+                            ]])
+                            
+                            # Add debug logging
+                            logger.debug(f"Frame {frame_idx}, Object {obj_id}: bbox={bbox}")
+                        else:
+                            logger.warning(f"Empty mask for object {obj_id} in frame {frame_idx}")
+                            continue
                         
-                        frame_vis = draw_predictions(
-                            frame=frame,
-                            mask=mask,
-                            bbox=vis_bbox,
-                            keypoints=keypoints,
-                            confidences=confidences
-                        )
+                        # Create context and run pose estimation
+                        context = {"bboxes": bbox}
+                        frame_with_context = (frame, context)
+                        predictions = pose_runner.inference([frame_with_context])
                         
-                        # Save frame
-                        frame_path = frames_dir / f"frame_{frame_idx:06d}.jpg"
-                        cv2.imwrite(str(frame_path), frame_vis)
-                        frame_paths.append(str(frame_path))
-                        
+                        if predictions and len(predictions) > 0:
+                            keypoints = predictions[0]["bodyparts"][..., :2]
+                            confidences = predictions[0]["bodyparts"][..., 2]
+                            
+                            x, y, w, h = bbox[0]
+                            vis_bbox = [x, y, x+w, y+h]
+                            
+                            frame_vis = draw_predictions(
+                                frame=frame_vis,
+                                mask=binary_mask,
+                                bbox=vis_bbox,
+                                keypoints=keypoints,
+                                confidences=confidences
+                            )
                     except Exception as e:
-                        print(f"Error processing predictions: {e}")
-                        print("Current bbox:", bbox)
-                        print("Current frame shape:", frame.shape)
+                        logger.error(f"Error processing object {obj_id} in frame {frame_idx}: {e}")
+                        logger.error("Error details:", exc_info=True)
+                        continue
+                
+                # Save frame
+                frame_path = frames_dir / f"frame_{frame_idx:06d}.jpg"
+                cv2.imwrite(str(frame_path), frame_vis)
+                frame_paths.append(str(frame_path))
+                
+            except Exception as e:
+                logger.error(f"Error processing frame {frame_idx}: {e}")
+                logger.error("Error details:", exc_info=True)
+                continue
     
-    finally:
-        # Cleanup
-        cap.release()
-        del samurai_predictor, state, pose_runner
-        torch.cuda.empty_cache()
+    print("303 frame_paths:", frame_paths)
+    # Cleanup (moved outside the with block)
+    cap.release()
+    del samurai_predictor, state, pose_runner
+    torch.cuda.empty_cache()
+    
+    # Get video name and create output paths
+    video_name = Path(video_path).stem
+    output_dir = Path(output_path)
+    output_video = output_dir / f"{video_name}_tracked.mp4"
     
     # Use ffmpeg to create video from frames
     if frame_paths:
-        output_video = str(output_dir / "output.mp4")
-        # Try with mpeg4 encoder instead of libx264
-        ffmpeg_cmd = [
-            'ffmpeg', '-y',
-            '-framerate', str(fps),
-            '-i', str(frames_dir / 'frame_%06d.jpg'),
-            '-vcodec', 'mpeg4',  # Changed from libx264 to mpeg4
-            '-q:v', '1',        # Quality setting for mpeg4
-            '-pix_fmt', 'yuv420p',
-            output_video
-        ]
-        
         try:
-            logger.info(f"Creating video with command: {' '.join(ffmpeg_cmd)}")
+            logger.info(f"Creating video at {output_video}")
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',
+                '-framerate', str(fps),
+                '-i', str(frames_dir / 'frame_%06d.jpg'),
+                '-vcodec', 'mpeg4',
+                '-q:v', '1',
+                '-pix_fmt', 'yuv420p',
+                str(output_video)
+            ]
+            
             result = subprocess.run(ffmpeg_cmd, 
                                  check=True, 
                                  capture_output=True, 
                                  text=True)
             
-            # If mpeg4 fails, try with other available encoders
-            if not (os.path.exists(output_video) and os.path.getsize(output_video) > 0):
+            # If mpeg4 fails, try with alternative encoder
+            if not (output_video.exists() and output_video.stat().st_size > 0):
                 logger.info("MPEG4 encoding failed, trying alternative encoder...")
+                alternative_video = output_dir / f"{video_name}_tracked.avi"
                 alternative_cmd = [
                     'ffmpeg', '-y',
                     '-framerate', str(fps),
                     '-i', str(frames_dir / 'frame_%06d.jpg'),
-                    '-c:v', 'mjpeg',  # Try mjpeg encoder
+                    '-c:v', 'mjpeg',
                     '-q:v', '2',
                     '-pix_fmt', 'yuv420p',
-                    str(output_dir / "output.avi")  # Use .avi for mjpeg
+                    str(alternative_video)
                 ]
                 subprocess.run(alternative_cmd, check=True, capture_output=True, text=True)
-                return str(output_dir / "output.avi")
+                logger.info(f"Video saved as {alternative_video}")
+                return str(alternative_video)
             
-            logger.info("Successfully created video")
-            return output_video
+            logger.info(f"Video successfully saved to {output_video}")
+            return str(output_video)
             
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to create video: {e.stderr}")
             # If video creation fails, return the directory containing individual frames
+            logger.info(f"Frames saved in directory: {frames_dir}")
             return str(frames_dir)
 
     logger.info(f"Processing complete! Results saved to {output_dir}")
-    return str(output_dir / "output.mp4")
+    return str(output_video)
 
 if __name__ == "__main__":
     # Paths
-    # VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/a_monkey.mp4"
     VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps.mp4"
     BBOX_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/bbox.txt"
-    # OUTPUT_DIR = "/home/ti_wang/Ti_workspace/projects/samurai/results/output/"  # Changed this
-
-    video_name = Path(VIDEO_PATH).stem  # Get the video file name without the extension
-    OUTPUT_DIR = f"/home/ti_wang/Ti_workspace/projects/samurai/results/output/{video_name}"
+    
+    # Create output directory based on video name
+    video_name = Path(VIDEO_PATH).stem
+    OUTPUT_DIR = Path("/home/ti_wang/Ti_workspace/projects/samurai/results/output") / video_name
     
     # Pose estimation paths
     POSE_CONFIG = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/pytorch_config.yaml"
     POSE_SNAPSHOT = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-best-056.pt"
     DETECTOR_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-detector-best-171.pt"
+    
     try:
-        process_video_with_tracking(
+        output_path = process_video_with_tracking(
             video_path=VIDEO_PATH,
             bbox_path=BBOX_PATH,
-            output_path=OUTPUT_DIR,  # Now passing directory path
+            output_path=OUTPUT_DIR,
             pose_config=POSE_CONFIG,
             pose_snapshot=POSE_SNAPSHOT,
             detector_path=DETECTOR_PATH,
             device="cuda"
         )
+        print(f"Processing complete! Output saved to: {output_path}")
     except Exception as e:
         logger.error(f"Processing failed: {e}")
         sys.exit(1)
