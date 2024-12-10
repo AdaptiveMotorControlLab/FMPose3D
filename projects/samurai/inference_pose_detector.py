@@ -57,7 +57,7 @@ def initialize_models(pose_config_path, pose_snapshot_path, detector_path, devic
     pose_runner, detector_runner = get_inference_runners(
         model_config=model_cfg,
         snapshot_path=pose_snapshot_path,
-        max_individuals=10,
+        max_individuals=3,
         num_bodyparts=len(model_cfg["metadata"]["bodyparts"]),
         num_unique_bodyparts=len(model_cfg["metadata"]["unique_bodyparts"]),
         with_identity=model_cfg["metadata"].get("with_identity", False),
@@ -151,7 +151,7 @@ def draw_predictions(frame, mask, bbox, keypoints, confidences):
             
             # Draw keypoints
             for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
-                if conf > 0:
+                if conf > 0.5:
                     x, y = int(kp[0]), int(kp[1])
                     cv2.circle(frame_vis, (x, y), point_size, (0, 0, 255), -1)
     
@@ -231,7 +231,7 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
             logger.info(f"Initialized tracking for object {obj_id} with bbox {initial_bbox}")
         
             print("masks:", masks.shape)  #  [B, 1, H, W]
-            break
+            # break
         
     # We'll save frames instead of directly writing to video
     frame_paths = []
@@ -239,84 +239,74 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
         # Process frames one by one            
         for frame_idx, object_ids, masks in samurai_predictor.propagate_in_video(state):
-            try:
-                logger.info(f"Processing frame {frame_idx}/{total_frames}")
-                logger.info(f"Object IDs: {object_ids}")
-                logger.info(f"Masks shape: {masks.shape if masks is not None else 'None'}")
+            print("frame_idx:", frame_idx)
+            # Skip frame 1 where the tracking might be unstable
+            # if frame_idx == 1:
+            #     print("Skipping frame 1 to maintain tracking stability")
+            #     continue
                 
-                # Read current frame
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                if not ret:
-                    logger.error(f"Failed to read frame {frame_idx}")
-                    break
+            logger.info(f"Processing frame {frame_idx}/{total_frames}")
+            logger.info(f"Object IDs: {object_ids}")
+            logger.info(f"Masks shape: {masks.shape if masks is not None else 'None'}")
+            
+            # Read current frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            ret, frame = cap.read()
+            if not ret:
+                logger.error(f"Failed to read frame {frame_idx}")
+                break
+            
+            frame_vis = frame.copy()
+            
+            # Ensure masks is on CPU and in correct format
+            if torch.is_tensor(masks):
+                masks = masks.detach().cpu().numpy()
+            
+            # Process each object
+            for idx, obj_id in enumerate(object_ids):
+                # Get mask for current object
+                current_mask = masks[idx, 0]
+                binary_mask = (current_mask > 0.0).astype(np.uint8)
+                non_zero_indices = np.argwhere(binary_mask)
                 
-                frame_vis = frame.copy()
+                if len(non_zero_indices) == 0:
+                    logger.warning(f"Empty mask for object {obj_id} in frame {frame_idx}")
+                    continue
+                    
+                y_min, x_min = non_zero_indices.min(axis=0)
+                y_max, x_max = non_zero_indices.max(axis=0)
+                bbox = np.array([[
+                    int(x_min),
+                    int(y_min),
+                    int(x_max - x_min),  # width
+                    int(y_max - y_min)   # height
+                ]])
                 
-                # Ensure masks is on CPU and in correct format
-                if torch.is_tensor(masks):
-                    # 确保在进行任何布尔操作之前转换为numpy
-                    masks = masks.detach().cpu().numpy()
+                # Run pose estimation
+                context = {"bboxes": bbox}
+                frame_with_context = (frame, context)
+                predictions = pose_runner.inference([frame_with_context])
                 
-                # Process each object
-                for idx, obj_id in enumerate(object_ids):
-                    try:
-                        # Get mask for current object and ensure it's numpy
-                        current_mask = masks[idx, 0]
-                        
-                        # 使用numpy操作而不是tensor操作
-                        binary_mask = (current_mask > 0.0).astype(np.uint8)
-                        non_zero_indices = np.argwhere(binary_mask)
-                        
-                        if len(non_zero_indices) > 0:
-                            y_min, x_min = non_zero_indices.min(axis=0)
-                            y_max, x_max = non_zero_indices.max(axis=0)
-                            bbox = np.array([[
-                                int(x_min),
-                                int(y_min),
-                                int(x_max - x_min),  # width
-                                int(y_max - y_min)   # height
-                            ]])
-                            
-                            # Add debug logging
-                            logger.debug(f"Frame {frame_idx}, Object {obj_id}: bbox={bbox}")
-                        else:
-                            logger.warning(f"Empty mask for object {obj_id} in frame {frame_idx}")
-                            continue
-                        
-                        # Create context and run pose estimation
-                        context = {"bboxes": bbox}
-                        frame_with_context = (frame, context)
-                        predictions = pose_runner.inference([frame_with_context])
-                        
-                        if predictions and len(predictions) > 0:
-                            keypoints = predictions[0]["bodyparts"][..., :2]
-                            confidences = predictions[0]["bodyparts"][..., 2]
-                            
-                            x, y, w, h = bbox[0]
-                            vis_bbox = [x, y, x+w, y+h]
-                            
-                            frame_vis = draw_predictions(
-                                frame=frame_vis,
-                                mask=binary_mask,
-                                bbox=vis_bbox,
-                                keypoints=keypoints,
-                                confidences=confidences
-                            )
-                    except Exception as e:
-                        logger.error(f"Error processing object {obj_id} in frame {frame_idx}: {e}")
-                        logger.error("Error details:", exc_info=True)
-                        continue
-                
-                # Save frame
-                frame_path = frames_dir / f"frame_{frame_idx:06d}.jpg"
-                cv2.imwrite(str(frame_path), frame_vis)
-                frame_paths.append(str(frame_path))
-                
-            except Exception as e:
-                logger.error(f"Error processing frame {frame_idx}: {e}")
-                logger.error("Error details:", exc_info=True)
-                continue
+                if predictions and len(predictions) > 0:
+                    keypoints = predictions[0]["bodyparts"][..., :2]
+                    confidences = predictions[0]["bodyparts"][..., 2]
+                    
+                    x, y, w, h = bbox[0]
+                    vis_bbox = [x, y, x+w, y+h]
+                    
+                    frame_vis = draw_predictions(
+                        frame=frame_vis,
+                        mask=binary_mask,
+                        bbox=vis_bbox,
+                        keypoints=keypoints,
+                        confidences=confidences
+                    )
+            
+            # Save frame
+            frame_path = frames_dir / f"frame_{frame_idx:06d}.jpg"
+            cv2.imwrite(str(frame_path), frame_vis)
+            frame_paths.append(str(frame_path))
+            print("frame_paths:", frame_path)
     
     print("303 frame_paths:", frame_paths)
     # Cleanup (moved outside the with block)
@@ -381,6 +371,7 @@ if __name__ == "__main__":
     # Paths
     VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps.mp4"
     BBOX_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/bbox.txt"
+    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps_30frames.mp4"
     
     # Create output directory based on video name
     video_name = Path(VIDEO_PATH).stem
@@ -391,20 +382,20 @@ if __name__ == "__main__":
     POSE_SNAPSHOT = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-best-056.pt"
     DETECTOR_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-detector-best-171.pt"
     
-    try:
-        output_path = process_video_with_tracking(
-            video_path=VIDEO_PATH,
-            bbox_path=BBOX_PATH,
-            output_path=OUTPUT_DIR,
-            pose_config=POSE_CONFIG,
-            pose_snapshot=POSE_SNAPSHOT,
-            detector_path=DETECTOR_PATH,
-            device="cuda"
-        )
-        print(f"Processing complete! Output saved to: {output_path}")
-    except Exception as e:
-        logger.error(f"Processing failed: {e}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        logger.info("Processing interrupted by user")
-        sys.exit(0) 
+    # try:
+    output_path = process_video_with_tracking(
+        video_path=VIDEO_PATH,
+        bbox_path=BBOX_PATH,
+        output_path=OUTPUT_DIR,
+        pose_config=POSE_CONFIG,
+        pose_snapshot=POSE_SNAPSHOT,
+        detector_path=DETECTOR_PATH,
+        device="cuda"
+    )
+    print(f"Processing complete! Output saved to: {output_path}")
+    # except Exception as e:
+    #     logger.error(f"Processing failed: {e}")
+    #     sys.exit(1)
+    # except KeyboardInterrupt:
+    #     logger.info("Processing interrupted by user")
+    #     sys.exit(0) 
