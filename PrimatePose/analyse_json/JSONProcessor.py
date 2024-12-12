@@ -69,7 +69,7 @@ class JSONProcessor:
             for key, value in dataset.items():
                 print(f"{key}: {value}")
         print("-" * 40)
-
+    
     def analyze_annotations(self):
         """Analyze annotations to find different types of errors and count them."""
         error_counts = {
@@ -77,7 +77,8 @@ class JSONProcessor:
             'xmin+w_out_of_bounds': 0,
             'ymin+h_out_of_bounds': 0,
             'missing_image_reference': 0,
-            'no_keypoints_annotations': 0
+            'no_keypoints_annotations': 0,
+            'keypoints_annotations': 0
         }
         
         image_dims = {image['id']: (image['width'], image['height']) for image in self.data.get('images', [])}
@@ -106,6 +107,8 @@ class JSONProcessor:
             visibility_labels = keypoints[2::3]
             if all(v == -1 for v in visibility_labels):
                 error_counts['no_keypoints_annotations'] += 1
+            else:
+                error_counts['keypoints_annotations'] += 1
         
         return error_counts
 
@@ -255,7 +258,7 @@ class JSONProcessor:
             'annotations': [],
             'categories': []  # We'll take categories from the first file
         }
-        
+            
         # Get all JSON files in the folder
         json_files = [f for f in os.listdir(json_folder_path) if f.endswith('.json')]
         
@@ -291,8 +294,6 @@ class JSONProcessor:
         print(f"Merged JSON data saved to {output_path}")
 
 
-
-
 # Example usage:
 if __name__ == "__main__":
     
@@ -300,16 +301,19 @@ if __name__ == "__main__":
 
     # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_v8.json")
     # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/oms_test.json")
-    processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
+    # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
+
+    processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/lote_test.json")
 
     # Print JSON structure
-    processor.print_structure()
-    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/train_datasets_checked", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_merged.json")
-    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_datasets_checked", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
+    # processor.print_structure()
+    
+    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/train_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_goodpose_merged.json")
+    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_goodpose_merged.json")
     
     # processor.print_all_datasets_content()
     # processor.print_keypoints_names()
-    # processor.sample_json(nums=50, output_json_file="/home/ti_wang/data/tiwang/primate_data/samples/oms_test_sampled_50.json")
+    # processor.sample_json(nums=20, output_json_file="/home/ti_wang/data/tiwang/primate_data/samples/lote_test_sampled_20.json")
     
     # Sample a subset of JSON data
     
