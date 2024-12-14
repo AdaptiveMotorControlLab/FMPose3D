@@ -369,10 +369,10 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
 
 if __name__ == "__main__":
     # Paths
-    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps.mp4"
+    # VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps.mp4"
     BBOX_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/bbox.txt"
-    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps_30frames.mp4"
-    
+    # VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/multi_monkey_uhd_3840_2160_25fps_30frames.mp4"
+    VIDEO_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/results/monkey_data/CAM1_short_400.mp4"
     # Create output directory based on video name
     video_name = Path(VIDEO_PATH).stem
     OUTPUT_DIR = Path("/home/ti_wang/Ti_workspace/projects/samurai/results/output") / video_name
