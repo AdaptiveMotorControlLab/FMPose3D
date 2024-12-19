@@ -330,7 +330,6 @@ def convert_to_x1y1x2y2(bbox):
         return None
     return [bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]]
 
-# Add this class after the helper functions and before process_video_from_json
 class MOTATracker:
     def __init__(self):
         """Initialize MOTA tracker"""
@@ -350,8 +349,8 @@ class MOTATracker:
         gt_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in gt_bboxes]
         valid_pred_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in pred_bboxes if bbox is not None]
         
-        if len(gt_bboxes) != len(valid_pred_bboxes):
-            raise ValueError('Dimension mismatch. Check the inputs.')
+        # if len(gt_bboxes) != len(valid_pred_bboxes):
+        #     raise ValueError('Dimension mismatch. Check the inputs.') ??
         
         # Convert to numpy arrays for mm.distances.iou_matrix
         gt_bboxes = np.array(gt_bboxes)
@@ -363,7 +362,6 @@ class MOTATracker:
         else:
             # Calculate IoU distance matrix using motmetrics
             distances = mm.distances.iou_matrix(gt_bboxes, valid_pred_bboxes)
-            distances = 1 - distances  # Convert IoU to distance
         
         # Update accumulator
         self.acc.update(
@@ -660,7 +658,7 @@ def process_video_from_json(
     video_name = f"videoID_{video_id}"
     output_video = output_dir / f"{video_name}_tracked.mp4"
     
-    fps = 25  # Default FPS, adjust if known
+    fps = 15  # Default FPS, adjust if known
     
     # Use ffmpeg to create video from processed frames
     if frame_paths:
@@ -711,8 +709,8 @@ if __name__ == "__main__":
     JSON_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/processed/test_annotations_hard_gorilla.json"
     
     BASE_IMAGE_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/images"
-    VIDEO_ID = 1000013  # Example video_id
-    # VIDEO_ID = 1000008
+    # VIDEO_ID = 1000013  # Example video_id
+    VIDEO_ID = 1000008
     # VIDEO_ID = 1000012
     # VIDEO_ID = 1000027
     # VIDEO_ID = 16
