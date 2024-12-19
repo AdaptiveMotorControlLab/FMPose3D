@@ -58,6 +58,23 @@ def read_bbox(bbox_path):
         x, y, w, h = map(float, f.read().strip().split(','))
         return [int(x), int(y), int(w), int(h)]
 
+def compute_mot_metrics_bboxes(bboxes, bboxes_ground_truth):
+    if bboxes.shape != bboxes_ground_truth.shape:
+        raise ValueError('Dimension mismatch. Check the inputs.')
+    
+    ids = np.array(list(range(bboxes_ground_truth.shape[0])))
+    acc = mm.MOTAccumulator(auto_id=True)
+    for i in range(bboxes_ground_truth.shape[1]):
+        bboxes_hyp = bboxes[:, i, :4]
+        bboxes_gt = bboxes_ground_truth[:, i, :4]
+        empty_hyp = np.isnan(bboxes_hyp).any(axis=1)
+        empty_gt = np.isnan(bboxes_gt).any(axis=1)
+        bboxes_hyp = bboxes_hyp[~empty_hyp]
+        bboxes_gt = bboxes_gt[~empty_gt]
+        dist = mm.distances.iou_matrix(bboxes_gt, bboxes_hyp)
+        acc.update(ids[~empty_gt], ids[~empty_hyp], dist)
+    return acc
+
 def initialize_models(pose_config_path, pose_snapshot_path, detector_path, device="cuda"):
     """Initialize SAM2, pose estimation and detector models"""
     # Initialize SAM2
@@ -136,6 +153,7 @@ def draw_predictions(frame, mask, bbox, keypoints, confidences, color):
     x1, y1, x2, y2 = [int(coord) for coord in bbox]
     cv2.rectangle(frame_vis, (x1, y1), (x1+x2, y1+y2), color, line_thickness)
     
+    confidence_threshold = 0.35
     # Draw keypoints and skeleton
     if isinstance(keypoints, np.ndarray):
         if len(keypoints.shape) == 3:  # Shape: (N, 37, 2)
@@ -146,15 +164,15 @@ def draw_predictions(frame, mask, bbox, keypoints, confidences, color):
                 # Draw skeleton connections with skeleton color
                 for connection in PFM_SKELETON:
                     idx1, idx2 = connection[0]-1, connection[1]-1
-                    if (instance_confidences[idx1] > 0 and 
-                        instance_confidences[idx2] > 0):
+                    if (instance_confidences[idx1] > confidence_threshold and 
+                        instance_confidences[idx2] > confidence_threshold):
                         pt1 = tuple(map(int, instance_keypoints[idx1]))
                         pt2 = tuple(map(int, instance_keypoints[idx2]))
                         cv2.line(frame_vis, pt1, pt2, skeleton_color, line_thickness)
                 
                 # Draw keypoints with specified color
                 for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
-                    if conf > 0:
+                    if conf > confidence_threshold:
                         x, y = int(kp[0]), int(kp[1])
                         cv2.circle(frame_vis, (x, y), point_size, color, -1)
     
@@ -307,7 +325,9 @@ def calculate_iou(box1, box2):
     return 0
 
 def convert_to_x1y1x2y2(bbox):
-    """Convert bbox from [x, y, w, h] to [x1, y1, x2, y2]"""
+    """Convert [x, y, w, h] to [x1, y1, x2, y2] format"""
+    if bbox is None:
+        return None
     return [bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]]
 
 # Add this class after the helper functions and before process_video_from_json
@@ -332,8 +352,7 @@ class MOTATracker:
         # Convert ground truth boxes to x1y1x2y2 format
         gt_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in gt_bboxes]
         
-        # pred_bboxes already in [x1, y1, x2, y2] format
-        # valid_pred_bboxes = [bbox for bbox in pred_bboxes if bbox is not None]
+        # Filter out None values and convert predicted boxes
         valid_pred_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in pred_bboxes if bbox is not None]
         
         # Calculate distances (cost matrix)
@@ -499,8 +518,8 @@ def process_video_from_json(
         with torch.autocast("cuda", dtype=torch.bfloat16):
             for out_frame_idx, out_object_ids, out_masks in sam2_predictor.propagate_in_video(state):
                 print(f"Processing frame {frame_idx}/{total_frames}")
-                
-                # 获取当前帧的图像
+                print("out_object_ids:", out_object_ids)
+                # Get the current frame's image
                 image_data = video_images[out_frame_idx]
                 frame_path = get_frame_path(image_data, base_image_path)
                 frame = cv2.imread(frame_path)
@@ -513,7 +532,7 @@ def process_video_from_json(
                 frame_masks = []
                 frame_bboxes = []
                 
-                # 处理当前帧的masks
+                # Process the masks of the current frame
                 current_masks = [mask.cpu().numpy().squeeze(0) for mask in out_masks]
                 current_masks = [(mask > 0).astype(np.uint8) for mask in current_masks]
                 
@@ -570,8 +589,9 @@ def process_video_from_json(
                         current_gt_bboxes.append(ann['bbox'])  # [x, y, w, h] format
                 
                 # Update MOTA tracker
-                print("current_gt_bboxes:", current_gt_bboxes)
-                print("frame_bboxes:", frame_bboxes)
+                print("current_gt_bboxes:", [[int(x) for x in bbox] for bbox in current_gt_bboxes])
+                print("frame_bboxes:", [[x for x in bbox] if bbox is not None else None for bbox in frame_bboxes])
+                
                 mota_tracker.update(current_gt_bboxes, frame_bboxes)
                 
                 # Print current metrics every 10 frames
@@ -590,10 +610,9 @@ def process_video_from_json(
                 
                 # Visualize all objects in one frame
                 frame_vis = frame.copy()
-                for obj_id in range(len(input_boxes)):
+                for obj_id in range(len(out_object_ids)):
                     if frame_predictions[obj_id] is not None:
-
-
+                        
                         color = COLOR_PALETTE[obj_id % len(COLOR_PALETTE)]
                         
                         frame_vis = draw_predictions(
@@ -604,7 +623,7 @@ def process_video_from_json(
                             confidences=frame_predictions[obj_id]["bodyparts"][..., 2],
                             color=color
                         )
-                
+    
                 # Save frame
                 frame_path = processed_frames_dir / f"frame_{frame_idx:04d}.jpg"
                 cv2.imwrite(str(frame_path), frame_vis)
@@ -691,10 +710,10 @@ if __name__ == "__main__":
     JSON_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/processed/test_annotations_hard_gorilla.json"
     
     BASE_IMAGE_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/images"
-    # VIDEO_ID = 1000013  # Example video_id
+    VIDEO_ID = 1000013  # Example video_id
     # VIDEO_ID = 1000008
     # VIDEO_ID = 1000012
-    VIDEO_ID = 1000027
+    # VIDEO_ID = 1000027
     # VIDEO_ID = 16
     BASE_OUTPUT_DIR = Path("/home/ti_wang/Ti_workspace/projects/sam2/results2/aptv2")
     
