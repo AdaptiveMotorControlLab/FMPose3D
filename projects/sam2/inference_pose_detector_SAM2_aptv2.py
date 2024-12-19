@@ -332,47 +332,46 @@ def convert_to_x1y1x2y2(bbox):
 
 # Add this class after the helper functions and before process_video_from_json
 class MOTATracker:
-    def __init__(self, iou_threshold=0.5):
-        """Initialize MOTA tracker
-        Args:
-            iou_threshold: IoU threshold for matching predictions with ground truth
-        """
+    def __init__(self):
+        """Initialize MOTA tracker"""
         self.acc = mm.MOTAccumulator(auto_id=True)
-        self.iou_threshold = iou_threshold
         
     def update(self, gt_bboxes, pred_bboxes):
         """Update metrics with new frame data
         Args:
             gt_bboxes: List of ground truth bboxes [x, y, w, h]
-            pred_bboxes: List of predicted bboxes [x1, y1, x2, y2]
+            pred_bboxes: List of predicted bboxes [x, y, w, h]
         """
+
         if not gt_bboxes and not pred_bboxes:
             return
             
-        # Convert ground truth boxes to x1y1x2y2 format
+        # Convert boxes to x1y1x2y2 format
         gt_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in gt_bboxes]
-        
-        # Filter out None values and convert predicted boxes
         valid_pred_bboxes = [convert_to_x1y1x2y2(bbox) for bbox in pred_bboxes if bbox is not None]
         
-        # Calculate distances (cost matrix)
-        distances = []
-        for gt_box in gt_bboxes:
-            frame_distances = []
-            for pred_box in valid_pred_bboxes:
-                iou = calculate_iou(gt_box, pred_box)
-                # Convert IoU to distance (1 - IoU)
-                distance = 1 - iou if iou > self.iou_threshold else np.nan
-                frame_distances.append(distance)
-            distances.append(frame_distances)
+        if len(gt_bboxes) != len(valid_pred_bboxes):
+            raise ValueError('Dimension mismatch. Check the inputs.')
+        
+        # Convert to numpy arrays for mm.distances.iou_matrix
+        gt_bboxes = np.array(gt_bboxes)
+        valid_pred_bboxes = np.array(valid_pred_bboxes)
+        
+        if len(valid_pred_bboxes) == 0:
+            # Handle case with no valid predictions
+            distances = np.empty((len(gt_bboxes), 0))
+        else:
+            # Calculate IoU distance matrix using motmetrics
+            distances = mm.distances.iou_matrix(gt_bboxes, valid_pred_bboxes)
+            distances = 1 - distances  # Convert IoU to distance
         
         # Update accumulator
         self.acc.update(
             [i for i in range(len(gt_bboxes))],      # Ground truth objects
             [i for i in range(len(valid_pred_bboxes))], # Predicted objects
-            distances if distances else np.empty((0, 0))  # Distance matrix
+            distances
         )
-    
+   
     def get_metrics(self):
         """Calculate current metrics"""
         mh = mm.metrics.create()
@@ -537,11 +536,13 @@ def process_video_from_json(
                 current_masks = [(mask > 0).astype(np.uint8) for mask in current_masks]
                 
                 # Process each object's mask
-                for obj_id in range(len(input_boxes)):
+                for obj_id in range(len(out_object_ids)):
+                    print(f"Processing object {obj_id}")
                     current_mask = current_masks[obj_id]
                     
                     # Get bbox from mask
                     non_zero_indices = np.nonzero(current_mask)
+                    print(f"non_zero_indices: {non_zero_indices}")
                     if len(non_zero_indices[0]) > 0:
                         y_min, x_min = non_zero_indices[0].min(), non_zero_indices[1].min()
                         y_max, x_max = non_zero_indices[0].max(), non_zero_indices[1].max()
@@ -580,7 +581,7 @@ def process_video_from_json(
                 
                 # Initialize MOTA tracker if this is the first frame
                 if frame_idx == 0:
-                    mota_tracker = MOTATracker(iou_threshold=0.5)
+                    mota_tracker = MOTATracker()
                 
                 # Get ground truth bboxes for current frame
                 current_gt_bboxes = []
