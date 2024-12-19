@@ -406,7 +406,6 @@ def process_video_from_json(
     print(f"Original video data saved to: {original_json_path}")
     
     # Copy frames directly
-    # print(f"Copying frames to {frames_dir}")
     for image_data in video_images:
         src_path = osp.join(base_image_path, image_data['file_name'])
         original_filename = Path(image_data['file_name']).name
@@ -607,7 +606,7 @@ def process_video_from_json(
                         )
                 
                 # Save frame
-                frame_path = processed_frames_dir / f"frame_{frame_idx:06d}.jpg"
+                frame_path = processed_frames_dir / f"frame_{frame_idx:04d}.jpg"
                 cv2.imwrite(str(frame_path), frame_vis)
                 frame_paths.append(str(frame_path))
                 
@@ -649,7 +648,7 @@ def process_video_from_json(
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-framerate', str(fps),
-            '-i', str(processed_frames_dir / 'frame_%06d.jpg'),
+            '-i', str(processed_frames_dir / 'frame_%04d.jpg'),
             '-vcodec', 'mpeg4',
             '-q:v', '1',
             '-pix_fmt', 'yuv420p',
@@ -673,7 +672,7 @@ def create_video_from_frames(frames_dir: Path, output_video_path: Path, fps: int
     ffmpeg_cmd = [
         'ffmpeg', '-y',
         '-framerate', str(fps),
-        '-i', str(frames_dir / '%06d.jpg'),  # Changed from 'frame_%06d.jpg' to '%06d.jpg'
+        '-i', str(frames_dir / '%04d.jpg'),  # '%04d.jpg'
         '-vcodec', 'mpeg4',
         '-q:v', '1',  # High quality
         '-pix_fmt', 'yuv420p',
