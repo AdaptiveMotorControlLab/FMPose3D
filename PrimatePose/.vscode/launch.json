@@ -1,0 +1,37 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Train Script Debugger",
+            "type": "python",
+            "request": "launch",
+            // "program": "/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary/train.py",  // Correct path to train.py
+            "program": "/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary_split/evaluation.py",  // Correct path to train.py
+            "console": "integratedTerminal",
+            // debug for training
+            // "args": [ "--debug", "--project_root", "/mnt/data/tiwang/v8_coco", 
+            // "--pytorch_config", "/home/ti_wang/Ti_workspace/PrimatePose/project/Debug/ak_hrnet_train/train/pytorch_config.yaml",  // Replace with the actual path to your pytorch_config.yaml if it's different
+            // "--train_file", "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/ak_train.json",  // The value of train_file
+            // "--test_file",  "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/ak_test.json",   // The value of test_file
+            // "--device", "cuda", "--gpus", "0"],
+            // debug for pfm
+            // "args": [ "--debug", "--project_root", "/mnt/data/tiwang/v8_coco",
+            // "--pytorch_config", "/app/project/Debug/pfm_3_train/train/pytorch_config.yaml",  // Replace with the actual path to your pytorch_config.yaml if it's different
+            // "--train_file", "/mnt/data/tiwang/primate_data/pfm_train_v8.json",  // The value of train_file
+            // "--test_file",  "/mnt/data/tiwang/primate_data/pfm_test_v8.json",   // The value of test_file
+            // "--device", "cuda", "--gpus", "0"],
+            // debug for evaluation
+            "args": ["--project_root", "/mnt/data/tiwang/v8_coco",
+            "--pytorch_config", "/home/ti_wang/Ti_workspace/PrimatePose/project/split/lote_pose_hrnet_train/train/pytorch_config.yaml",  //
+            // "--snapshot_path", "/home/ti_wang/Ti_workspace/PrimatePose/project/split/ak_hrnet_pose_train/train/snapshot-200.pt",
+            "--snapshot_path", "/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_train/train/snapshot-180.pt",
+            "--train_file", "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/lote_train.json",  // The value of train_file
+            "--test_file",  "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples/lote_test_sampled_20.json",   // The value of test_file
+            "--gpus", "0"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"},
+            "justMyCode": false
+        }
+    ]
+}
