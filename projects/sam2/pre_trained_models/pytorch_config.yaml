@@ -1,0 +1,344 @@
+Task:
+scorer:
+date:
+multianimalproject:
+identity:
+project_path:
+engine: tensorflow
+video_sets:
+bodyparts:
+start:
+stop:
+numframes2pick:
+skeleton: []
+skeleton_color: black
+pcutoff:
+dotsize:
+alphavalue:
+colormap:
+TrainingFraction:
+iteration:
+default_net_type:
+default_augmenter:
+snapshotindex:
+detector_snapshotindex:
+batch_size:
+detector_batch_size:
+cropping:
+x1:
+x2:
+y1:
+y2:
+corner2move2:
+move2corner:
+SuperAnimalConversionTables:
+data:
+  colormode: RGB
+  inference:
+    normalize_images: true
+    auto_padding:
+      pad_width_divisor: 32
+      pad_height_divisor: 32
+  train:
+    affine:
+      p: 0.5
+      rotation: 30
+      scaling:
+      - 1.0
+      - 1.0
+      translation: 0
+    collate:
+    covering: false
+    gaussian_noise: 12.75
+    hist_eq: false
+    motion_blur: false
+    normalize_images: true
+detector:
+  data:
+    colormode: RGB
+    inference:
+      normalize_images: true
+    train:
+      affine:
+        p: 0.5
+        rotation: 30
+        scaling:
+        - 1.0
+        - 1.0
+        translation: 40
+      collate:
+        type: ResizeFromDataSizeCollate
+        min_scale: 0.4
+        max_scale: 1.0
+        min_short_side: 128
+        max_short_side: 1152
+        multiple_of: 32
+        to_square: false
+      hflip: true
+      normalize_images: true
+  device: auto
+  model:
+    type: FasterRCNN
+    freeze_bn_stats: true
+    freeze_bn_weights: false
+    variant: fasterrcnn_mobilenet_v3_large_fpn
+  runner:
+    type: DetectorTrainingRunner
+    key_metric: test.mAP@50:95
+    key_metric_asc: true
+    eval_interval: 1
+    optimizer:
+      type: AdamW
+      params:
+        lr: 0.0001
+    scheduler:
+      type: LRListScheduler
+      params:
+        milestones:
+        - 160
+        lr_list:
+        - - 1e-05
+    snapshots:
+      max_snapshots: 5
+      save_epochs: 1
+      save_optimizer_state: false
+  train_settings:
+    batch_size: 32
+    dataloader_workers: 12
+    dataloader_pin_memory: true
+    display_iters: 500
+    epochs: 250
+device: auto
+metadata:
+  project_path: /mnt/data/tiwang/v8_coco
+  pose_config_path: 
+    /home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_train/train/pytorch_config.yaml
+  bodyparts:
+  - forehead
+  - head
+  - left_eye
+  - right_eye
+  - nose
+  - left_ear
+  - right_ear
+  - mouth_front_top
+  - mouth_front_bottom
+  - mouth_back_left
+  - mouth_back_right
+  - neck
+  - left_shoulder
+  - right_shoulder
+  - upper_back
+  - torso_mid_back
+  - body_center
+  - lower_back
+  - left_elbow
+  - right_elbow
+  - left_wrist
+  - right_wrist
+  - left_hand
+  - right_hand
+  - left_hip
+  - right_hip
+  - center_hip
+  - left_knee
+  - right_knee
+  - left_ankle
+  - right_ankle
+  - left_foot
+  - right_foot
+  - root_tail
+  - mid_tail
+  - mid_end_tail
+  - end_tail
+  unique_bodyparts: []
+  individuals:
+  - individual0
+  - individual1
+  - individual2
+  - individual3
+  - individual4
+  - individual5
+  - individual6
+  - individual7
+  - individual8
+  - individual9
+  - individual10
+  - individual11
+  - individual12
+  - individual13
+  - individual14
+  - individual15
+  - individual16
+  - individual17
+  - individual18
+  - individual19
+  - individual20
+  - individual21
+  - individual22
+  - individual23
+  - individual24
+  - individual25
+  - individual26
+  - individual27
+  - individual28
+  - individual29
+  - individual30
+  - individual31
+  - individual32
+  - individual33
+  - individual34
+  - individual35
+  - individual36
+  - individual37
+  - individual38
+  - individual39
+  - individual40
+  - individual41
+  - individual42
+  - individual43
+  - individual44
+  - individual45
+  - individual46
+  - individual47
+  - individual48
+  - individual49
+  - individual50
+  - individual51
+  - individual52
+  - individual53
+  - individual54
+  - individual55
+  - individual56
+  - individual57
+  - individual58
+  - individual59
+  - individual60
+  - individual61
+  - individual62
+  - individual63
+  - individual64
+  - individual65
+  - individual66
+  - individual67
+  - individual68
+  - individual69
+  - individual70
+  - individual71
+  - individual72
+  - individual73
+  - individual74
+  - individual75
+  - individual76
+  - individual77
+  - individual78
+  - individual79
+  - individual80
+  - individual81
+  - individual82
+  - individual83
+  - individual84
+  - individual85
+  - individual86
+  - individual87
+  - individual88
+  - individual89
+  - individual90
+  - individual91
+  - individual92
+  - individual93
+  - individual94
+  - individual95
+  - individual96
+  - individual97
+  - individual98
+  - individual99
+  - individual100
+  - individual101
+  - individual102
+  - individual103
+  - individual104
+  with_identity: false
+method: td
+model:
+  backbone:
+    type: HRNet
+    model_name: hrnet_w32
+    freeze_bn_stats: false
+    freeze_bn_weights: false
+    interpolate_branches: false
+    increased_channel_count: false
+  backbone_output_channels: 32
+  heads:
+    bodypart:
+      type: HeatmapHead
+      weight_init: normal
+      predictor:
+        type: HeatmapPredictor
+        apply_sigmoid: false
+        clip_scores: true
+        location_refinement: true
+        locref_std: 7.2801
+      target_generator:
+        type: HeatmapGaussianGenerator
+        num_heatmaps: 37
+        pos_dist_thresh: 17
+        heatmap_mode: KEYPOINT
+        gradient_masking: true
+        background_weight: 0.0
+        generate_locref: true
+        locref_std: 7.2801
+      criterion:
+        heatmap:
+          type: WeightedMSECriterion
+          weight: 1.0
+        locref:
+          type: WeightedHuberCriterion
+          weight: 0.05
+      heatmap_config:
+        channels:
+        - 32
+        kernel_size: []
+        strides: []
+        final_conv:
+          out_channels: 37
+          kernel_size: 1
+      locref_config:
+        channels:
+        - 32
+        kernel_size: []
+        strides: []
+        final_conv:
+          out_channels: 74
+          kernel_size: 1
+net_type: hrnet_w32
+runner:
+  type: PoseTrainingRunner
+  gpus:
+  key_metric: test.mAP
+  key_metric_asc: true
+  eval_interval: 1
+  optimizer:
+    type: AdamW
+    params:
+      lr: 0.0001
+  scheduler:
+    type: LRListScheduler
+    params:
+      lr_list:
+      - - 1e-05
+      - - 1e-06
+      milestones:
+      - 160
+      - 190
+  snapshots:
+    max_snapshots: 5
+    save_epochs: 1
+    save_optimizer_state: false
+train_settings:
+  batch_size: 64
+  dataloader_workers: 12
+  dataloader_pin_memory: false
+  display_iters: 10000
+  epochs: 200
+  seed: 42
