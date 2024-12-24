@@ -21,6 +21,7 @@ from deeplabcut.pose_estimation_pytorch.apis.analyze_videos import VideoIterator
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.config import read_config_as_dict
 from deeplabcut.pose_estimation_pytorch.task import Task
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_gt_and_predictions
 
 # Define skeleton for visualization
 PFM_SKELETON = [
@@ -521,6 +522,8 @@ def process_video_from_json(
                 frame_path = get_frame_path(image_data, base_image_path)
                 frame = cv2.imread(frame_path)
                 
+                frame_name = os.path.basename(frame_path)
+                
                 if frame is None:
                     print(f"Could not read frame: {frame_path}")
                     continue
@@ -609,23 +612,33 @@ def process_video_from_json(
                 
                 # Visualize all objects in one frame
                 frame_vis = frame.copy()
-                for obj_id in range(len(out_object_ids)):
-                    if frame_predictions[obj_id] is not None:
+                
+                # for obj_id in range(len(out_object_ids)):
+                #     if frame_predictions[obj_id] is not None:
                         
-                        color = COLOR_PALETTE[obj_id % len(COLOR_PALETTE)]
+                #         color = COLOR_PALETTE[obj_id % len(COLOR_PALETTE)]
                         
-                        frame_vis = draw_predictions(
-                            frame=frame_vis,
-                            mask=frame_masks[obj_id],
-                            bbox=frame_bboxes[obj_id],
-                            keypoints=frame_predictions[obj_id]["bodyparts"][..., :2],
-                            confidences=frame_predictions[obj_id]["bodyparts"][..., 2],
-                            color=color
-                        )
+                #         frame_vis = draw_predictions(
+                #             frame=frame_vis,
+                #             mask=frame_masks[obj_id],
+                #             bbox=frame_bboxes[obj_id],
+                #             keypoints=frame_predictions[obj_id]["bodyparts"][..., :2],
+                #             confidences=frame_predictions[obj_id]["bodyparts"][..., 2],
+                #             color=color
+                #         )
     
                 # Save frame
                 frame_path = processed_frames_dir / f"frame_{frame_idx:04d}.jpg"
-                cv2.imwrite(str(frame_path), frame_vis)
+                # cv2.imwrite(str(frame_path), frame_vis)
+                # Test dlc plotting ToDo:
+                plot_gt_and_predictions(
+                    image_path = xxx,
+                    output_dir = xxx,
+                    gt_bodyparts= ,
+                    pred_bodyparts= ,
+                    bounding_boxes=frame_bboxes,
+                )
+        
                 frame_paths.append(str(frame_path))
                 
                 # Store processed data for each object
