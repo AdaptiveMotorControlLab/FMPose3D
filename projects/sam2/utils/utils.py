@@ -132,3 +132,27 @@ def save_video_data_to_json(json_data: Dict, video_id: int, output_dir: Path) ->
         json.dump(video_data, f, indent=2)
     
     return str(json_path)
+
+def create_video_from_frames(frames_dir: Path, output_video_path: Path, fps: int = 25):
+    """Create a video from original frames
+    Args:
+        frames_dir: Directory containing the frame images
+        output_video_path: Path to save the output video
+        fps: Frames per second for the output video
+    """
+    print(f"Creating original video at {output_video_path}")
+    ffmpeg_cmd = [
+        'ffmpeg', '-y',
+        '-framerate', str(fps),
+        '-i', str(frames_dir / '%04d.jpg'),  # '%04d.jpg'
+        '-vcodec', 'mpeg4',
+        '-q:v', '1',  # High quality
+        '-pix_fmt', 'yuv420p',
+        str(output_video_path)
+    ]
+    
+    try:
+        subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+        print(f"Original video successfully saved to {output_video_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating video: {e.stderr}")

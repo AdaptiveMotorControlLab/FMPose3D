@@ -363,30 +363,6 @@ def process_video_from_json(
 
     return str(output_video)
 
-def create_video_from_frames(frames_dir: Path, output_video_path: Path, fps: int = 25):
-    """Create a video from original frames
-    Args:
-        frames_dir: Directory containing the frame images
-        output_video_path: Path to save the output video
-        fps: Frames per second for the output video
-    """
-    print(f"Creating original video at {output_video_path}")
-    ffmpeg_cmd = [
-        'ffmpeg', '-y',
-        '-framerate', str(fps),
-        '-i', str(frames_dir / '%04d.jpg'),  # '%04d.jpg'
-        '-vcodec', 'mpeg4',
-        '-q:v', '1',  # High quality
-        '-pix_fmt', 'yuv420p',
-        str(output_video_path)
-    ]
-    
-    try:
-        subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
-        print(f"Original video successfully saved to {output_video_path}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error creating video: {e.stderr}")
-
 if __name__ == "__main__":
     # Update paths
     # JSON_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/processed/test_annotations_easy_gorilla.json"
