@@ -15,6 +15,7 @@ import sys
 from sam2.build_sam import build_sam2_video_predictor
 from collections import defaultdict
 from utils.metrics import MOTATracker
+from utils.visualization import draw_predictions
 
 # Import pose estimation components
 from deeplabcut.pose_estimation_pytorch.apis.analyze_videos import VideoIterator
@@ -22,32 +23,6 @@ from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.config import read_config_as_dict
 from deeplabcut.pose_estimation_pytorch.task import Task
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_gt_and_predictions
-
-# Define skeleton for visualization
-PFM_SKELETON = [
-    [3, 5], [4, 5], [6, 3], [7, 4],
-    [5, 12], [13, 12], [14, 12], [2, 17],
-    [19, 13], [20, 14], [21, 19], [22, 20],
-    [23, 21], [24, 22], [25, 12], [26, 12],
-    [25, 27], [26, 27], [25, 28], [26, 29],
-    [27, 28], [27, 29], [28, 30], [29, 31],
-    [30, 32], [31, 33], [27, 34], [34, 35],
-    [35, 36], [36, 37]
-]
-
-# Define color palette for different objects (BGR format)
-# Avoid Blue, Red, Yellow as they are reserved for special purposes
-COLOR_PALETTE = [
-    (128, 0, 128),   # Purple
-    (0, 165, 255),   # Orange
-    (255, 0, 255),   # Magenta
-    (0, 128, 128),   # Brown
-    (255, 191, 0),   # Deep Sky Blue  
-    (180, 105, 255), # Pink
-    (128, 128, 0),   # Teal
-    (147, 20, 255),  # Deep Pink
-    (127, 255, 212), # Aquamarine
-]
 
 # Reserved colors (BGR format)
 GT_COLOR = (0, 0, 255)       # Red for ground truth
@@ -58,23 +33,6 @@ def read_bbox(bbox_path):
     with open(bbox_path, 'r') as f:
         x, y, w, h = map(float, f.read().strip().split(','))
         return [int(x), int(y), int(w), int(h)]
-
-def compute_mot_metrics_bboxes(bboxes, bboxes_ground_truth):
-    if bboxes.shape != bboxes_ground_truth.shape:
-        raise ValueError('Dimension mismatch. Check the inputs.')
-    
-    ids = np.array(list(range(bboxes_ground_truth.shape[0])))
-    acc = mm.MOTAccumulator(auto_id=True)
-    for i in range(bboxes_ground_truth.shape[1]):
-        bboxes_hyp = bboxes[:, i, :4]
-        bboxes_gt = bboxes_ground_truth[:, i, :4]
-        empty_hyp = np.isnan(bboxes_hyp).any(axis=1)
-        empty_gt = np.isnan(bboxes_gt).any(axis=1)
-        bboxes_hyp = bboxes_hyp[~empty_hyp]
-        bboxes_gt = bboxes_gt[~empty_gt]
-        dist = mm.distances.iou_matrix(bboxes_gt, bboxes_hyp)
-        acc.update(ids[~empty_gt], ids[~empty_hyp], dist)
-    return acc
 
 def initialize_models(pose_config_path, pose_snapshot_path, detector_path, device="cuda"):
     """Initialize SAM2, pose estimation and detector models"""
@@ -105,79 +63,6 @@ def initialize_models(pose_config_path, pose_snapshot_path, detector_path, devic
     print("Pose estimation model initialized")
     
     return predictor, pose_runner, detector_runner
-
-def calculate_point_size(frame_width, frame_height):
-    """Calculate appropriate point size based on image resolution"""
-    # 基于图像对角线长度计算点的大小
-    diagonal = np.sqrt(frame_width**2 + frame_height**2)
-    
-    # 设置点的大小为对角线长度的千分之一到千分之二之间
-    point_size = max(3, int(diagonal * 0.0015))  # 最小为3像素
-    
-    return point_size
-
-def draw_predictions(frame, mask, bbox, keypoints, confidences, color):
-    """Draw all predictions on frame with specified color"""
-    frame_vis = frame.copy()
-    height, width = frame.shape[:2]
-    
-    # Calculate skeleton color (slightly darker)
-    skeleton_color = tuple(int(c * 0.8) for c in color)
-    
-    # Calculate appropriate point size and line thickness based on image resolution
-    point_size = calculate_point_size(width, height)
-    line_thickness = max(1, int(point_size / 2*1.5))
-    
-    # Draw mask
-    if isinstance(mask, torch.Tensor):
-        mask = mask.detach().cpu().numpy()
-    
-    if mask is not None:
-        if len(mask.shape) > 2:
-            mask = mask.squeeze()
-        
-        mask = (mask > 0).astype(np.uint8)
-        
-        # Create 3-channel mask with specified color
-        mask_3d = np.stack([
-            mask * color[0],  # Blue channel
-            mask * color[1],  # Green channel
-            mask * color[2]   # Red channel
-        ], axis=2).astype(np.uint8)
-        
-        # Apply mask overlay
-        frame_vis = cv2.addWeighted(frame_vis, 1, mask_3d, 0.2, 0)
-
-    # Draw bbox with specified color
-    if isinstance(bbox, np.ndarray):
-        bbox = bbox.flatten()
-    x1, y1, x2, y2 = [int(coord) for coord in bbox]
-    cv2.rectangle(frame_vis, (x1, y1), (x1+x2, y1+y2), color, line_thickness)
-    
-    confidence_threshold = 0.35
-    # Draw keypoints and skeleton
-    if isinstance(keypoints, np.ndarray):
-        if len(keypoints.shape) == 3:  # Shape: (N, 37, 2)
-            for instance_idx in range(len(keypoints)):
-                instance_keypoints = keypoints[instance_idx]
-                instance_confidences = confidences[instance_idx]
-                
-                # Draw skeleton connections with skeleton color
-                for connection in PFM_SKELETON:
-                    idx1, idx2 = connection[0]-1, connection[1]-1
-                    if (instance_confidences[idx1] > confidence_threshold and 
-                        instance_confidences[idx2] > confidence_threshold):
-                        pt1 = tuple(map(int, instance_keypoints[idx1]))
-                        pt2 = tuple(map(int, instance_keypoints[idx2]))
-                        cv2.line(frame_vis, pt1, pt2, skeleton_color, line_thickness)
-                
-                # Draw keypoints with specified color
-                for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
-                    if conf > confidence_threshold:
-                        x, y = int(kp[0]), int(kp[1])
-                        cv2.circle(frame_vis, (x, y), point_size, color, -1)
-    
-    return frame_vis
 
 def process_frame_batch(frames, pose_runner):
     """Process a batch of frames through pose estimation"""
