@@ -16,7 +16,7 @@ from sam2.build_sam import build_sam2_video_predictor
 from collections import defaultdict
 from utils.metrics import MOTATracker
 from utils.visualization import draw_predictions
-from utils.utils import load_json_data, get_video_data, get_frame_path, save_video_data_to_json, save_processed_data_to_json
+from utils.utils import load_json_data, get_video_data, get_frame_path, save_video_data_to_json, save_processed_data_to_json, create_video_from_frames
 
 # Import pose estimation components
 from deeplabcut.pose_estimation_pytorch.apis.analyze_videos import VideoIterator
@@ -49,7 +49,7 @@ def initialize_models(pose_config_path, pose_snapshot_path, detector_path, devic
     pose_runner, detector_runner = get_inference_runners(
         model_config=model_cfg,
         snapshot_path=pose_snapshot_path,
-        max_individuals=10,
+        max_individuals=1,
         num_bodyparts=len(model_cfg["metadata"]["bodyparts"]),
         num_unique_bodyparts=len(model_cfg["metadata"]["unique_bodyparts"]),
         with_identity=model_cfg["metadata"].get("with_identity", False),
@@ -232,7 +232,7 @@ def process_video_from_json(
                             # ToDo
                             # Get detections from detector for this frame
                             detections = detector_runner.inference([frame])
-                            print("len(detections[0]['bboxes']):", len(detections[0]['bboxes']))
+                            # print("len(detections[0]['bboxes']):", len(detections[0]['bboxes']))
                             if detections and len(detections[0]['bboxes']) > 0:
                                 # Use detector bbox for pose estimation
                                 bbox = np.array([detections[0]['bboxes'][obj_id]])  # [x, y, w, h]
@@ -243,6 +243,8 @@ def process_video_from_json(
                         predictions = pose_runner.inference([frame_with_context])
                         
                         if predictions and len(predictions) > 0:
+                            # print("predictions[0]:", predictions[0].keys())
+                            # print("predictions[0]:", predictions[0]["bodyparts"].shape)
                             frame_predictions.append(predictions[0])
                         else:
                             frame_predictions.append(None)
@@ -262,8 +264,8 @@ def process_video_from_json(
                         current_gt_bboxes.append(ann['bbox'])  # [x, y, w, h] format
                 
                 # Update MOTA tracker
-                print("current_gt_bboxes:", [[int(x) for x in bbox] for bbox in current_gt_bboxes])
-                print("frame_bboxes:", [[x for x in bbox] if bbox is not None else None for bbox in frame_bboxes])
+                # print("current_gt_bboxes:", [[int(x) for x in bbox] for bbox in current_gt_bboxes])
+                # print("frame_bboxes:", [[x for x in bbox] if bbox is not None else None for bbox in frame_bboxes])
                 
                 mota_tracker.update(current_gt_bboxes, frame_bboxes)
                 
@@ -282,13 +284,10 @@ def process_video_from_json(
                     print(f"Tracking metrics saved to: {metrics_path}")
                 
                 # Visualize all objects in one frame
-                frame_vis = frame.copy()
-                
+                # frame_vis = frame.copy() 
                 # for obj_id in range(len(out_object_ids)):
                 #     if frame_predictions[obj_id] is not None:
-                        
                 #         color = COLOR_PALETTE[obj_id % len(COLOR_PALETTE)]
-                        
                 #         frame_vis = draw_predictions(
                 #             frame=frame_vis,
                 #             mask=frame_masks[obj_id],
@@ -297,18 +296,78 @@ def process_video_from_json(
                 #             confidences=frame_predictions[obj_id]["bodyparts"][..., 2],
                 #             color=color
                 #         )
-    
                 # Save frame
-                frame_path = processed_frames_dir / f"frame_{frame_idx:04d}.jpg"
+                # frame_path = processed_frames_dir / f"frame_{frame_idx:04d}.jpg"
                 # cv2.imwrite(str(frame_path), frame_vis)
-                # Test dlc plotting ToDo:
-                # plot_gt_and_predictions(
-                #     image_path = xxx,
-                #     output_dir = xxx,
-                #     gt_bodyparts= ,
-                #     pred_bodyparts= ,
-                #     bounding_boxes=frame_bboxes,
-                # )
+                 
+                # Format predictions for plotting--dlc3
+                original_frame_path = frames_dir / f"{frame_idx:04d}.jpg"  # Input image path
+                frame_path = processed_frames_dir  # Output directory path
+                
+                current_pred_bodyparts = []
+                for pred in frame_predictions:
+                    if pred is not None:
+                        # pred['bodyparts'] shape is (10, 37, 3) where:
+                        # 10 is number of animals
+                        # 37 is number of keypoints
+                        # 3 is (x, y, confidence)
+                        # print("pred['bodyparts'].shape:", pred["bodyparts"].shape)
+                        bodyparts = pred["bodyparts"]  # Already in correct shape (num_animals, num_keypoints, 3)
+                        # print("bodyparts.shape:", bodyparts.shape)
+                        current_pred_bodyparts.append(bodyparts)
+                
+                # Convert to numpy array with shape (num_animals, num_keypoints, 3)
+                if current_pred_bodyparts:
+                    pred_bodyparts = np.concatenate(current_pred_bodyparts, axis=0)  # Concatenate along animals dimension
+                    print("pred_bodyparts.shape:", pred_bodyparts.shape)
+                else:
+                    num_keypoints = len(model_cfg["metadata"]["bodyparts"])
+                    pred_bodyparts = np.zeros((0, num_keypoints, 3))
+
+                # Get ground truth bodyparts for current frame
+                current_gt_bodyparts = []
+                for ann in video_annotations:
+                    if ann['image_id'] == image_data['id']:
+                        if 'keypoints' in ann:
+                            # Convert [x1,y1,v1,x2,y2,v2,...] to (num_keypoints, 3)
+                            keypoints = np.array(ann['keypoints'])
+                            num_keypoints = len(keypoints) // 3
+                            keypoints = keypoints.reshape(num_keypoints, 3)  # Shape: (num_keypoints, 3)
+                            # Add batch dimension to match (num_animals, num_keypoints, 3)
+                            keypoints = keypoints.reshape(1, num_keypoints, 3)
+                            current_gt_bodyparts.append(keypoints)
+                
+                if current_gt_bodyparts:
+                    gt_bodyparts = np.concatenate(current_gt_bodyparts, axis=0)  # Shape: (num_animals, num_keypoints, 3)
+                    gt_bodyparts = gt_bodyparts[:, :, :2]
+                else:
+                    num_keypoints = len(model_cfg["metadata"]["bodyparts"])
+                    gt_bodyparts = np.zeros((0, num_keypoints, 3))
+
+                # Format bounding boxes for plotting
+                bboxes = np.array([bbox for bbox in frame_bboxes if bbox is not None])
+                # ToDo: if the bbox is from detector, then the confidence is from the detector
+                # Assuming all boxes from mask confidence 1.0
+                bbox_scores = np.ones(len(bboxes))  
+                bounding_boxes = (bboxes, bbox_scores) if len(bboxes) > 0 else None
+
+                # Plot predictions and ground truth
+                print("plotting...")
+                print("gt_bodyparts.shape:", gt_bodyparts.shape)
+                print("pred_bodyparts.shape:", pred_bodyparts.shape)
+                
+                plot_gt_and_predictions(
+                    image_path=original_frame_path,  # Original image from frames_dir
+                    output_dir=frame_path,  # Directory where output will be saved
+                    gt_bodyparts=gt_bodyparts,
+                    pred_bodyparts=pred_bodyparts,
+                    mode="individual",  # Color by individual animal
+                    dot_size=12,
+                    alpha_value=0.7,
+                    p_cutoff=0.6,
+                    bounding_boxes=bounding_boxes,  # Tuple of (boxes, scores)
+                    bboxes_pcutoff=0.6,  # Confidence threshold for showing boxes
+                )
         
                 frame_paths.append(str(frame_path))
                 
@@ -350,7 +409,8 @@ def process_video_from_json(
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-framerate', str(fps),
-            '-i', str(processed_frames_dir / 'frame_%04d.jpg'),
+            # '-i', str(processed_frames_dir / 'frame_%04d.jpg'),
+            '-i', str(processed_frames_dir / 'Test-frames-%04d.jpg'),
             '-vcodec', 'mpeg4',
             '-q:v', '1',
             '-pix_fmt', 'yuv420p',
