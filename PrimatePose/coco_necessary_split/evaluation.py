@@ -11,8 +11,6 @@ import numpy as np
 from matplotlib.patches import Rectangle
 
 import numpy as np
-import cv2
-import os
 from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
@@ -67,15 +65,6 @@ PRIMATE_COLOR_MAP = {
     "mid_end_tail": (0, 128, 255), 
     "right_eye": (0, 255, 255),
     "left_eye": (128, 0, 128),
-    # "right_earend": (0, 128, 0),
-    # "right_antler_base": (0, 0, 128),
-    # "right_antler_end": (128, 128, 0),
-    # "left_earend": (192, 192, 192),
-    # "left_antler_base": (128, 128, 128),
-    # "left_antler_end": (64, 64, 64),
-    # "throat_end": (0, 128, 255), 
-    # "front_right_paw": (64, 64, 255),
-    # "back_right_thai": (64, 255, 255),
 }
 
 # Define the skeleton structure
@@ -147,158 +136,6 @@ def get_contrasting_color(bg_color):
     luminance = (0.299 * bg_color[2] + 0.587 * bg_color[1] + 0.114 * bg_color[0]) / 255
     return (0, 0, 0) if luminance > 0.5 else (255, 255, 255)
 
-# def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None, draw_skeleton=True):
-#     # Bounding box visualization
-#     bbox = annotation["bbox"]
-#     x1, y1, width, height = bbox
-#     x2, y2 = x1 + width, y1 + height
-#     cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-
-#     if "keypoints" in annotation:
-#         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
-#         keypoint_names = categories[0]["keypoints"]
-        
-#         img_height, img_width = img.shape[:2]
-#         scale_factor = max(img_width, img_height) / 1000
-#         existing_text_positions = []
-
-#         for i, (x_kp, y_kp, v) in enumerate(keypoints):
-#             if v > 0:
-#                 keypoint_label = keypoint_names[i]
-#                 color = color_map.get(keypoint_label, (0, 0, 255))
-
-#                 # Draw the keypoint
-#                 cv2.circle(
-#                     img,
-#                     center=(int(x_kp), int(y_kp)),
-#                     radius=int(7 * scale_factor),
-#                     color=color,
-#                     thickness=-1
-#                 )
-
-#                 # Text color contrast
-#                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
-#                 txt_color = get_contrasting_color(bg_color)
-                
-#                 # Position text with scaling
-#                 font_scale = max(0.4, min(scale_factor, 1.5))
-#                 thickness = max(1, int(2 * scale_factor))
-                
-#                 y_text = int(y_kp) - int(15 * scale_factor)
-#                 x_text = int(x_kp) - int(10 * scale_factor)
-#                 x_text = min(max(0, x_text), img_width - 100)
-#                 y_text = min(max(0, y_text), img_height - 10)
-                
-#                 for (existing_x, existing_y) in existing_text_positions:
-#                     if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
-#                         y_text += int(20 * scale_factor)
-#                 existing_text_positions.append((x_text, y_text))
-
-#                 # Draw keypoint name
-#                 cv2.putText(
-#                     img,
-#                     keypoint_label,
-#                     (x_text, y_text),
-#                     cv2.FONT_HERSHEY_SIMPLEX,
-#                     font_scale,
-#                     txt_color,
-#                     thickness,
-#                     cv2.LINE_AA,
-#                 )
-
-#         # Optionally draw skeleton
-#         if draw_skeleton:
-#             for connection in skeleton:
-#                 idx1, idx2 = connection
-#                 x1_kp, y1_kp, v1 = keypoints[idx1 - 1]
-#                 x2_kp, y2_kp, v2 = keypoints[idx2 - 1]
-#                 if v1 > 0 and v2 > 0:
-#                     keypoint_label1 = keypoint_names[idx1 - 1]
-#                     color = color_map.get(keypoint_label1, (255, 255, 255))
-#                     cv2.line(
-#                         img,
-#                         (int(x1_kp), int(y1_kp)),
-#                         (int(x2_kp), int(y2_kp)),
-#                         color,
-#                         thickness=int(2 * scale_factor)
-#                     )
-#     return img
-
-def visualize_predictions111(json_path="path_to_your_predictions_file.json", image_dir="/mnt/data/tiwang/v8_coco/images", num_samples=5, test_file_json="test.json", color = None,  draw_skeleton=True):
-    """
-    Visualize a specified number of samples from COCO predictions and save the plots.
-
-    Args:
-        json_path (str): Path to the JSON file with COCO predictions.
-        image_dir (str): Directory where the images corresponding to image IDs are stored.
-        num_samples (int): Number of samples to visualize. Defaults to 5.
-    """
-    # Load the coco_predictions JSON file
-    with open(json_path, "r") as f:
-        coco_predictions = json.load(f)
-
-    # Determine the output directory for saving images
-    output_dir = os.path.join(os.path.dirname(json_path), "predictions_visualizations")
-    os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
-    
-    keypoint_labels = list(PRIMATE_COLOR_MAP.keys())
-
-    # Iterate through the first few samples and plot each one
-    for i, prediction in enumerate(coco_predictions[:num_samples]):
-        # Extract data from the prediction
-        image_id = prediction["image_id"]
-        category_id = prediction["category_id"]
-        keypoints = np.array(prediction["keypoints"]).reshape(-1, 3)  # reshape for (x, y, visibility)
-        score = prediction["score"]
-        bbox = prediction["bbox"]
-        bbox_score = prediction["bbox_scores"][0] if prediction["bbox_scores"] else None
-
-        # with open(test_file_json, 'r') as f:
-        #     ori_data = json.load(f)
-        
-        # Load the visibility status for the current image from the test file
-        visibility_status, _ = get_visibility_status(test_file_json, image_id)
-        
-        # Load the corresponding image
-        file_name = get_file_name_from_image_id(json_path=test_file_json, image_id=image_id)
-        image_path = os.path.join(image_dir, f"{file_name}")  # Adjust extension if different
-        image = Image.open(image_path)
-        fig, ax = plt.subplots(figsize=(8, 8))
-        ax.imshow(image)
-        ax.set_title(f"Image ID: {image_id}, bbox_score: {bbox_score:.2f}, Score: {score:.2f}")
-
-        # Plot bounding box
-        rect = Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor="red", facecolor="none")
-        ax.add_patch(rect)
-        # ax.text(bbox[0], bbox[1] - 10, f"Score: {bbox_score:.2f}" if bbox_score else "No bbox score", color="red")
-
-        # Plot keypoints with color-coding
-        for idx, kp in enumerate(keypoints):
-            # if kp[2] > 0:  # visibility flag
-            if visibility_status.get(idx, False):  # visibility flag
-                label = keypoint_labels[idx] if idx < len(keypoint_labels) else "unknown"
-                color = PRIMATE_COLOR_MAP.get(label, "blue")  # Default to blue if label not found
-                ax.plot(kp[0], kp[1], "o", markersize=5, color=np.array(color) / 255.0)
-
-        # Draw skeleton if enabled
-        if draw_skeleton:
-            for connection in PFM_SKELETON:
-                idx1, idx2 = connection
-                # if keypoints[idx1 - 1, 2] > 0 and keypoints[idx2 - 1, 2] > 0:  # Check 
-                # Only draw line if both keypoints are visible
-                if visibility_status.get(idx1 - 1, False) and visibility_status.get(idx2 - 1, False):
-                    x1, y1 = keypoints[idx1 - 1][:2]
-                    x2, y2 = keypoints[idx2 - 1][:2]
-                    color = PRIMATE_COLOR_MAP.get(keypoint_labels[idx1 - 1], "blue")
-                    ax.plot([x1, x2], [y1, y2], color=np.array(color) / 255.0, linewidth=2)
-                    
-        # Save the figure to the output directory
-        output_path = os.path.join(output_dir, f"predict_{file_name}")
-        plt.savefig(output_path)
-        plt.close(fig)
-
-    print(f"Visualizations saved in: {output_dir}")
-
 # Define the function to get visibility status from the test file
 def get_visibility_status(test_file_json, image_id):
     with open(test_file_json, "r") as f:
@@ -352,6 +189,9 @@ def main(
     output_path.mkdir(exist_ok=True)
     print(output_path)
     #for mode in ["train", "test"]:
+    
+    print("detector_runner:", detector_runner)
+    
     for mode in ["test"]:    
         scores, predictions = evaluate(
             pose_task=Task(loader.model_cfg["method"]),
@@ -366,21 +206,8 @@ def main(
         # bboxes: (1, 4)
         # bbox_scores: (1,)
         
-        # 获取 ground truth 数据
-        gt_keypoints = loader.ground_truth_keypoints(mode)  # 这应该返回一个以图片路径为键的字典
-        
-        # Print format of gt_keypoints
-        # for key, value in gt_keypoints.items():
-        #     print(f"\nImage {key}:")
-        #     if isinstance(value, np.ndarray):
-        #         print(f"  Shape: {value.shape}")
-        #         print(f"  Type: {value.dtype}")
-        #         print(f"  Format: Each keypoint is [x, y, visibility]")
-        #         if len(value.shape) == 3:
-        #             print(f"  Number of animals: {value.shape[0]}")
-        #             print(f"  Number of keypoints per animal: {value.shape[1]}")
-        #             print(f"  Coordinates per keypoint: {value.shape[2]}")
-        #     break  # Only print first image as example
+        # get ground truth 
+        gt_keypoints = loader.ground_truth_keypoints(mode) 
         
         print("finished evaluating")
         
@@ -392,24 +219,6 @@ def main(
         with open(predictions_file, "w") as f:
             json.dump(coco_predictions, f, indent=4)
         
-        # color_map = PRIMATE_COLOR_MAP
-        # # visualize_predictions(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map)
-        # # visualize_predictions_with_GT(json_path=predictions_file, num_samples=10, test_file_json=test_file, color=color_map, draw_skeleton=True) 
-          
-        # annotation_types = ["keypoints"]
-        # if detector_runner is not None:
-        #     annotation_types.append("bbox")
-
-        # ground_truth = loader.load_data(mode=mode)
-        # for annotation_type in annotation_types:
-        #     kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
-        #     pycocotools_evaluation(
-        #         ground_truth=ground_truth,
-        #         predictions=coco_predictions,
-        #         kpt_oks_sigmas=kpt_oks_sigmas,
-        #         annotation_type=annotation_type,
-        #     )
-            
         print(80 * "-")
         print(f"{mode} results")
         
