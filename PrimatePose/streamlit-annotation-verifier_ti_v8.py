@@ -7,8 +7,7 @@ import numpy as np
 from PIL import Image
 import tempfile
 
-
-# Define the skeleton
+# Define the skeletons
 PFM_SKELETON = [
     [3, 5], [4, 5], [6, 3], [7, 4],
     [5, 12], [13, 12], [14, 12], [2, 17],
@@ -19,7 +18,6 @@ PFM_SKELETON = [
     [30, 32], [31, 33], [27, 34], [34, 35],
     [35, 36], [36, 37]
 ]
-
 
 TOPVIEWMOUSE_COLOR_MAP = {
     "nose": (255, 0, 0),
@@ -191,6 +189,90 @@ PRIMATE_COLOR_MAP = {
     # "back_right_thai": (64, 255, 255),
 }
 
+# Define dataset configurations
+DATASET_CONFIGS = {
+    "aptv2": {
+        "skeleton": [
+            [1, 2], [1, 3], [2, 3], [3, 4], [4, 5],
+            [4, 6], [6, 7], [7, 8], [4, 9], [9, 10],
+            [10, 11], [5, 12], [12, 13], [13, 14],
+            [5, 15], [15, 16], [16, 17]
+        ],
+        "keypoint_mapping": [
+            -1, -1,  # 0-1
+            0, 1, 2,  # 2-4
+            -1, -1, -1, -1, -1, -1,  # 5-10
+            3, 5, 8,  # 11-13
+            -1, -1, -1, -1,  # 14-17
+            6, 9, 7, 10,  # 18-21
+            -1, -1,  # 22-23
+            11, 14, 4,  # 24-26
+            12, 15, 13, 16,  # 27-30
+            -1, -1, -1, -1, -1, -1  # 31-36
+        ]
+    },
+    "pfm": {
+        "skeleton": PFM_SKELETON,
+        "keypoint_mapping": None  # No mapping needed for PFM format
+    }
+}
+
+def get_dataset_config(image_id, images):
+    """
+    Get dataset configuration based on image_id
+    Args:
+        image_id: ID of the image
+        images: list of image information
+    Returns:
+        dataset configuration dictionary
+    """
+    # Find image info
+    image_info = next((img for img in images if img["id"] == image_id), None)
+    if not image_info:
+        return DATASET_CONFIGS["pfm"]
+        
+    # Get dataset name from image info
+    dataset_name = image_info.get("source_dataset", "pfm").lower()
+    return DATASET_CONFIGS.get(dataset_name, DATASET_CONFIGS["pfm"])
+
+def find_connections(pfm_idx, dataset_config):
+    """
+    Find all connections for a keypoint in PFM format
+    Args:
+        pfm_idx: index in PFM format
+        keypoints: array of keypoint coordinates
+        dataset_config: configuration of the dataset
+    Returns:
+        list of connected keypoint indices in PFM format
+    """
+    mapping = dataset_config["keypoint_mapping"]
+    if mapping is None or pfm_idx >= len(mapping):
+        return []
+        
+    # Get original dataset index for this PFM keypoint
+    orig_idx = mapping[pfm_idx]
+    if orig_idx == -1:  # Skip if this keypoint doesn't exist in original format
+        return []
+        
+    # Look for all connections in original dataset skeleton
+    connected_pfm_indices = []
+    for [idx1, idx2] in dataset_config["skeleton"]:
+        idx1 -= 1  # Convert to 0-based indexing
+        idx2 -= 1
+        
+        # Check both directions of connection
+        target_idx = None
+        if idx1 == orig_idx:
+            target_idx = idx2
+            
+        # Find corresponding PFM index
+        for pfm_i, orig_i in enumerate(mapping):
+            # Check if this keypoint exists in both formats
+            if orig_i == target_idx:
+                connected_pfm_indices.append(pfm_i)
+                    
+    return connected_pfm_indices
+
 def compute_brightness(img, x, y, radius=20):
     crop = img[
         max(0, y - radius) : min(img.shape[0], y + radius),
@@ -207,7 +289,7 @@ def get_contrasting_color(bg_color):
     else:
         return (255, 255, 255)  # Use white text
     
-def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None):
+def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None, dataset_config=None):
     # Bounding box visualization
     bbox = annotation["bbox"]
     x1, y1, width, height = bbox
@@ -220,10 +302,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         keypoint_names = categories[0]["keypoints"]  # Get keypoint names from categories
         # keypoint_names = categories  # Get keypoint names from categories
-        # except:
-        #     print("error")
-        #     print(categories[0])
-    
+         
         # Calculate scaling factor based on image size
         img_height, img_width = img.shape[:2]
         scale_factor = max(img_width, img_height) / 1000
@@ -250,10 +329,10 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # txt_color = (10, 10, 10) if bright > 128 else (235, 235, 215)
                
                 # Get the background color at the text position
-                print("x_kp:", x_kp, "y_kp:", y_kp)
-                print("img.shape:", img.shape)
-                print("image_id", image_id)
-                print("id", id)
+                # print("x_kp:", x_kp, "y_kp:", y_kp)
+                # print("img.shape:", img.shape)
+                # print("image_id", image_id)
+                # print("id", id)
                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
                 txt_color = get_contrasting_color(bg_color)
                 
@@ -309,20 +388,28 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 #     cv2.LINE_AA,
                 # )
                 # Draw skeleton
-                for connection in skeleton:
-                    idx1, idx2 = connection
-                    x1_kp, y1_kp, v1 = keypoints[idx1 - 1]
-                    x2_kp, y2_kp, v2 = keypoints[idx2 - 1]
-                    if v1 > 0 and v2 > 0:
-                        keypoint_label1 = keypoint_names[idx1 - 1]
-                        color = color_map.get(keypoint_label1, (255, 255, 255))
-                        cv2.line(
-                            img,
-                            (int(x1_kp), int(y1_kp)),
-                            (int(x2_kp), int(y2_kp)),
-                            color,
-                            thickness=int(2 * scale_factor)
-                        )                
+                # for connection in skeleton:
+                #     idx1, idx2 = connection
+                #     x1_kp, y1_kp, v1 = keypoints[idx1 - 1]
+                #     x2_kp, y2_kp, v2 = keypoints[idx2 - 1]
+                #     if v1 > 0 and v2 > 0:
+                #         keypoint_label1 = keypoint_names[idx1 - 1]
+                #         color = color_map.get(keypoint_label1, (255, 255, 255))
+                #         cv2.line(
+                #             img,
+                #             (int(x1_kp), int(y1_kp)),
+                #             (int(x2_kp), int(y2_kp)),
+                #             color,
+                #             thickness=int(2 * scale_factor)
+                #         )        
+                 
+                # Draw skeleton in original format
+                connected_pfm_indices = find_connections(i, dataset_config)
+                for pfm_idx in connected_pfm_indices:
+                    x2_kp, y2_kp, v2 = keypoints[pfm_idx]
+                    if v2 > 0:
+                        cv2.line(img, (int(x_kp), int(y_kp)), (int(x2_kp), int(y2_kp)), (0, 255, 0), 2)
+                        
     return img
 
 def load_annotation_data(file):
@@ -367,7 +454,7 @@ def main():
     # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
     #     annotation_file = json.load(f)
         
-    with open("/app/data/primate_data/splitted_val_datasets/chimpact_val_sampled_id_138359.json", "r") as f:
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/aptv2_test.json", "r") as f:
         annotation_file = json.load(f)
         
     if annotation_file is not None:
@@ -376,7 +463,6 @@ def main():
             try:
                 # st.session_state.data = load_annotation_data(annotation_file)
                 st.session_state.data = annotation_file
-                
                 st.success("Annotation file loaded successfully!")
             except json.JSONDecodeError:
                 st.error("Error: Invalid JSON file. Please upload a valid JSON file.")
@@ -420,8 +506,22 @@ def main():
                 img = cv2.imread(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
+                # Get dataset configuration
+                dataset_config = get_dataset_config(
+                    image_id=image_id,
+                    images=st.session_state.data["images"]
+                )
+                
                 # Visualize annotation 
-                img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["categories"], st.session_state.skeleton, image_id)
+                img_with_annotation = visualize_annotation(
+                    img.copy(), 
+                    annotation, 
+                    st.session_state.color_map, 
+                    st.session_state.data["categories"], 
+                    st.session_state.skeleton,
+                    image_id,
+                    dataset_config=dataset_config
+                )
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
              
                 # Display image with annotation
