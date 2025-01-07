@@ -9,8 +9,8 @@ data_path_prefix="/mnt/data/tiwang"
 data_root=${data_path_prefix}"/v8_coco"
 
 debug=0
-gpu_id="0"
-name=riken
+gpu_id="1"
+name=kinka
 # file=${name}_detector_fasterrcnn
 # train_detector=1
 # file=${name}_pose_reset
@@ -25,7 +25,7 @@ run_name="${file}"
 # for splitted datasets
 train_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json
 test_file=${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_file}_test.json
-test_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json
+# test_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_file}_train.json
 
 # train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
 # test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
