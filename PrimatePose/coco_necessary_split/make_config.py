@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-
 import torch
 import deeplabcut.utils.auxiliaryfunctions as af
 from deeplabcut.generate_training_dataset import MakeInference_yaml
@@ -65,6 +64,7 @@ def make_inference_config(
 def main(
     project_root: str,
     train_file: str,
+    test_file: str,
     output: str,
     model_arch: str,
     multi_animal: bool,
@@ -113,7 +113,7 @@ def main(
         print("The model is not HRNet, so the freeze_bn_stats is not set to False")
     
     # pytorch_cfg["detector"]["train_settings"]["epochs"] = False
-
+    
     # Set save_epochs=1 and eval_interval=1 for both detector and runner
     pytorch_cfg["detector"]["runner"]["snapshots"]["save_epochs"] = 1
     pytorch_cfg["detector"]["runner"]["eval_interval"] = 1
@@ -132,7 +132,7 @@ def main(
 
     txt_path = str(train_dir / "sapmle.txt")
     cal_different_kinds_of_samples(train_file, txt_path)
-
+    cal_different_kinds_of_samples(test_file, txt_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -140,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("output")
     parser.add_argument("model_arch")
     parser.add_argument("--train_file", default="train.json")
+    parser.add_argument("--test_file", default="test.json")
     parser.add_argument("--multi_animal", action="store_true")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     
@@ -148,6 +149,7 @@ if __name__ == "__main__":
     main(
         args.project_root,
         args.train_file,
+        args.test_file,
         args.output,
         args.model_arch,
         args.multi_animal,
