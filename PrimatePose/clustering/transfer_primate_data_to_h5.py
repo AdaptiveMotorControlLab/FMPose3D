@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 import numpy as np
+import os
 
 def analyse_json_structure(json_path):
     """
@@ -110,9 +111,13 @@ def build_dlc_dataframe_columns(scorer, bodyparts, individuals):
     
     return pd.MultiIndex.from_tuples(columns, names=['scorer', 'individuals', 'bodyparts', 'coords'])
 
-def transfer_json_to_h5(json_path, h5_path):
+def transfer_json_to_h5(json_path, output_dir):
     """
-    Transfer data from JSON to H5 format
+    Transfer data from JSON to H5 format and CSV format
+    
+    Args:
+        json_path (str): Path to input JSON file
+        output_dir (str): Directory to save output files
     """
     # Process JSON data
     prediction_data, index, bodyparts, individuals = process_json_data(json_path)
@@ -124,19 +129,32 @@ def transfer_json_to_h5(json_path, h5_path):
     columns = build_dlc_dataframe_columns(scorer[0], bodyparts, individuals)
     df = pd.DataFrame(prediction_data, index=index, columns=columns)
     
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate filenames
+    base_name = os.path.splitext(os.path.basename(json_path))[0]
+    h5_path = os.path.join(output_dir, f"{base_name}.h5")
+    csv_path = os.path.join(output_dir, f"{base_name}.csv")
+    
     # Save to H5
     df.to_hdf(h5_path, key='data', mode='w')
+    print(f"Saved H5 file to: {h5_path}")
+    
+    # Save to CSV
+    df.to_csv(csv_path)
+    print(f"Saved CSV file to: {csv_path}")
     
     return df
 
 def test_function():
     """Test the transfer function"""
     json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mbw_test.json"
-    h5_path = "output.h5"
+    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/clustering/data"
     
-    print("Converting JSON to H5...")
-    df = transfer_json_to_h5(json_path, h5_path)
-    print(f"\nCreated H5 file with shape: {df.shape}")
+    print("Converting JSON to H5 and CSV...")
+    df = transfer_json_to_h5(json_path, output_dir)
+    print(f"\nCreated files with shape: {df.shape}")
     print("\nFirst few rows of the converted data:")
     print(df.head())
 
