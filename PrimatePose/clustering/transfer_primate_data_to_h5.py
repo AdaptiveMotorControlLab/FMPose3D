@@ -128,7 +128,7 @@ def transfer_json_to_h5(json_path, output_dir):
     # Build DataFrame
     columns = build_dlc_dataframe_columns(scorer[0], bodyparts, individuals)
     df = pd.DataFrame(prediction_data, index=index, columns=columns)
-    
+        
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -144,12 +144,12 @@ def transfer_json_to_h5(json_path, output_dir):
     # Save to CSV
     df.to_csv(csv_path)
     print(f"Saved CSV file to: {csv_path}")
-    
+
     return df
 
 def test_function():
     """Test the transfer function"""
-    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mbw_test.json"
+    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/ap10k_test.json"
     output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/clustering/data"
     
     print("Converting JSON to H5 and CSV...")
