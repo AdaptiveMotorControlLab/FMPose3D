@@ -119,6 +119,8 @@ def main(
     pytorch_cfg["detector"]["runner"]["eval_interval"] = 1
     pytorch_cfg["detector"]["train_settings"]["dataloader_pin_memory"] = False
     pytorch_cfg["runner"]["snapshots"]["save_epochs"] = 1
+    pytorch_cfg["runner"]["snapshots"]["max_snapshots"] = 10
+    
     pytorch_cfg["runner"]["eval_interval"] = 1
 
     af.write_plainconfig(str(train_dir / "pytorch_config.yaml"), pytorch_cfg)
