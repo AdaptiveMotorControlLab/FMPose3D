@@ -59,7 +59,8 @@ def extract_annotations_with_tails(
             # If either x or y is non-zero, the keypoint exists
             # or the visibility is not -1, we consider the keypoint exists
             # print(ann["id"], idx, keypoints[kp_idx], keypoints[kp_idx + 1], keypoints[kp_idx + 2])
-            if keypoints[kp_idx] != 0 or keypoints[kp_idx + 1] != 0 or keypoints[kp_idx + 2] != -1:
+            # if keypoints[kp_idx] != 0 or keypoints[kp_idx + 1] != 0 or keypoints[kp_idx + 2] != -1:
+            if keypoints[kp_idx + 2] != -1:
                 has_tail = True
                 # print("tail keypoints found")
                 break
@@ -95,10 +96,9 @@ def extract_annotations_with_tails(
 def test_extraction():
     """Test the tail annotation extraction function"""
     # Input JSON file
-    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/ak_test.json"
-    
+    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/ak_test.json"   
     # Output directory
-    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples"
+    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples/with_tails"
     
     # Extract annotations with tails
     output_path = extract_annotations_with_tails(
