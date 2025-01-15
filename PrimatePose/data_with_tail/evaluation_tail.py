@@ -160,12 +160,15 @@ def main(
     )
     
     # Create results directory in the same directory as the config file
-    config_dir = Path(pytorch_config_path).parent
+    config_dir = Path(pytorch_config_path).parent.parent
+    # print("config_dir:", config_dir)
     output_path = config_dir / "results" / "with_tail"
-    snapshot_name = Path(snapshot_path).parent.parent
+    snapshot_name = Path(snapshot_path).parent.parent.stem
+    # print("snapshot_name:", snapshot_name)
     output_path = output_path / snapshot_name
     output_path.mkdir(parents=True, exist_ok=True)
-    return 
+    # print("output_path:", output_path)
+    # return 
     print(f"Saving results to: {output_path}")
     
     #for mode in ["train", "test"]:
@@ -229,7 +232,7 @@ def main(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
-            num_samples=10,  # Added to limit visualization to 10 samples
+            num_samples=50,  # Added to limit visualization to 10 samples
             random_select=True,
         )
         
