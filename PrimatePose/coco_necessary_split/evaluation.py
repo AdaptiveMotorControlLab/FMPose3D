@@ -1,27 +1,19 @@
 """Evaluating COCO models"""
 
 from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
-
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.patches import Rectangle
-
 import numpy as np
 from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import visualize_predictions
-
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from analyse_json.split_v8_json import get_file_name_from_image_id
-
 
 PRIMATE_COLOR_MAP = {
     "head": (0, 180, 0), # wait
@@ -131,26 +123,6 @@ def pycocotools_evaluation(
 
 from PIL import Image
 
-
-def get_contrasting_color(bg_color):
-    luminance = (0.299 * bg_color[2] + 0.587 * bg_color[1] + 0.114 * bg_color[0]) / 255
-    return (0, 0, 0) if luminance > 0.5 else (255, 255, 255)
-
-# Define the function to get visibility status from the test file
-def get_visibility_status(test_file_json, image_id):
-    with open(test_file_json, "r") as f:
-        test_data = json.load(f)
-    # Find the entry for the given image_id and extract visibility information
-    visibility_info = {}
-    keypoints_info = {}
-    for item in test_data["annotations"]:
-        if item["image_id"] == image_id:
-            keypoints_info["keypoints"] = np.array(item["keypoints"]).reshape(-1, 3)
-            visibility_info = {i: kp[2] > 0 for i, kp in enumerate(keypoints_info["keypoints"])}
-            keypoints_info["bbox"] = item.get("bbox", [])
-            break
-    return visibility_info, keypoints_info
-
 def main(
     project_root: str,
     train_file: str,
@@ -173,6 +145,8 @@ def main(
     if device is not None:
         loader.model_cfg["device"] = device
 
+    # print("max_num_animals:", parameters.max_num_animals)
+    
     pose_runner, detector_runner = get_inference_runners(
         model_config=loader.model_cfg,
         snapshot_path=snapshot_path,
@@ -201,6 +175,9 @@ def main(
             detector_runner=detector_runner,
             pcutoff=pcutoff,
         ) 
+      
+        print("scores:", scores)
+        
         # predictions:      
         # bodyparts: (1, 37, 3)
         # bboxes: (1, 4)
