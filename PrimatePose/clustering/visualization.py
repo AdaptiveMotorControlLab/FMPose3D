@@ -1,3 +1,8 @@
+# refer to this code:
+# DeepLabCut/deeplabcut/utils/visualization.py
+#
+#
+
 import json
 import cv2
 import numpy as np
@@ -76,13 +81,14 @@ def visualize_annotation_pfm(
     confidence_threshold: float = 0.5,
     vis_bbox: bool = False,
     vis_text: bool = False,
-    colormap_name: str = "rainbow"
-) -> np.ndarray:
+    colormap_name: str = "rainbow",
+    dpi: int = 200  # Added DPI parameter
+) -> None:  # Changed return type to None since we're using plt directly
     """
     Visualize a single annotation on an image.
     
     Args:
-        img: Input image as numpy array
+        img: Input image as numpy array (BGR format)
         annotation: Annotation dictionary containing bbox and keypoints
         keypoint_names: List of keypoint names
         skeleton: Optional list of keypoint connections
@@ -91,20 +97,28 @@ def visualize_annotation_pfm(
         vis_bbox: Whether to visualize bounding box
         vis_text: Whether to display keypoint labels
         colormap_name: Name of matplotlib colormap to use
-        
-    Returns:
-        Image with visualization
+        dpi: Resolution for the figure
     """
+    # Convert BGR to RGB for matplotlib
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # Create figure with the same size as the image
+    dpi = plt.rcParams['figure.dpi']
+    height, width = img.shape[:2]
+    figsize = width / float(dpi), height / float(dpi)
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(img_rgb)
+    
     # Create color map
-    color_map = get_color_map(keypoint_names, colormap_name)
+    cmap = get_cmap(len(keypoint_names), colormap_name)
     
     # Draw bounding box if requested
     if vis_bbox and "bbox" in annotation:
         bbox = annotation["bbox"]
         x1, y1, width, height = [int(x) for x in bbox]
-        x2, y2 = x1 + width, y1 + height
-        # Reduce bbox thickness to 1
-        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 1)
+        rect = plt.Rectangle((x1, y1), width, height, fill=False, color='g', linewidth=1)
+        ax.add_patch(rect)
     
     # Draw keypoints if they exist
     if "keypoints" in annotation:
@@ -114,75 +128,45 @@ def visualize_annotation_pfm(
         img_height, img_width = img.shape[:2]
         scale_factor = max(img_width, img_height) / 1000
         
-        existing_text_positions = []
-        
-        # Draw keypoints
-        for i, (x_kp, y_kp, v) in enumerate(keypoints):
-            if v > 0:  # Only visualize visible keypoints
-                keypoint_label = keypoint_names[i]
-                color = color_map[keypoint_label]
-                
-                # Draw keypoint as circle
-                cv2.circle(
-                    img,
-                    center=(int(x_kp), int(y_kp)),
-                    radius=int(7 * scale_factor),
-                    color=color,
-                    thickness=-1,
-                )
-                
-                # Add text labels if requested
-                if vis_text:
-                    # Add label with contrasting color
-                    bg_color = img[int(y_kp), int(x_kp)].astype(int)
-                    txt_color = get_contrasting_color(bg_color)
-                    
-                    # adjust font scale and thickness based on scale factor
-                    font_scale = max(0.4, min(scale_factor, 1.2)) * 1.0
-                    thickness = max(1, int(scale_factor))
-                    
-                    y_text = int(y_kp) - int(15 * scale_factor)
-                    x_text = int(x_kp) - int(10 * scale_factor)
-                    # Ensure text does not go out of image bounds
-                    x_text = min(max(0, x_text), img_width - 100)
-                    y_text = min(max(0, y_text), img_height - 10)
-                
-                    # Avoid overlapping text: Adjust position if it overlaps with previously drawn text
-                    for (existing_x, existing_y) in existing_text_positions:
-                        if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
-                            y_text += int(20 * scale_factor)  # Move text slightly downward if overlap detected
-                    # Record this position
-                    existing_text_positions.append((x_text, y_text))
-                    
-                    cv2.putText(
-                        img,
-                        keypoint_label,
-                        (int(x_kp), y_text),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        font_scale,
-                        txt_color,
-                        thickness,
-                        cv2.LINE_AA
-                    )
-                    
-        # Draw skeleton first (if provided) so it appears behind keypoints
+        # Draw skeleton if provided
         if skeleton is not None:
             for connection in skeleton:
                 idx1, idx2 = connection
                 x1_kp, y1_kp, v1 = keypoints[idx1 - 1]
                 x2_kp, y2_kp, v2 = keypoints[idx2 - 1]
                 if v1 > 0 and v2 > 0:
-                    keypoint_label = keypoint_names[idx1 - 1]
-                    color = color_map[keypoint_label]
-                    cv2.line(
-                        img,
-                        (int(x1_kp), int(y1_kp)),
-                        (int(x2_kp), int(y2_kp)),
-                        color,
-                        thickness=max(1, int(1.5 * scale_factor))
-                    )
-
-    return img
+                    color = cmap(idx1 - 1)[:3]
+                    ax.plot([x1_kp, x2_kp], [y1_kp, y2_kp], '-', color=color, 
+                           linewidth=max(1, 1.5*scale_factor))
+        
+        # Draw keypoints
+        for i, (x_kp, y_kp, v) in enumerate(keypoints):
+            if v > 0:  # Only visualize visible keypoints
+                color = cmap(i)[:3]  # Get RGB color directly from colormap
+                
+                # Calculate marker size based on image dimensions
+                min_dim = min(img_width, img_height)
+                marker_size = int(min_dim * 0.015)  # 1.5% of smallest dimension
+                marker_size = max(6, min(marker_size, 25))  # Keep size between 6 and 25 pixels
+                
+                # Plot keypoint as '+'
+                ax.plot(x_kp, y_kp, '+', color=color, markersize=marker_size, markeredgewidth=max(1, marker_size//8))
+                
+                # Add text labels if requested
+                if vis_text:
+                    y_text = y_kp - 15 * scale_factor
+                    plt.text(x_kp, y_text, keypoint_names[i], 
+                            color=color, 
+                            fontsize=10*scale_factor,
+                            ha='center', 
+                            va='bottom')
+    
+    # Remove axes and white space
+    ax.axis('off')
+    plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
+    plt.margins(0,0)
+    ax.xaxis.set_major_locator(plt.NullLocator())
+    ax.yaxis.set_major_locator(plt.NullLocator())
 
 def visualize_sample_by_image_ids(
     image_ids: List[int],
@@ -192,8 +176,9 @@ def visualize_sample_by_image_ids(
     mode: str = "GT",
     confidence_threshold: float = 0.5,
     vis_text: bool = False,
-    colormap_name: str = "rainbow"
-) -> List[np.ndarray]:
+    colormap_name: str = "rainbow",
+    dpi: int = 100  # Default DPI
+) -> None:
     """
     Visualize images with their annotations based on image IDs.
     
@@ -206,10 +191,11 @@ def visualize_sample_by_image_ids(
         confidence_threshold: Threshold for confidence in prediction mode
         vis_text: Whether to display keypoint labels
         colormap_name: Name of matplotlib colormap to use
-        
-    Returns:
-        List of visualized images as numpy arrays
+        dpi: Resolution of output images
     """
+    # Set matplotlib backend to Agg for non-interactive plotting
+    plt.switch_backend('Agg')
+    
     # Load JSON data
     with open(json_file_path, 'r') as f:
         data = json.load(f)
@@ -227,19 +213,16 @@ def visualize_sample_by_image_ids(
     keypoint_names = data['categories'][0]['keypoints']
     skeleton = PFM_SKELETON
     
-    visualized_images = []
-    
     for image_id in image_ids:
         # Load image
         image_path = os.path.join(image_dir, image_id_to_name[image_id])
-        # Read image in full resolution
         img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
         
         # Draw annotations
         annotations = image_id_to_anns.get(image_id, [])
         
         for ann in annotations:
-            img = visualize_annotation_pfm(
+            visualize_annotation_pfm(
                 img=img,
                 annotation=ann,
                 keypoint_names=keypoint_names,
@@ -247,25 +230,26 @@ def visualize_sample_by_image_ids(
                 mode=mode,
                 confidence_threshold=confidence_threshold,
                 vis_text=vis_text,
-                colormap_name=colormap_name
+                colormap_name=colormap_name,
+                dpi=dpi
             )
             
             # Save image if output directory is provided
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
                 dataset_name = os.path.basename(json_file_path).split('.')[0]
-                # Include annotation ID in filename
                 ann_id = ann.get('id', 'unknown')
+                
+                # Keep original file extension
+                original_ext = os.path.splitext(image_id_to_name[image_id])[1]
                 output_path = os.path.join(
                     output_dir,
-                    f"{dataset_name}_{mode}_{image_id}_{ann_id}_{image_id_to_name[image_id]}.png"
+                    f"{dataset_name}_{image_id}_{ann_id}_{image_id_to_name[image_id]}"
                 )
-                # Save with maximum quality
-                cv2.imwrite(output_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 0])
-        
-        visualized_images.append(img)
-    
-    return visualized_images
+                
+                # Save with original format
+                plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0, format=original_ext[1:])
+            plt.close()  # Close the figure after saving
 
 if __name__ == "__main__":
     # Example usage
