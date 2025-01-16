@@ -74,7 +74,8 @@ def visualize_annotation_pfm(
     skeleton: Optional[List[List[int]]] = None,
     mode: str = "GT",
     confidence_threshold: float = 0.5,
-    vis_bbox: bool = True,
+    vis_bbox: bool = False,
+    vis_text: bool = False,
     colormap_name: str = "rainbow"
 ) -> np.ndarray:
     """
@@ -88,6 +89,7 @@ def visualize_annotation_pfm(
         mode: Either "GT" or "Pred" to determine marker style
         confidence_threshold: Threshold for confidence in prediction mode
         vis_bbox: Whether to visualize bounding box
+        vis_text: Whether to display keypoint labels
         colormap_name: Name of matplotlib colormap to use
         
     Returns:
@@ -101,7 +103,8 @@ def visualize_annotation_pfm(
         bbox = annotation["bbox"]
         x1, y1, width, height = [int(x) for x in bbox]
         x2, y2 = x1 + width, y1 + height
-        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        # Reduce bbox thickness to 1
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 1)
     
     # Draw keypoints if they exist
     if "keypoints" in annotation:
@@ -110,8 +113,58 @@ def visualize_annotation_pfm(
         # Calculate scale factor based on image size
         img_height, img_width = img.shape[:2]
         scale_factor = max(img_width, img_height) / 1000
-        scale_factor = max(0.5, min(scale_factor, 2))
         
+        existing_text_positions = []
+        
+        # Draw keypoints
+        for i, (x_kp, y_kp, v) in enumerate(keypoints):
+            if v > 0:  # Only visualize visible keypoints
+                keypoint_label = keypoint_names[i]
+                color = color_map[keypoint_label]
+                
+                # Draw keypoint as circle
+                cv2.circle(
+                    img,
+                    center=(int(x_kp), int(y_kp)),
+                    radius=int(7 * scale_factor),
+                    color=color,
+                    thickness=-1,
+                )
+                
+                # Add text labels if requested
+                if vis_text:
+                    # Add label with contrasting color
+                    bg_color = img[int(y_kp), int(x_kp)].astype(int)
+                    txt_color = get_contrasting_color(bg_color)
+                    
+                    # adjust font scale and thickness based on scale factor
+                    font_scale = max(0.4, min(scale_factor, 1.2)) * 1.0
+                    thickness = max(1, int(scale_factor))
+                    
+                    y_text = int(y_kp) - int(15 * scale_factor)
+                    x_text = int(x_kp) - int(10 * scale_factor)
+                    # Ensure text does not go out of image bounds
+                    x_text = min(max(0, x_text), img_width - 100)
+                    y_text = min(max(0, y_text), img_height - 10)
+                
+                    # Avoid overlapping text: Adjust position if it overlaps with previously drawn text
+                    for (existing_x, existing_y) in existing_text_positions:
+                        if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
+                            y_text += int(20 * scale_factor)  # Move text slightly downward if overlap detected
+                    # Record this position
+                    existing_text_positions.append((x_text, y_text))
+                    
+                    cv2.putText(
+                        img,
+                        keypoint_label,
+                        (int(x_kp), y_text),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        font_scale,
+                        txt_color,
+                        thickness,
+                        cv2.LINE_AA
+                    )
+                    
         # Draw skeleton first (if provided) so it appears behind keypoints
         if skeleton is not None:
             for connection in skeleton:
@@ -126,80 +179,19 @@ def visualize_annotation_pfm(
                         (int(x1_kp), int(y1_kp)),
                         (int(x2_kp), int(y2_kp)),
                         color,
-                        thickness=max(1, int(2 * scale_factor))
+                        thickness=max(1, int(1.5 * scale_factor))
                     )
-        
-        existing_text_positions = []
-        
-        # Draw keypoints
-        for i, (x_kp, y_kp, v) in enumerate(keypoints):
-            if v > 0:  # Only visualize visible keypoints
-                keypoint_label = keypoint_names[i]
-                color = color_map[keypoint_label]
-                
-                # Calculate marker size and thickness
-                marker_size = int(10 * scale_factor)
-                thickness = max(1, marker_size // 5)
-                x, y = int(x_kp), int(y_kp)
-                
-                # Draw marker based on mode and confidence
-                if mode == "GT":
-                    # Draw plus sign
-                    cv2.line(img, (x-marker_size, y), (x+marker_size, y), color, thickness)
-                    cv2.line(img, (x, y-marker_size), (x, y+marker_size), color, thickness)
-                else:  # Pred mode
-                    if v > confidence_threshold:
-                        # Draw dot
-                        cv2.circle(img, (x, y), marker_size//2, color, -1)
-                    else:
-                        # Draw x
-                        cv2.line(img, (x-marker_size, y-marker_size), (x+marker_size, y+marker_size), color, thickness)
-                        cv2.line(img, (x-marker_size, y+marker_size), (x+marker_size, y-marker_size), color, thickness)
-                
-                # Add label with contrasting color
-                bg_color = img[y, x].astype(int)
-                txt_color = get_contrasting_color(bg_color)
-                
-                # Calculate text properties
-                font_scale = max(0.2, min(scale_factor, 1)) * 0.8
-                thickness = max(1, int(scale_factor))
-                
-                # Calculate text position
-                y_text = y - int(15 * scale_factor)
-                x_text = x - int(10 * scale_factor)
-                
-                # Ensure text stays within image bounds
-                x_text = min(max(0, x_text), img_width - 100)
-                y_text = min(max(0, y_text), img_height - 10)
-                
-                # Avoid text overlap
-                for (existing_x, existing_y) in existing_text_positions:
-                    if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
-                        y_text += int(20 * scale_factor)
-                
-                existing_text_positions.append((x_text, y_text))
-                
-                # Draw text
-                cv2.putText(
-                    img,
-                    keypoint_label,
-                    (x_text, y_text),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    font_scale,
-                    txt_color,
-                    thickness,
-                    cv2.LINE_AA
-                )
-    
+
     return img
 
-def visualize_images_by_ids(
+def visualize_sample_by_image_ids(
     image_ids: List[int],
     json_file_path: str,
     image_dir: str,
     output_dir: Optional[str] = None,
     mode: str = "GT",
     confidence_threshold: float = 0.5,
+    vis_text: bool = False,
     colormap_name: str = "rainbow"
 ) -> List[np.ndarray]:
     """
@@ -212,6 +204,7 @@ def visualize_images_by_ids(
         output_dir: Optional directory to save visualized images
         mode: Either "GT" or "Pred" to determine marker style
         confidence_threshold: Threshold for confidence in prediction mode
+        vis_text: Whether to display keypoint labels
         colormap_name: Name of matplotlib colormap to use
         
     Returns:
@@ -239,19 +232,21 @@ def visualize_images_by_ids(
     for image_id in image_ids:
         # Load image
         image_path = os.path.join(image_dir, image_id_to_name[image_id])
-        img = cv2.imread(image_path)
+        # Read image in full resolution
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
         
         # Draw annotations
         annotations = image_id_to_anns.get(image_id, [])
         
         for ann in annotations:
             img = visualize_annotation_pfm(
-                img,
-                ann,
-                keypoint_names,
-                skeleton=skeleton,
+                img=img,
+                annotation=ann,
+                keypoint_names=keypoint_names,
+                # skeleton=skeleton,
                 mode=mode,
                 confidence_threshold=confidence_threshold,
+                vis_text=vis_text,
                 colormap_name=colormap_name
             )
             
@@ -265,7 +260,8 @@ def visualize_images_by_ids(
                     output_dir,
                     f"{dataset_name}_{mode}_{image_id}_{ann_id}_{image_id_to_name[image_id]}.png"
                 )
-                cv2.imwrite(output_path, img)
+                # Save with maximum quality
+                cv2.imwrite(output_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 0])
         
         visualized_images.append(img)
     
@@ -276,16 +272,17 @@ if __name__ == "__main__":
     dataset_name = "ak"
     mode = "test"
     json_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
-    image_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v8_coco"
+    image_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v8_coco/images"
     output_dir = f"/home/ti_wang/Ti_workspace/PrimatePose/clustering/data/{dataset_name}_{mode}"
     os.makedirs(output_dir, exist_ok=True)
     
     # Visualize some images
-    image_ids = [1, 2, 3]  # Replace with actual image IDs
-    visualize_images_by_ids(
+    image_ids = [39050, 39051, 39052]  # Replace with actual image IDs
+    visualize_sample_by_image_ids(
         image_ids=image_ids,
         json_file_path=json_file_path,
         image_dir=image_dir,
         output_dir=output_dir,
-        mode=mode
+        mode=mode,
+        # vis_text=False
     )
