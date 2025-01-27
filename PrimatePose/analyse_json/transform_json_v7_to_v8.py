@@ -1,14 +1,9 @@
 import json
 
 # Define the file paths
-# input_file = '/mnt/tiwang/v7/annotations/pfm_train_apr15.json'
-# output_file = '/mnt/tiwang/primate_data/pfm_train_v8.json'
-
-input_file = '/mnt/tiwang/v7/annotations/pfm_val_apr15.json'
-output_file = '/mnt/tiwang/primate_data/pfm_val_v8.json'
-
-# input_file = '/mnt/tiwang/v7/annotations/pfm_test_apr15.json'
-# output_file = '/mnt/tiwang/primate_data/pfm_test_v8.json'
+mode = 'val'
+input_file = f'/mnt/data/tiwang/v7/annotations/pfm_{mode}_apr15.json'
+output_file = f'/mnt/data/tiwang/primate_data/pfm_{mode}_v8.1.json'
 
 # output_file = '/home/ti/projects/PrimatePose/ti_data/pfm_test_3_transformed1.json'
 # input_file = '/home/ti/projects/PrimatePose/ti_data/data/pfm_test_3_items.json'
@@ -42,7 +37,8 @@ for image in primate_data['images']:
         'width': image['width'],
         'height': image['height'],
         'id': image['id'],
-        'source_dataset': source_dataset
+        'source_dataset': source_dataset,
+        'dataset_id': image['dataset_id']
     }
     output_data['images'].append(output_image)
     
@@ -52,11 +48,14 @@ for annotation in primate_data['annotations']:
         'id': annotation['id'],
         'image_id': annotation['image_id'],
         'category_id': 1, # fixed, assume the whole dataset is one category
+        'dataset_id': annotation['dataset_id'],
         'bbox': annotation['bbox'],
         'keypoints': annotation['keypoints'],
         'num_keypoints': 37,
         'area': annotation['area'],
-        'iscrowd': annotation['iscrowd']
+        'iscrowd': annotation['iscrowd'],
+        'keypoints_orig': annotation['keypoints_orig'],
+        'bbox_orig': annotation['bbox_orig'],
     }
     output_data['annotations'].append(output_annotation)
 
@@ -79,6 +78,7 @@ output_category = {
     'supercategory': 'animal',
     'keypoints': pfm_keypoints
 }
+
 output_data['categories'].append(output_category)
 
 # Save the converted data to a new JSON file
