@@ -102,6 +102,7 @@ def convert_v7_to_v8_and_split_datasets(input_file: str, output_dir: str, model:
     
     # Process the images and group them by source_dataset
     for image in primate_data['images']:
+        # print("image", image)
         dataset_id = image['dataset_id']
 
         # print("dataset_id:", type(dataset_id))
@@ -115,16 +116,16 @@ def convert_v7_to_v8_and_split_datasets(input_file: str, output_dir: str, model:
                     'annotations': [],
                     'categories': []
                         }
-
-            output_image = {
-                'file_name': image['file_name'],
-                'width': image['width'],
-                'height': image['height'],
-                'id': image['id'],
-                'source_dataset': source_dataset,
-                'dataset_id': image['dataset_id']
-            }
-            split_data[source_dataset]['images'].append(output_image)
+            
+        output_image = {
+            'file_name': image['file_name'],
+            'width': image['width'],
+            'height': image['height'],
+            'id': image['id'],
+            'source_dataset': source_dataset,
+            'dataset_id': image['dataset_id']
+        }
+        split_data[source_dataset]['images'].append(output_image)
 
     # Process the annotations and add them to the corresponding source_dataset
     for annotation in primate_data['annotations']:
@@ -236,7 +237,7 @@ if __name__ == "__main__":
     # Define your input and output paths
     # input_file = '/mnt/tiwang/primate_data/primate_test_1.2.json'
 
-    model = "train" # train test val
+    model = "test" # train test val
      # val
     input_file = f'/mnt/data/tiwang/v7/annotations/pfm_{model}_apr15.json'
     output_dir = f'/mnt/data/tiwang/primate_data/data_v8.1/splitted_{model}_datasets/'
