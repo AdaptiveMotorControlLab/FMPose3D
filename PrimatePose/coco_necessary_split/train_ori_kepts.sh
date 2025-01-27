@@ -10,25 +10,20 @@ data_root=${data_path_prefix}"/v8_coco"
 
 debug=0
 gpu_id="1"
-name=mit
+name=riken
 # file=${name}_detector_fasterrcnn
 # train_detector=1
 # file=${name}_pose_reset
-file=${name}_V2_pose_hrnet
+file=${name}_ori_kepts_bbox_pose_hrnet
 train_pose=1
 
 dataset_name=${name}
 mode="train"
 # Generate run name based on configuration
 run_name="${file}"
-
 # for splitted datasets
-# train_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_name}_train.json
-# test_file=${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_name}_test.json
-# test_file=${data_path_prefix}/primate_data/splitted_train_datasets/${dataset_name}_train.json
-# for dataset without testset
-train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_name}_train_${mode}.json"
-test_json="${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_name}_train_test.json"
+train_json="${data_path_prefix}/primate_data/data_v8.1/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
+test_json="${data_path_prefix}/primate_data/data_v8.1/splitted_test_datasets/${dataset_name}_test.json"
 
 # train_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
 # test_file=/mnt/tiwang/primate_data/splitted_val_datasets/${file}_sampled_500.json
