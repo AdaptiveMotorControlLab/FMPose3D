@@ -1,15 +1,14 @@
 import json
 
 # Define the file paths
+# input_file = '/mnt/tiwang/v7/annotations/pfm_train_apr15.json'
+# output_file = '/mnt/tiwang/primate_data/pfm_train_v8.json'
 
-input_file = '/mediaPFM/data/datasets/final_datasets/v7/annotations/pfm_train_apr15.json'
-output_file = '/home/ti/projects/PrimatePose/ti_data/primate_train_1.1.json'
+input_file = '/mnt/tiwang/v7/annotations/pfm_val_apr15.json'
+output_file = '/mnt/tiwang/primate_data/pfm_val_v8.json'
 
-# input_file = '/mediaPFM/data/datasets/final_datasets/v7/annotations/pfm_val_apr15.json'
-# output_file = '/home/ti/projects/PrimatePose/ti_data/primate_valid_1.1.json'
-
-# input_file = '/mediaPFM/data/datasets/final_datasets/v7/annotations/pfm_test_apr15.json'
-# output_file = '/home/ti/projects/PrimatePose/ti_data/primate_test_1.1.json'
+# input_file = '/mnt/tiwang/v7/annotations/pfm_test_apr15.json'
+# output_file = '/mnt/tiwang/primate_data/pfm_test_v8.json'
 
 # output_file = '/home/ti/projects/PrimatePose/ti_data/pfm_test_3_transformed1.json'
 # input_file = '/home/ti/projects/PrimatePose/ti_data/data/pfm_test_3_items.json'
@@ -46,7 +45,7 @@ for image in primate_data['images']:
         'source_dataset': source_dataset
     }
     output_data['images'].append(output_image)
-
+    
 # Process the annotations section
 for annotation in primate_data['annotations']:
     output_annotation = {
@@ -64,15 +63,23 @@ for annotation in primate_data['annotations']:
 # Process the categories section
 pfm_keypoints = primate_data['pfm_keypoints']
 
-for category in primate_data['categories']:
-    output_category = {
-        'id': category['id'],
-        'name': category['common_name'],
-        'supercategory': category['superfamily'],
-        'keypoints': pfm_keypoints
-    }
-    output_data['categories'].append(output_category)
-    break
+# for category in primate_data['categories']:
+#     output_category = {
+#         'id': category['id'],
+#         'name': category['common_name'],
+#         'supercategory': category['superfamily'],
+#         'keypoints': pfm_keypoints
+#     }
+#     output_data['categories'].append(output_category)
+#     break
+
+output_category = { 
+    'id': 1,
+    'name': 'pfm',
+    'supercategory': 'animal',
+    'keypoints': pfm_keypoints
+}
+output_data['categories'].append(output_category)
 
 # Save the converted data to a new JSON file
 with open(output_file, 'w') as f:
