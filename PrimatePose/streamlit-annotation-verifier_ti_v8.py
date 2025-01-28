@@ -211,6 +211,31 @@ DATASET_CONFIGS = {
             -1, -1, -1, -1, -1, -1  # 31-36
         ]
     },
+    "mit": {
+            "skeleton": [
+                [1, 2], [3, 4], [1, 3], [3, 13], [13, 14],
+                [14, 5], [5, 8], [8, 10], [6, 9], [5, 6],
+                [13, 7], [7, 12], [13, 5], [5, 11]
+            ],
+    "keypoint_mapping": None,  # No mapping needed for PFM format
+    "keypoints": [
+                "Front",
+                "Right",
+                "Middle",
+                "Left",
+                "FL1",
+                "BL1",
+                "FR1",
+                "BR1",
+                "BL2",
+                "BR2",
+                "FL2",
+                "FR2",
+                "Body1",
+                "Body2",
+                "Body3"
+            ]
+    },
     "pfm": {
         "skeleton": PFM_SKELETON,
         "keypoint_mapping": None  # No mapping needed for PFM format
@@ -236,6 +261,7 @@ def get_dataset_config(image_id, images):
     return DATASET_CONFIGS.get(dataset_name, DATASET_CONFIGS["pfm"])
 
 def find_connections(pfm_idx, dataset_config):
+    
     """
     Find all connections for a keypoint in PFM format
     Args:
@@ -245,6 +271,7 @@ def find_connections(pfm_idx, dataset_config):
     Returns:
         list of connected keypoint indices in PFM format
     """
+    
     mapping = dataset_config["keypoint_mapping"]
     if mapping is None or pfm_idx >= len(mapping):
         return []
@@ -259,7 +286,6 @@ def find_connections(pfm_idx, dataset_config):
     for [idx1, idx2] in dataset_config["skeleton"]:
         idx1 -= 1  # Convert to 0-based indexing
         idx2 -= 1
-        
         # Check both directions of connection
         target_idx = None
         if idx1 == orig_idx:
@@ -297,8 +323,9 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
     cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     
     print("________________________")
+    
     id = annotation["id"]
-    if "keypoints" in annotation:        
+    if "keypoints" in annotation:
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         keypoint_names = categories[0]["keypoints"]  # Get keypoint names from categories
         # keypoint_names = categories  # Get keypoint names from categories
@@ -306,6 +333,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         # Calculate scaling factor based on image size
         img_height, img_width = img.shape[:2]
         scale_factor = max(img_width, img_height) / 1000
+        
         # print("scale_factor:", scale_factor)
         # Set minimum and maximum limits for scaling factor
         # scale_factor = max(0.5, min(scale_factor, 2))
@@ -333,12 +361,13 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # print("img.shape:", img.shape)
                 # print("image_id", image_id)
                 # print("id", id)
+                
                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
                 txt_color = get_contrasting_color(bg_color)
                 
                 # adjust font scale and thickness based on scale factor
-                font_scale = max(0.4, min(scale_factor, 1.5))
-                thickness = max(1, int(2 * scale_factor))
+                font_scale = max(0.2, min(scale_factor, 1))*0.8
+                thickness = max(1, int(scale_factor))
                 
                 y_text = int(y_kp) - int(15 * scale_factor)
                 x_text = int(x_kp) - int(10 * scale_factor)
@@ -353,16 +382,16 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # Record this position
                 existing_text_positions.append((x_text, y_text))
                 
-                # cv2.putText(
-                #     img,
-                #     keypoint_label,
-                #     (int(x_kp), y_text),
-                #     cv2.FONT_HERSHEY_SIMPLEX,
-                #     font_scale,
-                #     txt_color,
-                #     thickness + 0,
-                #     cv2.LINE_AA,
-                # )
+                cv2.putText(
+                    img,
+                    keypoint_label,
+                    (int(x_kp), y_text),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    font_scale,
+                    txt_color,
+                    thickness + 0,
+                    cv2.LINE_AA,
+                )
                 
                 # Draw the black text as an outline
                 # cv2.putText(
