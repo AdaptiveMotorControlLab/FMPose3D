@@ -81,19 +81,16 @@ def pycocotools_evaluation(
     finally:
         print(80 * "-")
 
-# 37 -> 24
-
-keypoint_vis_mask = [ 0,
-                     1,
-                     1,
-                     1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]
-keypoint_vis_mask = [ 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]
+# idx                 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36          
+keypoint_vis_mask = [ 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]  # Original
+keypoint_vis_mask = [ 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]  # Version 2
+keypoint_vis_mask = [ 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]  # Version 3
 
 keypoint_name_simplified = [
     "forehead",
     "head",
-    "Leye",
-    "R_eye",
+    "L_E",
+    "R_E",
     "nose",
     "L_ear",
     "R_ear",
@@ -102,25 +99,25 @@ keypoint_name_simplified = [
     "mouth_B_L",
     "mouth_B_R",
     "neck",
-    "L_shoulder",
-    "R_shoulder",
+    "L_S",
+    "R_S",
     "upper_B",
     "torso_M_B",
     "body_C",
     "lower_B",
-    "L_elbow",
-    "R_elbow",
-    "L_wrist",
-    "R_wrist",
-    "L_hand",
-    "R_hand",
+    "L_E",
+    "R_E",
+    "L_W",
+    "R_W",
+    "L_H",
+    "R_H",
     "L_hip",
     "R_hip",
     "C_hip",
-    "L_knee",
-    "R_knee",
-    "L_ankle",
-    "R_ankle",
+    "L_K",
+    "R_K",
+    "L_A",
+    "R_A",
     "L_foot",
     "R_foot",
     "root_tail",
@@ -229,7 +226,7 @@ def main(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
-            num_samples=10,  # Added to limit visualization to 10 samples
+            num_samples=30,  # Added to limit visualization to 10 samples
             random_select=True,
             keypoint_vis_mask=keypoint_vis_mask,
             plot_bboxes=True,
@@ -274,15 +271,6 @@ def visualize_PFM_predictions(
 
     # Process each selected image
     for image_path in image_paths:
-        # Read image and calculate dot size
-        frame = auxfun_videos.imread(str(image_path), mode="skimage")
-        h, w = frame.shape[:2]
-        
-        # Calculate adaptive dot size based on image dimensions
-        # This creates dots that scale with image size while staying reasonable
-        dot_size = int(min(w, h) * 0.015)  # 1.5% of smallest dimension
-        dot_size = max(6, min(dot_size, 25))  # Keep size between 6 and 25 pixels
-
         # Get prediction and ground truth data
         pred_data = predictions[image_path]
         gt_keypoints = ground_truth[image_path]  # Shape: [N, num_keypoints, 3]
@@ -308,7 +296,6 @@ def visualize_PFM_predictions(
             gt_bodyparts=gt_keypoints,
             pred_bodyparts=pred_keypoints,
             bounding_boxes=bounding_boxes,
-            dot_size=dot_size,
             skeleton=skeleton,
             keypoint_names=keypoint_names,
             p_cutoff=confidence_threshold,
@@ -328,7 +315,7 @@ def plot_gt_and_predictions_PFM(
     mode: str = "bodypart",
     colormap: str = "rainbow",
     dot_size: int = 12,
-    alpha_value: float = 0.7,
+    alpha_value: float = 0.8,
     p_cutoff: float = 0.6,
     bounding_boxes: tuple[np.ndarray, np.ndarray] | None = None,
     bounding_boxes_color="k",
@@ -357,11 +344,28 @@ def plot_gt_and_predictions_PFM(
         keypoint_vis_mask: List of keypoint indices to show
         labels: Marker styles for [ground truth, reliable predictions, unreliable predictions]
     """
-    
-    # Setup figure
+    # Read image and calculate dot size
     frame = auxfun_videos.imread(str(image_path), mode="skimage")
-    num_pred, num_keypoints = pred_bodyparts.shape[:2]
     h, w = frame.shape[:2]
+    # print("h, w:", h, w)
+    # print("image_name:", Path(image_path).stem)
+    # Calculate adaptive dot size based on image dimensions
+    # Use a logarithmic scale to handle very large or small images better
+    diagonal = np.sqrt(w * w + h * h)  # Image diagonal length
+    base_size = np.log10(diagonal) * 3  # Logarithmic scaling
+    # print("diagonal:", diagonal)
+    # Fine-tune the dot size
+    if diagonal > 1200:  # High resolution
+        dot_size = base_size * 2.0
+    elif diagonal < 800:  # Low resolution
+        dot_size = base_size * 1.0
+    else:  # Medium resolution
+        dot_size = base_size
+        
+    # Ensure dot size stays within reasonable bounds
+    dot_size = int(max(4, min(dot_size, 15)))  # Tighter bounds for dots
+    
+    num_pred, num_keypoints = pred_bodyparts.shape[:2]
     
     # Create figure with optimal settings
     fig, ax = create_minimal_figure()
@@ -387,6 +391,7 @@ def plot_gt_and_predictions_PFM(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
+    # Draw bounding boxes if provided
     if bounding_boxes is not None:
         for bbox, bbox_score in zip(bounding_boxes[0], bounding_boxes[1]):
             bbox_origin = (bbox[0], bbox[1])
@@ -402,6 +407,10 @@ def plot_gt_and_predictions_PFM(
             )
             ax.add_patch(rect)
 
+    # Track existing text positions to avoid overlap
+    existing_text_positions = []
+    scale_factor = min(w, h) / 1000  # Normalize scale factor based on image size
+
     for idx_individual in range(num_pred):
         for idx_keypoint in range(num_keypoints):
             if pred_bodyparts is not None and keypoint_vis_mask[idx_keypoint]:
@@ -412,23 +421,47 @@ def plot_gt_and_predictions_PFM(
                 else:
                     pred_label = labels[2]
                 if keypoint_confidence > p_cutoff:
+                    x_kp = pred_bodyparts[idx_individual, idx_keypoint, 0]
+                    y_kp = pred_bodyparts[idx_individual, idx_keypoint, 1]
+                    
                     ax.plot(
-                        pred_bodyparts[idx_individual, idx_keypoint, 0], 
-                        pred_bodyparts[idx_individual, idx_keypoint, 1], 
+                        x_kp, 
+                        y_kp, 
                         pred_label, 
                         color=colors(idx_keypoint), 
                         alpha=alpha_value,
                         markersize=dot_size
-                        )
+                    )
+
                     if keypoint_names is not None:
+                        # Calculate initial text position
+                        x_text = x_kp - (10 * scale_factor)
+                        y_text = y_kp - (15 * scale_factor)
+                        
+                        # Ensure text stays within image bounds
+                        x_text = min(max(0, x_text), w - 100)
+                        y_text = min(max(0, y_text), h - 10)
+                        
+                        # Avoid overlapping with existing text
+                        while any(abs(x_text - ex) < 50 * scale_factor and abs(y_text - ey) < 20 * scale_factor 
+                                for ex, ey in existing_text_positions):
+                            y_text += 20 * scale_factor
+                            if y_text > h - 10:  # If we run out of vertical space
+                                y_text = pred_bodyparts[idx_individual, idx_keypoint, 1]  # Reset to original y
+                                x_text += 50 * scale_factor  # Move text horizontally instead
+                        
+                        # Record this position
+                        existing_text_positions.append((x_text, y_text))
+                        
                         ax.text(
-                            pred_bodyparts[idx_individual, idx_keypoint, 0], 
-                            pred_bodyparts[idx_individual, idx_keypoint, 1], 
+                            x_text,
+                            y_text,
                             keypoint_names[idx_keypoint], 
                             color=colors(idx_keypoint), 
                             alpha=alpha_value,
-                            fontsize=dot_size
+                            fontsize=dot_size * 0.5
                         )
+
                     # plot ground truth
                     if gt_bodyparts is not None:
                         if gt_bodyparts[idx_individual, idx_keypoint, 2] != -1:
@@ -438,16 +471,15 @@ def plot_gt_and_predictions_PFM(
                                 labels[0], 
                                 color=colors(idx_keypoint), 
                                 alpha=alpha_value,
-                                markersize=dot_size
-                                )
-                    
-    
+                                markersize=dot_size*0.5
+                            )
+                
     # Save the figure
     output_path = Path(output_dir) / f"{Path(image_path).stem}_predictions.png"
-    save_labeled_frame(fig, str(image_path), str(output_dir), belongs_to_train=False)
+    # save_labeled_frame(fig, str(image_path), str(output_dir), belongs_to_train=False)
     plt.savefig(
         output_path,
-        dpi=100,
+        dpi=200,
         bbox_inches='tight',
         pad_inches=0,
         transparent=False
