@@ -1,0 +1,410 @@
+"""Evaluating COCO models"""
+
+from __future__ import annotations
+import argparse
+import json
+import logging
+from pathlib import Path
+import numpy as np
+from typing import Optional, Dict, List, Tuple, Union
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
+import matplotlib.patches as patches
+from deeplabcut.utils import auxfun_videos
+from deeplabcut.pose_estimation_pytorch import COCOLoader
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate, plot_gt_and_predictions
+from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners, create_minimal_figure, get_cmap
+from deeplabcut.pose_estimation_pytorch.task import Task
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import visualize_predictions
+from deeplabcut.utils.plotting import erase_artists, save_labeled_frame
+from deeplabcut.utils.auxfun_videos import imread
+from deeplabcut.utils.visualization import get_cmap
+
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from analyse_json.split_v8_json import get_file_name_from_image_id
+
+def compute_brightness(img, x, y, radius=20):
+    crop = img[
+        max(0, y - radius): min(img.shape[0], y + radius),
+        max(0, x - radius): min(img.shape[1], x + radius),
+        :
+    ]
+    return np.mean(crop)
+
+def pycocotools_evaluation(
+    kpt_oks_sigmas: list[int],
+    ground_truth: dict,
+    predictions: list[dict],
+    annotation_type: str,
+) -> None:
+    """Evaluation of models using Pycocotools
+
+    Evaluates the predictions using OKS sigma 0.1, margin 0 and prints the results to
+    the console.
+
+    Args:
+        kpt_oks_sigmas: the OKS sigma for each keypoint
+        ground_truth: the ground truth data, in COCO format
+        predictions: the predictions, in COCO format
+        annotation_type: {"bbox", "keypoints"} the annotation type to evaluate
+    """
+    print(80 * "-")
+    print(f"Attempting `pycocotools` evaluation for {annotation_type}!")
+    try:
+        from pycocotools.coco import COCO
+        from pycocotools.cocoeval import COCOeval
+
+        coco = COCO()
+        coco.dataset["annotations"] = ground_truth["annotations"]
+        coco.dataset["categories"] = ground_truth["categories"]
+        coco.dataset["images"] = ground_truth["images"]
+        coco.createIndex()
+
+        coco_det = coco.loadRes(predictions)
+        coco_eval = COCOeval(coco, coco_det, iouType=annotation_type)
+        coco_eval.params.kpt_oks_sigmas = np.array(kpt_oks_sigmas)
+
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        coco_eval.summarize()
+
+    except Exception as err:
+        print(f"Could not evaluate with `pycocotools`: {err}")
+    finally:
+        print(80 * "-")
+
+def main(
+    project_root: str,
+    train_file: str,
+    test_file: str,
+    pytorch_config_path: str,
+    device: str | None,
+    snapshot_path: str,
+    detector_path: str | None,
+    pcutoff: float,
+    oks_sigma: float,
+    gpus: list[int] | None,
+):
+    loader = COCOLoader(
+        project_root=project_root,
+        model_config_path=pytorch_config_path, # the path for pytorch_config.yaml
+        train_json_filename=train_file,
+        test_json_filename=test_file,
+    )
+    parameters = loader.get_dataset_parameters()
+    if device is not None:
+        loader.model_cfg["device"] = device
+
+    # print("max_num_animals:", parameters.max_num_animals)
+    
+    pose_runner, detector_runner = get_inference_runners(
+        model_config=loader.model_cfg,
+        snapshot_path=snapshot_path,
+        max_individuals=parameters.max_num_animals,
+        num_bodyparts=parameters.num_joints,
+        num_unique_bodyparts=parameters.num_unique_bpts,
+        with_identity=False,
+        transform=None,
+        detector_path=detector_path,
+        detector_transform=None,
+    )
+    
+    output_path = Path(pytorch_config_path).parent.parent / "results"
+    output_path.mkdir(exist_ok=True)
+    print(output_path)
+    #for mode in ["train", "test"]:
+    
+    print("detector_runner:", detector_runner)
+    
+    for mode in ["test"]:    
+        scores, predictions = evaluate(
+            pose_task=Task(loader.model_cfg["method"]),
+            pose_runner=pose_runner,
+            loader=loader,
+            mode=mode,
+            detector_runner=detector_runner,
+            pcutoff=pcutoff,
+        ) 
+      
+        print("scores:", scores)
+        
+        # predictions:      
+        # bodyparts: (1, 37, 3)
+        # bboxes: (1, 4)
+        # bbox_scores: (1,)
+        
+        # get ground truth 
+        gt_keypoints = loader.ground_truth_keypoints(mode) 
+        
+        print("finished evaluating")
+        
+        coco_predictions = loader.predictions_to_coco(predictions, mode=mode)
+        model_name = Path(snapshot_path).stem
+        if detector_path is not None:
+            model_name += Path(detector_path).stem
+        predictions_file = output_path / f"{model_name}-{mode}-predictions.json"
+        with open(predictions_file, "w") as f:
+            json.dump(coco_predictions, f, indent=4)
+        
+        print(80 * "-")
+        print(f"{mode} results")
+        
+        # Define the path for the results file
+        results_file_path = output_path / "test_results.txt"
+        
+        # Print and write the results
+        print(f"\nResults from model: {snapshot_path}")
+        print("Evaluation scores:")
+        
+        # Open the file in append mode
+        with open(results_file_path, "a") as f:
+            # Write a separator line and model path
+            separator = "\n" + "="*50 + "\n"
+            f.write(separator)
+            f.write(f"Model: {snapshot_path}\n")
+            
+            # Write the scores
+            for k, v in scores.items():
+                result_line = f"  {k}: {v}\n"
+                print(result_line.strip())  # Print to console
+                f.write(result_line)  # Write to file
+
+        visualize_PFM_predictions(
+            predictions=predictions,
+            ground_truth=gt_keypoints,
+            output_dir=output_path,
+            num_samples=10,  # Added to limit visualization to 10 samples
+            random_select=True,
+            show_ground_truth=False,
+            plot_bboxes=True
+        )
+        
+def visualize_PFM_predictions(
+    predictions: Dict[str, Dict],
+    ground_truth: Dict[str, np.ndarray],
+    output_dir: Optional[Union[str, Path]] = None,
+    num_samples: Optional[int] = None,
+    random_select: bool = False,
+    show_ground_truth: bool = True,
+    plot_bboxes: bool = True,
+    skeleton: Optional[List[Tuple[int, int]]] = None,
+    keypoint_vis_mask: Optional[List[int]] = None,
+    keypoint_names: Optional[List[str]] = None,
+    confidence_threshold: float = 0.6
+) -> None:
+    """Visualize model predictions alongside ground truth keypoints with additional PFM-specific configurations."""
+    # Setup output directory and logging
+    output_dir = Path(output_dir or "predictions_visualizations")
+    output_dir.mkdir(exist_ok=True, parents=True)
+    
+    # Configure logging with a unique handler
+    log_file = output_dir / "visualization.log"
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger = logging.getLogger('PFM_visualization')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.info(f"Starting visualization process. Output directory: {output_dir}")
+
+    # Select images to process efficiently
+    image_paths = list(predictions.keys())
+    if num_samples and num_samples < len(image_paths):
+            if random_select:
+                image_paths = np.random.choice(
+                    image_paths, num_samples, replace=False
+                ).tolist()
+            else:
+                image_paths = image_paths[:num_samples]
+
+    # Process each selected image
+    for image_path in image_paths:
+        # Read image and calculate dot size
+        frame = auxfun_videos.imread(str(image_path), mode="skimage")
+        h, w = frame.shape[:2]
+        
+        # Calculate adaptive dot size based on image dimensions
+        # This creates dots that scale with image size while staying reasonable
+        dot_size = int(min(w, h) * 0.015)  # 1.5% of smallest dimension
+        dot_size = max(6, min(dot_size, 25))  # Keep size between 6 and 25 pixels
+
+        # Get prediction and ground truth data
+        pred_data = predictions[image_path]
+        gt_keypoints = ground_truth[image_path]  # Shape: [N, num_keypoints, 3]
+
+        # Process predicted keypoints
+        pred_keypoints = pred_data["bodyparts"]
+
+        if plot_bboxes:
+            bboxes = predictions[image_path].get("bboxes", None)
+            bbox_scores = predictions[image_path].get("bbox_scores", None)
+            bounding_boxes = (
+                (bboxes, bbox_scores)
+                if bbox_scores is not None and bbox_scores is not None
+                else None
+            )
+        else:
+            bounding_boxes = None
+
+        # Generate visualization
+        plot_gt_and_predictions_PFM(
+            image_path=image_path,
+            output_dir=output_dir,
+            gt_bodyparts=gt_keypoints,
+            pred_bodyparts=pred_keypoints,
+            bounding_boxes=bounding_boxes,
+            dot_size=dot_size,
+            skeleton=skeleton,
+            keypoint_names=keypoint_names,
+            p_cutoff=confidence_threshold,
+            keypoint_vis_mask=keypoint_vis_mask,  # Pass the mask to plotting function
+            show_ground_truth=show_ground_truth,
+        )
+        logger.info(f"Successfully visualized predictions for {image_path}")
+
+    # Clean up logging handler
+    logger.removeHandler(handler)
+    handler.close()
+
+def plot_gt_and_predictions_PFM(
+    image_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    gt_bodyparts: Optional[np.ndarray] = None,
+    pred_bodyparts: Optional[np.ndarray] = None,
+    mode: str = "bodypart",
+    colormap: str = "rainbow",
+    dot_size: int = 12,
+    alpha_value: float = 0.7,
+    p_cutoff: float = 0.6,
+    bounding_boxes: tuple[np.ndarray, np.ndarray] | None = None,
+    bounding_boxes_color="k",
+    bboxes_pcutoff: float = 0.6,
+    skeleton: Optional[List[Tuple[int, int]]] = None,
+    keypoint_names: Optional[List[str]] = None,
+    keypoint_vis_mask: Optional[List[int]] = None,
+    labels: List[str] = ["+", ".", "x"],
+) -> None:
+    """Plot ground truth and predictions on an image.
+
+    Args:
+        image_path: Path to the image file
+        output_dir: Directory to save the visualization
+        gt_bodyparts: Ground truth keypoints array [N, num_keypoints, 3] (x, y, vis_label)
+        pred_bodyparts: Predicted keypoints array [N, num_keypoints, 3] (x, y, confidence)
+        bounding_boxes: Tuple of (boxes, scores) for bounding box visualization
+        dot_size: Size of the keypoint markers
+        alpha_value: Transparency for points and lines
+        p_cutoff: Confidence threshold for predictions
+        mode: How to color the points ("bodypart" or "individual")
+        colormap: Matplotlib colormap name
+        bbox_color: Color for bounding boxes
+        skeleton: List of joint pairs for skeleton visualization
+        keypoint_names: List of keypoint names for labeling
+        keypoint_vis_mask: List of keypoint indices to show
+        labels: Marker styles for [ground truth, reliable predictions, unreliable predictions]
+    """
+    
+    # Setup figure
+    frame = auxfun_videos.imread(str(image_path), mode="skimage")
+    num_pred, num_keypoints = pred_bodyparts.shape[:2]
+    h, w = frame.shape[:2]
+    
+    # Create figure with optimal settings
+    fig, ax = create_minimal_figure()
+    fig.set_size_inches(w/100, h/100)
+    ax.set_xlim(0, w)
+    ax.set_ylim(0, h)
+    ax.invert_yaxis()
+    ax.imshow(frame, "gray")
+
+    # Set up colors based on mode
+    if mode == "bodypart":
+        num_colors = num_keypoints
+        # if pred_unique_bodyparts is not None:
+        #     num_colors += pred_unique_bodyparts.shape[1]
+        colors = get_cmap(num_colors, name=colormap)
+    # predictions = pred_bodyparts.swapaxes(0, 1)
+    # ground_truth = gt_bodyparts.swapaxes(0, 1)
+    elif mode == "individual":
+        colors = get_cmap(num_pred + 1, name=colormap)
+        # predictions = pred_bodyparts
+        # ground_truth = gt_bodyparts
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
+                
+    if bounding_boxes is not None:
+        for bbox, bbox_score in zip(bounding_boxes[0], bounding_boxes[1]):
+            bbox_origin = (bbox[0], bbox[1])
+            (bbox_width, bbox_height) = (bbox[2], bbox[3])
+            rect = patches.Rectangle(
+                bbox_origin,
+                bbox_width,
+                bbox_height,
+                linewidth=2,
+                edgecolor=bounding_boxes_color,
+                facecolor='none',
+                linestyle="--" if bbox_score < bbox else "-"
+            )
+            ax.add_patch(rect)
+    
+    for idx_individual in range(num_pred):
+        for idx_keypoint in range(num_keypoints):
+            if pred_bodyparts is not None and keypoint_vis_mask[idx_keypoint]:
+                # if the keypoint is allowed to be shown and the prediction is reliable
+                if pred_bodyparts[idx_individual, idx_keypoint, 2] > p_cutoff:
+                    pred_label = labels[1]
+                else:
+                    pred_label = labels[2]
+                ax.plot(
+                    pred_bodyparts[idx_individual, idx_keypoint, 0], 
+                    pred_bodyparts[idx_individual, idx_keypoint, 1], 
+                    pred_label, 
+                    color=colors[idx_individual], 
+                    alpha=alpha_value,
+                    markersize=dot_size
+                    )
+                # plot ground truth
+                if gt_bodyparts is not None:
+                    if gt_bodyparts[idx_individual, idx_keypoint, 2] > 0:
+                        ax.plot(
+                            gt_bodyparts[idx_individual, idx_keypoint, 0], 
+                            gt_bodyparts[idx_individual, idx_keypoint, 1], 
+                            labels[0], 
+                            color=colors[idx_individual], 
+                            alpha=alpha_value,
+                            markersize=dot_size
+                            )
+    # Save the figure
+    output_path = Path(output_dir) / f"{Path(image_path).stem}_predictions.png"
+    save_labeled_frame(fig, str(image_path), str(output_dir), belongs_to_train=False)
+    erase_artists(ax)
+    plt.close()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--project_root")
+    parser.add_argument("--pytorch_config_path")
+    parser.add_argument("--snapshot_path")
+    parser.add_argument("--train_file", default="train.json")
+    parser.add_argument("--test_file", default="test.json")
+    parser.add_argument("--device", default=None)
+    parser.add_argument("--detector_path", default=None)
+    parser.add_argument("--gpus", default=None, nargs="+", type=int)
+    parser.add_argument("--pcutoff", type=float, default=0.6)
+    parser.add_argument("--oks_sigma", type=float, default=0.1)
+    args = parser.parse_args()
+    main(
+        args.project_root,
+        args.train_file,
+        args.test_file,
+        args.pytorch_config_path,
+        args.device,
+        args.snapshot_path,
+        args.detector_path,
+        args.pcutoff,
+        args.oks_sigma,
+        args.gpus,
+    )
