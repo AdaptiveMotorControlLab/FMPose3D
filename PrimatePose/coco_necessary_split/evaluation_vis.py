@@ -226,7 +226,7 @@ def main(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
-            num_samples=30,  # Added to limit visualization to 10 samples
+            num_samples=10,  # Added to limit visualization to 10 samples
             random_select=True,
             keypoint_vis_mask=keypoint_vis_mask,
             plot_bboxes=True,
@@ -365,7 +365,49 @@ def plot_gt_and_predictions_PFM(
     # Ensure dot size stays within reasonable bounds
     dot_size = int(max(4, min(dot_size, 15)))  # Tighter bounds for dots
     
+    # filter out the individuals that without GT keypoints 
+    # if all the keypoints are 0, then this individual will be delete
+    if gt_bodyparts is not None:
+        valid_individuals = []
+        for idx in range(gt_bodyparts.shape[0]):
+            # Check if this individual has any valid keypoints
+            # A keypoint is valid if:
+            # 1. its visibility (3rd value) is not -1
+            # 2. not all keypoints are [0, 0, 0]
+            has_valid_keypoints = False
+            all_zeros = True
+            
+            for kp_idx in range(gt_bodyparts.shape[1]):
+                kp = gt_bodyparts[idx, kp_idx]
+                # Check if keypoint is not [0, 0, 0]
+                if not (kp[0] == 0 and kp[1] == 0 and kp[2] == 0):
+                    all_zeros = False
+                # Check if keypoint is visible
+                if kp[2] != -1:
+                    has_valid_keypoints = True
+            
+            # Only include individual if they have valid keypoints and not all zeros
+            if has_valid_keypoints and not all_zeros:
+                valid_individuals.append(idx)
+        
+        print(f"Found {len(valid_individuals)} valid individuals out of {gt_bodyparts.shape[0]}")
+        
+        # Filter both ground truth and predictions
+        if valid_individuals:
+            gt_bodyparts = gt_bodyparts[valid_individuals]
+            pred_bodyparts = pred_bodyparts[valid_individuals]
+            if bounding_boxes is not None:
+                bounding_boxes = (
+                    bounding_boxes[0][valid_individuals],
+                    bounding_boxes[1][valid_individuals]
+                )
+    
     num_pred, num_keypoints = pred_bodyparts.shape[:2]
+    
+    print("After filtering:")
+    print("num_pred, num_keypoints:", num_pred, num_keypoints)
+    if gt_bodyparts is not None:
+        print("gt_bodyparts shape:", gt_bodyparts.shape)
     
     # Create figure with optimal settings
     fig, ax = create_minimal_figure()
@@ -391,6 +433,8 @@ def plot_gt_and_predictions_PFM(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
+    print("bounding_boxes:", bounding_boxes)
+    
     # Draw bounding boxes if provided
     if bounding_boxes is not None:
         for bbox, bbox_score in zip(bounding_boxes[0], bounding_boxes[1]):
@@ -411,6 +455,113 @@ def plot_gt_and_predictions_PFM(
     existing_text_positions = []
     scale_factor = min(w, h) / 1000  # Normalize scale factor based on image size
 
+    plot_individual = True
+    
+    if plot_individual:
+        # Save individual plots for each animal
+        for idx_individual in range(num_pred):
+            print("plot individual:", idx_individual)
+            # Create a new figure for each individual
+            fig_ind, ax_ind = create_minimal_figure()
+            fig_ind.set_size_inches(w/100, h/100)
+            ax_ind.set_xlim(0, w)
+            ax_ind.set_ylim(0, h)
+            ax_ind.invert_yaxis()
+            ax_ind.imshow(frame, "gray")
+            
+            # Draw bounding box for this individual if available
+            if bounding_boxes is not None:
+                bbox = bounding_boxes[0][idx_individual]
+                bbox_score = bounding_boxes[1][idx_individual]
+                bbox_origin = (bbox[0], bbox[1])
+                (bbox_width, bbox_height) = (bbox[2], bbox[3])
+                rect = patches.Rectangle(
+                    bbox_origin,
+                    bbox_width,
+                    bbox_height,
+                    linewidth=2,
+                    edgecolor=bounding_boxes_color,
+                    facecolor='none',
+                    linestyle="--" if bbox_score < bboxes_pcutoff else "-"
+                )
+                ax_ind.add_patch(rect)
+            
+            # Reset text positions for each individual
+            existing_text_positions = []
+            
+            # Plot keypoints for this individual
+            for idx_keypoint in range(num_keypoints):
+                if keypoint_vis_mask[idx_keypoint]:
+                    
+                    keypoint_confidence = pred_bodyparts[idx_individual, idx_keypoint, 2]
+                    print("keypoint_confidence_individual:", keypoint_confidence)
+                    if keypoint_confidence > p_cutoff:
+                        x_kp = pred_bodyparts[idx_individual, idx_keypoint, 0]
+                        y_kp = pred_bodyparts[idx_individual, idx_keypoint, 1]
+                        
+                        ax_ind.plot(
+                            x_kp, 
+                            y_kp, 
+                            labels[1] if keypoint_confidence > p_cutoff else labels[2], 
+                            color=colors(idx_keypoint), 
+                            alpha=alpha_value,
+                            markersize=dot_size
+                        )
+
+                        if keypoint_names is not None:
+                            # Calculate and adjust text position
+                            x_text = x_kp - (10 * scale_factor)
+                            y_text = y_kp - (15 * scale_factor)
+                            x_text = min(max(0, x_text), w - 100)
+                            y_text = min(max(0, y_text), h - 10)
+                            
+                            while any(abs(x_text - ex) < 50 * scale_factor and abs(y_text - ey) < 20 * scale_factor 
+                                    for ex, ey in existing_text_positions):
+                                y_text += 20 * scale_factor
+                                if y_text > h - 10:
+                                    y_text = y_kp
+                                    x_text += 50 * scale_factor
+                            
+                            existing_text_positions.append((x_text, y_text))
+                            
+                            ax_ind.text(
+                                x_text,
+                                y_text,
+                                keypoint_names[idx_keypoint], 
+                                color=colors(idx_keypoint), 
+                                alpha=alpha_value,
+                                fontsize=dot_size * 0.8
+                            )
+                            
+                        # Plot ground truth for this individual
+                        if gt_bodyparts is not None:
+                            if gt_bodyparts[idx_individual, idx_keypoint, 2] != -1:
+                                ax_ind.plot(
+                                    gt_bodyparts[idx_individual, idx_keypoint, 0], 
+                                    gt_bodyparts[idx_individual, idx_keypoint, 1], 
+                                    labels[0], 
+                                    color=colors(idx_keypoint), 
+                                    alpha=alpha_value,
+                                    markersize=dot_size
+                                )
+            
+            # Save individual plot
+            if num_pred > 1:
+                # Add index for multi-animal images
+                output_path = Path(output_dir) / f"{Path(image_path).stem}_animal_{idx_individual}_predictions.png"
+            else:
+                # No index needed for single animal
+                output_path = Path(output_dir) / f"{Path(image_path).stem}_predictions.png"
+                
+            plt.savefig(
+                output_path,
+                bbox_inches='tight',
+                pad_inches=0,
+                transparent=False
+            )
+            plt.close(fig_ind)
+    
+    # Original combined plot
     for idx_individual in range(num_pred):
         for idx_keypoint in range(num_keypoints):
             if pred_bodyparts is not None and keypoint_vis_mask[idx_keypoint]:
