@@ -14,18 +14,22 @@ import matplotlib.patches as patches
 from deeplabcut.utils import auxfun_videos
 from deeplabcut.pose_estimation_pytorch import COCOLoader
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import evaluate, plot_gt_and_predictions
-from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners, create_minimal_figure, get_cmap
+from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
 from deeplabcut.pose_estimation_pytorch.apis.evaluate import visualize_predictions
-from deeplabcut.utils.plotting import erase_artists, save_labeled_frame
 from deeplabcut.utils.auxfun_videos import imread
 from deeplabcut.utils.visualization import get_cmap
-
-
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from analyse_json.split_v8_json import get_file_name_from_image_id
+from deeplabcut.utils.visualization import (
+    create_minimal_figure,
+    erase_artists,
+    get_cmap,
+    make_multianimal_labeled_image,
+    plot_evaluation_results,
+    save_labeled_frame,
+)
 
 def compute_brightness(img, x, y, radius=20):
     crop = img[
@@ -76,6 +80,54 @@ def pycocotools_evaluation(
         print(f"Could not evaluate with `pycocotools`: {err}")
     finally:
         print(80 * "-")
+
+# 37 -> 24
+
+keypoint_vis_mask = [ 0,
+                     1,
+                     1,
+                     1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]
+keypoint_vis_mask = [ 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1]
+
+keypoint_name_simplified = [
+    "forehead",
+    "head",
+    "Leye",
+    "R_eye",
+    "nose",
+    "L_ear",
+    "R_ear",
+    "mouth_front_top",
+    "mouth_front_bottom",
+    "mouth_B_L",
+    "mouth_B_R",
+    "neck",
+    "L_shoulder",
+    "R_shoulder",
+    "upper_B",
+    "torso_M_B",
+    "body_C",
+    "lower_B",
+    "L_elbow",
+    "R_elbow",
+    "L_wrist",
+    "R_wrist",
+    "L_hand",
+    "R_hand",
+    "L_hip",
+    "R_hip",
+    "C_hip",
+    "L_knee",
+    "R_knee",
+    "L_ankle",
+    "R_ankle",
+    "L_foot",
+    "R_foot",
+    "root_tail",
+    "M_tail",
+    "M_end_tail",
+    "end_tail"
+]
 
 def main(
     project_root: str,
@@ -172,15 +224,16 @@ def main(
                 result_line = f"  {k}: {v}\n"
                 print(result_line.strip())  # Print to console
                 f.write(result_line)  # Write to file
-
+        
         visualize_PFM_predictions(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
             num_samples=10,  # Added to limit visualization to 10 samples
             random_select=True,
-            show_ground_truth=False,
-            plot_bboxes=True
+            keypoint_vis_mask=keypoint_vis_mask,
+            plot_bboxes=True,
+            keypoint_names=keypoint_name_simplified
         )
         
 def visualize_PFM_predictions(
@@ -189,7 +242,6 @@ def visualize_PFM_predictions(
     output_dir: Optional[Union[str, Path]] = None,
     num_samples: Optional[int] = None,
     random_select: bool = False,
-    show_ground_truth: bool = True,
     plot_bboxes: bool = True,
     skeleton: Optional[List[Tuple[int, int]]] = None,
     keypoint_vis_mask: Optional[List[int]] = None,
@@ -261,7 +313,6 @@ def visualize_PFM_predictions(
             keypoint_names=keypoint_names,
             p_cutoff=confidence_threshold,
             keypoint_vis_mask=keypoint_vis_mask,  # Pass the mask to plotting function
-            show_ground_truth=show_ground_truth,
         )
         logger.info(f"Successfully visualized predictions for {image_path}")
 
@@ -326,6 +377,7 @@ def plot_gt_and_predictions_PFM(
         # if pred_unique_bodyparts is not None:
         #     num_colors += pred_unique_bodyparts.shape[1]
         colors = get_cmap(num_colors, name=colormap)
+        # print("colors:", colors)
     # predictions = pred_bodyparts.swapaxes(0, 1)
     # ground_truth = gt_bodyparts.swapaxes(0, 1)
     elif mode == "individual":
@@ -334,7 +386,7 @@ def plot_gt_and_predictions_PFM(
         # ground_truth = gt_bodyparts
     else:
         raise ValueError(f"Invalid mode: {mode}")
-                
+
     if bounding_boxes is not None:
         for bbox, bbox_score in zip(bounding_boxes[0], bounding_boxes[1]):
             bbox_origin = (bbox[0], bbox[1])
@@ -349,37 +401,57 @@ def plot_gt_and_predictions_PFM(
                 linestyle="--" if bbox_score < bbox else "-"
             )
             ax.add_patch(rect)
-    
+
     for idx_individual in range(num_pred):
         for idx_keypoint in range(num_keypoints):
             if pred_bodyparts is not None and keypoint_vis_mask[idx_keypoint]:
                 # if the keypoint is allowed to be shown and the prediction is reliable
-                if pred_bodyparts[idx_individual, idx_keypoint, 2] > p_cutoff:
+                keypoint_confidence = pred_bodyparts[idx_individual, idx_keypoint, 2]
+                if keypoint_confidence > p_cutoff:
                     pred_label = labels[1]
                 else:
                     pred_label = labels[2]
-                ax.plot(
-                    pred_bodyparts[idx_individual, idx_keypoint, 0], 
-                    pred_bodyparts[idx_individual, idx_keypoint, 1], 
-                    pred_label, 
-                    color=colors[idx_individual], 
-                    alpha=alpha_value,
-                    markersize=dot_size
-                    )
-                # plot ground truth
-                if gt_bodyparts is not None:
-                    if gt_bodyparts[idx_individual, idx_keypoint, 2] > 0:
-                        ax.plot(
-                            gt_bodyparts[idx_individual, idx_keypoint, 0], 
-                            gt_bodyparts[idx_individual, idx_keypoint, 1], 
-                            labels[0], 
-                            color=colors[idx_individual], 
+                if keypoint_confidence > p_cutoff:
+                    ax.plot(
+                        pred_bodyparts[idx_individual, idx_keypoint, 0], 
+                        pred_bodyparts[idx_individual, idx_keypoint, 1], 
+                        pred_label, 
+                        color=colors(idx_keypoint), 
+                        alpha=alpha_value,
+                        markersize=dot_size
+                        )
+                    if keypoint_names is not None:
+                        ax.text(
+                            pred_bodyparts[idx_individual, idx_keypoint, 0], 
+                            pred_bodyparts[idx_individual, idx_keypoint, 1], 
+                            keypoint_names[idx_keypoint], 
+                            color=colors(idx_keypoint), 
                             alpha=alpha_value,
-                            markersize=dot_size
-                            )
+                            fontsize=dot_size
+                        )
+                    # plot ground truth
+                    if gt_bodyparts is not None:
+                        if gt_bodyparts[idx_individual, idx_keypoint, 2] != -1:
+                            ax.plot(
+                                gt_bodyparts[idx_individual, idx_keypoint, 0], 
+                                gt_bodyparts[idx_individual, idx_keypoint, 1], 
+                                labels[0], 
+                                color=colors(idx_keypoint), 
+                                alpha=alpha_value,
+                                markersize=dot_size
+                                )
+                    
+    
     # Save the figure
     output_path = Path(output_dir) / f"{Path(image_path).stem}_predictions.png"
     save_labeled_frame(fig, str(image_path), str(output_dir), belongs_to_train=False)
+    plt.savefig(
+        output_path,
+        dpi=100,
+        bbox_inches='tight',
+        pad_inches=0,
+        transparent=False
+    )
     erase_artists(ax)
     plt.close()
 
