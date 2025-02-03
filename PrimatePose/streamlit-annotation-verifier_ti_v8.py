@@ -19,123 +19,6 @@ PFM_SKELETON = [
     [35, 36], [36, 37]
 ]
 
-TOPVIEWMOUSE_COLOR_MAP = {
-    "nose": (255, 0, 0),
-    "left_ear": (0, 255, 0),
-    "right_ear": (0, 0, 255),
-    "left_ear_tip": (255, 255, 0),
-    "right_ear_tip": (255, 0, 255),
-    "left_eye": (0, 255, 255),
-    "right_eye": (128, 0, 0),
-    "neck": (0, 128, 0),
-    "mid_back": (0, 0, 128),
-    "mouse_center": (128, 128, 0),
-    "mid_backend": (128, 0, 128),
-    "mid_backend2": (0, 128, 128),
-    "mid_backend3": (192, 192, 192),
-    "tail_base": (128, 128, 128),
-    "tail1": (64, 64, 64),
-    "tail2": (255, 128, 0),
-    "tail3": (128, 255, 0),
-    "tail4": (0, 255, 128),
-    "tail5": (0, 128, 255),
-    "left_shoulder": (255, 0, 128),
-    "left_midside": (255, 128, 128),
-    "left_hip": (128, 255, 255),
-    "right_shoulder": (128, 0, 64),
-    "right_midside": (64, 0, 128),
-    "right_hip": (128, 64, 0),
-    "tail_end": (64, 128, 0),
-    "head_midpoint": (0, 64, 128)
-}
-
-BIRD_COLOR_MAP = {
-    "back": (128, 0, 128),
-    "bill": (0, 102, 204),
-    "belly": (255, 128, 0),
-    "breast": (0, 255, 255),
-    "crown": (0, 255, 0),
-    "forehead": (255, 105, 180),
-    "left_eye": (102, 0, 204),
-    "left_leg": (139, 69, 19),
-    "left_wing_tip": (75, 0, 130),
-    "left_wrist": (255, 140, 0),
-    "nape": (255, 51, 51),
-    "right_eye": (255, 255, 102),
-    "right_leg": (205, 133, 63),
-    "right_wing_tip": (30, 144, 255),
-    "right_wrist": (50, 205, 50),
-    "tail_tip": (0, 255, 127),
-    "throat": (255, 20, 147),
-    "neck": (0, 191, 255),
-    "tail_left": (218, 112, 214),
-    "tail_right": (255, 165, 0),
-    "upper_spine": (32, 178, 170),
-    "upper_half_spine": (0, 128, 128),
-    "lower_half_spine": (135, 206, 235),
-    "right_foot": (255, 69, 0),
-    "left_foot": (128, 128, 0),
-    "left_half_chest": (233, 150, 122),
-    "right_half_chest": (220, 20, 60),
-    "chin": (127, 255, 0),
-    "left_tibia": (72, 61, 139),
-    "right_tibia": (60, 179, 113),
-    "lower_spine": (106, 90, 205),
-    "upper_half_neck": (199, 21, 133),
-    "lower_half_neck": (210, 105, 30),
-    "left_chest": (123, 104, 238),
-    "right_chest": (85, 107, 47),
-    "upper_neck": (47, 79, 79),
-    "left_wing_shoulder": (188, 143, 143),
-    "left_wing_elbow": (0, 255, 255),
-    "right_wing_shoulder": (255, 20, 147),
-    "right_wing_elbow": (105, 105, 105),
-    "upper_cere": (0, 100, 0),
-    "lower_cere": (100, 149, 237),
-}
-
-QUADRUPED_COLOR_MAP = {
-    "nose": (255, 0, 0),
-    "upper_jaw": (0, 255, 0),
-    "lower_jaw": (0, 0, 255),
-    "mouth_end_right": (255, 255, 0),
-    "mouth_end_left": (255, 0, 255),
-    "right_eye": (0, 255, 255),
-    "right_earbase": (128, 0, 0),
-    "right_earend": (0, 128, 0),
-    "right_antler_base": (0, 0, 128),
-    "right_antler_end": (128, 128, 0),
-    "left_eye": (128, 0, 128),
-    "left_earbase": (0, 128, 128),
-    "left_earend": (192, 192, 192),
-    "left_antler_base": (128, 128, 128),
-    "left_antler_end": (64, 64, 64),
-    "neck_base": (255, 128, 0),
-    "neck_end": (128, 255, 0),
-    "throat_base": (0, 255, 128),
-    "throat_end": (0, 128, 255),
-    "back_base": (255, 0, 128),
-    "back_end": (255, 128, 128),
-    "back_middle": (128, 255, 255),
-    "tail_base": (128, 0, 64),
-    "tail_end": (64, 0, 128),
-    "front_left_thai": (128, 64, 0),
-    "front_left_knee": (64, 128, 0),
-    "front_left_paw": (0, 64, 128),
-    "front_right_thai": (255, 64, 64),
-    "front_right_knee": (64, 255, 64),
-    "front_right_paw": (64, 64, 255),
-    "back_left_paw": (255, 255, 64),
-    "back_left_thai": (255, 64, 255),
-    "back_right_thai": (64, 255, 255),
-    "back_left_knee": (192, 64, 192),
-    "back_right_knee": (192, 192, 64),
-    "back_right_paw": (64, 192, 192),
-    "belly_bottom": (192, 192, 192),
-    "body_middle_right": (128, 64, 64),
-    "body_middle_left": (64, 128, 128)
-}
-
 PRIMATE_COLOR_MAP = {
     "head": (0, 180, 0), # wait
     "neck": (0, 0, 180), # wait
@@ -188,6 +71,7 @@ PRIMATE_COLOR_MAP = {
     # "front_right_paw": (64, 64, 255),
     # "back_right_thai": (64, 255, 255),
 }
+
 import matplotlib.pyplot as plt
 from matplotlib.colors import Colormap
 
@@ -459,15 +343,15 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 existing_text_positions.append((x_text, y_text))
                 
                 cv2.putText(
-                    img,
-                    keypoint_label,
+                    img=img,
+                    text=keypoint_label,
                     # keypoint_idx,  # Use index instead of name
-                    (int(x_kp), y_text),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    font_scale,
-                    txt_color,
-                    thickness + 0,
-                    cv2.LINE_AA,
+                    org=(int(x_kp), y_text),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=font_scale*1.2,
+                    color=txt_color,
+                    thickness=2,
+                    lineType=cv2.LINE_AA,
                 )
                 
                 # Draw the black text as an outline
@@ -541,16 +425,16 @@ def main():
 
     color_map_option = st.selectbox(
         "Select Color Map",
-        [ "Primate", "Topview Mouse", "Bird", "Quadruped"]
+        [ "Primate", "Topview Mouse"]
     )
-
-    if color_map_option == "Topview Mouse":
-        st.session_state.color_map = TOPVIEWMOUSE_COLOR_MAP
-    elif color_map_option == "Bird":
-        st.session_state.color_map = BIRD_COLOR_MAP
-    elif color_map_option == "Quadruped":
-        st.session_state.color_map = QUADRUPED_COLOR_MAP    
-    elif color_map_option == "Primate":
+    
+    # if color_map_option == "Topview Mouse":
+    #     st.session_state.color_map = TOPVIEWMOUSE_COLOR_MAP
+    # elif color_map_option == "Bird":
+    #     st.session_state.color_map = BIRD_COLOR_MAP
+    # elif color_map_option == "Quadruped":
+    #     st.session_state.color_map = QUADRUPED_COLOR_MAP    
+    if color_map_option == "Primate":
         st.session_state.color_map = PRIMATE_COLOR_MAP
         st.session_state.skeleton = PFM_SKELETON    
         
@@ -560,7 +444,7 @@ def main():
     # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
     #     annotation_file = json.load(f)
     
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json", "r") as f:
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/aptv2_test.json", "r") as f:
         annotation_file = json.load(f)
             
     if annotation_file is not None:
