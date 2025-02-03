@@ -188,7 +188,67 @@ PRIMATE_COLOR_MAP = {
     # "front_right_paw": (64, 64, 255),
     # "back_right_thai": (64, 255, 255),
 }
+import matplotlib.pyplot as plt
+from matplotlib.colors import Colormap
 
+def get_cmap(n: int, name: str = "rainbow") -> Colormap:
+    """
+    Get a matplotlib colormap with n distinct colors.
+    
+    Args:
+        n: number of distinct colors
+        name: name of matplotlib colormap
+
+    Returns:
+        A function that maps each index in 0, 1, ..., n-1 to a distinct RGB color
+    """
+    return plt.cm.get_cmap(name, n)
+
+# "left" → "L"
+# "right" → "R"
+# "mid" → "M"
+# "back" → "B"
+# "center" → "C"
+keypoints_simplified = [
+    "forehead", 
+    "head",
+    "L_eye",
+    "R_eye",
+    "nose",
+    "L_E",
+    "R_E",
+    "mouth_front_top",
+    "mouth_front_bottom",
+    "mouth_B_L",
+    "mouth_B_R",
+    "neck",
+    "L_S",
+    "R_S",
+    "upper_B",
+    "torso_M_B",
+    "body_C",
+    "lower_B",
+    "L_elbow",
+    "R_elbow",
+    "L_wrist",
+    "R_wrist",
+    "L_hand",
+    "R_hand",
+    "L_hip",
+    "R_hip",
+    "C_hip",
+    "L_knee",
+    "R_knee",
+    "L_ankle",
+    "R_ankle",
+    "L_foot",
+    "R_foot",
+    "root_tail",
+    "M_tail",
+    "M_end_tail",
+    "end_tail"
+]
+            
 # Define dataset configurations
 DATASET_CONFIGS = {
     "aptv2": {
@@ -217,7 +277,12 @@ DATASET_CONFIGS = {
                 [14, 5], [5, 8], [8, 10], [6, 9], [5, 6],
                 [13, 7], [7, 12], [13, 5], [5, 11]
             ],
-    "keypoint_mapping": None,  # No mapping needed for PFM format
+    "keypoint_mapping": [
+            0, 3, -1, -1, -1, 1, 2, -1, -1, -1,
+            -1, -1, 7, 9, 4, -1, -1, 5, -1, -1,
+            8, 10, -1, -1, 11, 13, -1, -1, -1, -1,
+            -1, 12, 14, 6, -1, -1, -1
+    ],  # No mapping needed for PFM format
     "keypoints": [
                 "Front",
                 "Right",
@@ -318,50 +383,61 @@ def get_contrasting_color(bg_color):
 def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None, dataset_config=None):
     # Bounding box visualization
     bbox = annotation["bbox"]
-    x1, y1, width, height = bbox
-    x2, y2 = x1 + width, y1 + height
-    cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+    if bbox is not None:
+        x1, y1, width, height = bbox
+        x2, y2 = x1 + width, y1 + height
+        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     
     print("________________________")
     
     id = annotation["id"]
     if "keypoints" in annotation:
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
-        keypoint_names = categories[0]["keypoints"]  # Get keypoint names from categories
-        # keypoint_names = categories  # Get keypoint names from categories
+        
+        print("dataset_config:", dataset_config)
+        if 'keypoints' in dataset_config:
+            print("keypoint in dataset_config")
+            keypoint_names = dataset_config['keypoints']  # Get keypoint names from categories; pfm;
+        else:
+            keypoint_names = keypoints_simplified
          
+        keypoint_names_idx = [str(i) for i in range(len(keypoint_names))]  # Create index list for keypoints
+        
         # Calculate scaling factor based on image size
         img_height, img_width = img.shape[:2]
+        # print("img.shape:", img.shape)
+        # print("img_width:", img_width, "img_height:", img_height)
+        
         scale_factor = max(img_width, img_height) / 1000
         
-        # print("scale_factor:", scale_factor)
-        # Set minimum and maximum limits for scaling factor
-        # scale_factor = max(0.5, min(scale_factor, 2))
+        existing_text_positions = []
         
-        existing_text_positions = []  # Track existing text positions to avoid overlap
+        # Create colormap
+        cmap = get_cmap(len(keypoint_names), "rainbow")
         
+        kpts_idx = 0
         for i, (x_kp, y_kp, v) in enumerate(keypoints):
             if v > 0:
-                keypoint_label = keypoint_names[i]
+                keypoint_label = keypoint_names[kpts_idx]
+                kpts_idx += 1
+                # print("keypoint_label:", keypoint_label)
+                
+                # keypoint_idx = keypoint_names_idx[kpts_idx]
+                
+                # Get color from colormap and convert to OpenCV BGR format
+                color_rgb = cmap(i)[:3]  # Get RGB values (ignore alpha)
+                color_bgr = tuple(int(c * 255) for c in color_rgb[::-1])  # Convert to BGR
+                
                 # draw the keypoint
                 cv2.circle(
                     img,
                     center=(int(x_kp), int(y_kp)),
                     radius=int(7 * scale_factor),
-                    color=color_map[keypoint_label],
+                    # color=color_map[keypoint_label],
+                    color=color_bgr,
                     thickness=-1,
                 )
-                
-                # bright = compute_brightness(img, int(x1), int(y1))
-                # txt_color = (10, 10, 10) if bright > 128 else (255, 255, 255)
-                # txt_color = (10, 10, 10) if bright > 128 else (235, 235, 215)
-               
-                # Get the background color at the text position
                 # print("x_kp:", x_kp, "y_kp:", y_kp)
-                # print("img.shape:", img.shape)
-                # print("image_id", image_id)
-                # print("id", id)
-                
                 bg_color = img[int(y_kp), int(x_kp)].astype(int)
                 txt_color = get_contrasting_color(bg_color)
                 
@@ -385,6 +461,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 cv2.putText(
                     img,
                     keypoint_label,
+                    # keypoint_idx,  # Use index instead of name
                     (int(x_kp), y_text),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     font_scale,
@@ -433,12 +510,12 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 #         )        
                  
                 # Draw skeleton in original format
-                connected_pfm_indices = find_connections(i, dataset_config)
-                for pfm_idx in connected_pfm_indices:
-                    x2_kp, y2_kp, v2 = keypoints[pfm_idx]
-                    if v2 > 0:
-                        cv2.line(img, (int(x_kp), int(y_kp)), (int(x2_kp), int(y2_kp)), (0, 255, 0), 2)
-                        
+                # connected_pfm_indices = find_connections(i, dataset_config)
+                # for pfm_idx in connected_pfm_indices:
+                #     x2_kp, y2_kp, v2 = keypoints[pfm_idx]
+                #     if v2 > 0:
+                #         cv2.line(img, (int(x_kp), int(y_kp)), (int(x2_kp), int(y2_kp)), (0, 255, 0), 2)
+                
     return img
 
 def load_annotation_data(file):
@@ -482,10 +559,10 @@ def main():
    
     # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
     #     annotation_file = json.load(f)
-        
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/aptv2_test.json", "r") as f:
+    
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json", "r") as f:
         annotation_file = json.load(f)
-        
+            
     if annotation_file is not None:
         # Load data only if a new file is uploaded
         if st.session_state.data is None:
@@ -520,7 +597,8 @@ def main():
 
             # Display current annotation
             annotation = st.session_state.data["annotations"][st.session_state.current_index]
-
+            # keypoint = st.session_state.data["categories"][0][""]
+            
             images = st.session_state.data['images']
             # print("images:", images)
             
@@ -536,6 +614,7 @@ def main():
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
                 # Get dataset configuration
+                # TODO: rewrite this function, get the dataset config from json_file_path
                 dataset_config = get_dataset_config(
                     image_id=image_id,
                     images=st.session_state.data["images"]
@@ -543,14 +622,15 @@ def main():
                 
                 # Visualize annotation 
                 img_with_annotation = visualize_annotation(
-                    img.copy(), 
-                    annotation, 
-                    st.session_state.color_map, 
-                    st.session_state.data["categories"], 
-                    st.session_state.skeleton,
-                    image_id,
-                    dataset_config=dataset_config
+                    img = img.copy(), 
+                    annotation =  annotation, 
+                    color_map = st.session_state.color_map, 
+                    categories = st.session_state.data["categories"], 
+                    skeleton = st.session_state.skeleton,
+                    image_id = image_id,
+                    dataset_config = dataset_config
                 )
+            
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
              
                 # Display image with annotation
