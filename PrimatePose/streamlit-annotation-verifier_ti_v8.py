@@ -5,7 +5,6 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
-import tempfile
 
 # Define the skeletons
 PFM_SKELETON = [
@@ -61,15 +60,6 @@ PRIMATE_COLOR_MAP = {
     "mid_end_tail": (0, 128, 255), 
     "right_eye": (0, 255, 255),
     "left_eye": (128, 0, 128),
-    # "right_earend": (0, 128, 0),
-    # "right_antler_base": (0, 0, 128),
-    # "right_antler_end": (128, 128, 0),
-    # "left_earend": (192, 192, 192),
-    # "left_antler_base": (128, 128, 128),
-    # "left_antler_end": (64, 64, 64),
-    # "throat_end": (0, 128, 255), 
-    # "front_right_paw": (64, 64, 255),
-    # "back_right_thai": (64, 255, 255),
 }
 
 import matplotlib.pyplot as plt
@@ -153,7 +143,45 @@ DATASET_CONFIGS = {
             11, 14, 4,  # 24-26
             12, 15, 13, 16,  # 27-30
             -1, -1, -1, -1, -1, -1  # 31-36
-        ]
+        ],
+        "keypoints": [
+            "left_eye",
+            "right_eye",
+            "nose",
+            "neck",
+            "root_of_tail",
+            "left_shoulder",
+            "left_elbow",
+            "left_front_paw",
+            "right_shoulder",
+            "right_elbow",
+            "right_front_paw",
+            "left_hip",
+            "left_knee",
+            "left_back_paw",
+            "right_hip",
+            "right_knee",
+            "right_back_paw"
+        ],
+        "keypoints_simplified": [
+            "L_eye",
+            "R_eye",
+            "nose",
+            "neck",
+            "R_of_tail",
+            "L_S",
+            "L_elbow",
+            "L_front_paw",
+            "R_shoulder",
+            "R_elbow",
+            "R_front_paw",
+            "L_hip",
+            "L_knee",
+            "L_back_paw",
+            "R_hip",
+            "R_knee",
+            "R_back_paw"
+        ],
     },
     "mit": {
             "skeleton": [
@@ -427,13 +455,7 @@ def main():
         "Select Color Map",
         [ "Primate", "Topview Mouse"]
     )
-    
-    # if color_map_option == "Topview Mouse":
-    #     st.session_state.color_map = TOPVIEWMOUSE_COLOR_MAP
-    # elif color_map_option == "Bird":
-    #     st.session_state.color_map = BIRD_COLOR_MAP
-    # elif color_map_option == "Quadruped":
-    #     st.session_state.color_map = QUADRUPED_COLOR_MAP    
+ 
     if color_map_option == "Primate":
         st.session_state.color_map = PRIMATE_COLOR_MAP
         st.session_state.skeleton = PFM_SKELETON    
@@ -460,10 +482,13 @@ def main():
 
         # Image directory input
         image_dir = st.text_input("Enter the path to the image directory:")
-        
-        # image_dir = "/mediaPFM/data/datasets/final_datasets/v7/test"
-        
+
         image_dir = "/mnt/data/tiwang/v8_coco/images"
+        
+        images = st.session_state.data['images']
+        # imageid2dataset_name 
+        imageid2dataset = {image['id']: image['source_dataset'] for image in images}
+        # imageid2dataset = {image['id']: image['dataset_id'] for image in images}
         
         if image_dir and os.path.isdir(image_dir):
             # Navigation and verification
@@ -479,15 +504,9 @@ def main():
                     st.session_state.data = update_annotation_data(st.session_state.data, st.session_state.current_index)
                     st.success(f"Annotation {st.session_state.current_index} verified!")
 
-            # Display current annotation
+            # Display the current annotation with index
             annotation = st.session_state.data["annotations"][st.session_state.current_index]
             # keypoint = st.session_state.data["categories"][0][""]
-            
-            images = st.session_state.data['images']
-            # print("images:", images)
-            
-            imageid2dataset = {image['id']: image['source_dataset'] for image in images}
-            # imageid2dataset = {image['id']: image['dataset_id'] for image in images}
             
             image_id = annotation["image_id"]
             image_info = [img for img in st.session_state.data["images"] if img["id"] == image_id][0]
