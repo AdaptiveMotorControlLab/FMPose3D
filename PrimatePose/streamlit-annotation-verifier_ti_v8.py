@@ -606,31 +606,44 @@ def main():
                     width=quality_width[quality]
                 )
                 
-                # Add download button for the current image
-                # Convert image to bytes
-                is_success, buffer = cv2.imencode(".png", cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR))
-                if is_success:
+                # Add download button for the current image                
+                # Create three columns for the buttons
+                col1, col2, col3 = st.columns(3)
 
-                    print("image_name:", image_name)
-                    btn = st.download_button(
-                        label="Download annotated image",
-                        data=buffer.tobytes(),
-                        file_name=f"{image_name}_anoID_{annotation['id']}.{image_type}",
-                        mime="image/png"
-                    )
+                with col1:
+                    if st.button("Save Annotated Image"):
+                        # Define the directory path
+                        save_dir = f"/home/ti_wang/data/tiwang/st_saved_images/{imageid2dataset[image_id]}"
+                        # Create the directory if it doesn't exist
+                        os.makedirs(save_dir, exist_ok=True)
+                        # Define the file path
+                        save_path = os.path.join(save_dir, f"{image_name}_anoID_{annotation['id']}.{image_type}")
+                        # Save the image with high quality
+                        cv2.imwrite(save_path, cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+                        st.success(f"Image saved successfully at {save_path}")
+
+                with col2:
+                    if st.button("Save Wrong Annotated Image"):
+                        # Define the directory path
+                        save_dir = f"/home/ti_wang/data/tiwang/st_wrong_images/{imageid2dataset[image_id]}"
+                        # Create the directory if it doesn't exist
+                        os.makedirs(save_dir, exist_ok=True)
+                        save_path = os.path.join(save_dir, f"wrong_{image_name}_anoID_{annotation['id']}.{image_type}")
+                        cv2.imwrite(save_path, cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+                        st.success(f"Image saved successfully at {save_path}")
                 
-                # Add a button to save the annotated image in a specific directory with high quality
-                if st.button("Save Annotated Image"):
-                    # Define the directory path
-                    save_dir = f"/home/ti_wang/data/tiwang/st_saved_images/{imageid2dataset[image_id]}"
-                    # Create the directory if it doesn't exist
-                    os.makedirs(save_dir, exist_ok=True)
-                    # Define the file path
-                    save_path = os.path.join(save_dir, f"{image_name}_anoID_{annotation['id']}.{image_type}")
-                    # Save the image with high quality
-                    cv2.imwrite(save_path, cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
-                    st.success(f"Image saved successfully at {save_path}")
-                
+                with col3:
+                    is_success, buffer = cv2.imencode(".png", cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR))
+                    if is_success:
+
+                        print("image_name:", image_name)
+                        btn = st.download_button(
+                            label="Download annotated image",
+                            data=buffer.tobytes(),
+                            file_name=f"{image_name}_anoID_{annotation['id']}.{image_type}",
+                            mime="image/png"
+                        )
+                    
                 # Display verification status
                 if annotation.get("verified", False):
                     st.info("This annotation has been verified.")
