@@ -170,19 +170,19 @@ DATASET_CONFIGS = {
             "R_eye",
             "nose",
             "neck",
-            "R_of_tail",
+            "R_tail",
             "L_S",
             "L_elbow",
-            "L_front_paw",
+            "L_F_paw",
             "R_S",
             "R_elbow",
-            "R_front_paw",
+            "RF_paw",
             "L_hip",
             "L_knee",
-            "L_back_paw",
+            "LB_paw",
             "R_hip",
             "R_knee",
-            "R_back_paw"
+            "RB_paw"
         ],
     },
     "mit": {
@@ -214,6 +214,46 @@ DATASET_CONFIGS = {
                 "Body2",
                 "Body3"
             ]
+    },
+    "oms": {
+        "skeleton": None,
+        "keypoint_mapping": 
+            [
+            -1, 3, -1, -1, 2, -1, -1, -1, -1, -1, -1,
+            4, 7, 5, -1, -1, -1, -1, -1, -1, -1, -1,
+            8, 6, -1, -1, 9, 12, 10, -1, -1, 13, 11,
+            -1, -1, -1, 14 
+            ],
+        "keypoints": [
+            "nose",
+            "head",
+            "neck",
+            "right_shoulder",
+            "right_hand",
+            "left_shoulder",
+            "left_hand",
+            "hip",
+            "right_knee",
+            "right_foot",            
+            "left_knee",
+            "left_foot",
+            "tail"],
+        "keypoints_simplified": [
+            "nose",
+            "head",
+            "neck",
+            "R_shoulder",
+            "R_hand",
+            "L_shoulder",
+            "L_hand",
+            "hip",
+            "right_knee",
+            "right_foot",            
+            "left_knee",
+            "left_foot",
+            "tail"]
+    },
+    "riken": {
     },
     "pfm": {
         "skeleton": PFM_SKELETON,
@@ -308,7 +348,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         
         print("dataset_config:", dataset_config)
-        if 'keypoints' in dataset_config:
+        if 'keypoints' in dataset_config and dataset_config["keypoints"] is not None:
             print("keypoint in dataset_config")
             if use_simplified_keypoints and 'keypoints_simplified' in dataset_config:
                 keypoint_names = dataset_config['keypoints_simplified']  # Get simplified keypoint names from dataset config
@@ -329,25 +369,21 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         existing_text_positions = []
         
         # Create colormap
-        cmap = get_cmap(len(keypoint_names), "rainbow")
+        cmap = get_cmap(len(keypoints_simplified), "rainbow")
         
-        kpts_idx = 0
         for i, (x_kp, y_kp, v) in enumerate(keypoints):
-            if v > 0:
-                
+            if v > 0:           
                 keypoint_label = keypoint_names[dataset_config['keypoint_mapping'][i]]
-                # kpts_idx += 1
-                # print("keypoint_label:", keypoint_label)
-                
-                # keypoint_idx = keypoint_names_idx[kpts_idx]
-                
+
                 # Get color from colormap and convert to OpenCV BGR format
                 color_rgb = cmap(i)[:3]  # Get RGB values (ignore alpha)
                 color_bgr = tuple(int(c * 255) for c in color_rgb[::-1])  # Convert to BGR
                 print(dataset_config['keypoint_mapping'][i])
                 print(color_map)
-                color = primate_color_list[dataset_config['keypoint_mapping'][i]]
-                color_bgr = color
+                # use the primate_color
+                # color = primate_color_list[dataset_config['keypoint_mapping'][i]]
+                # color_bgr = color
+                
                 # print("color:", color)
                 # draw the keypoint
                 cv2.circle(
@@ -432,11 +468,12 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 #         )        
                 
                 # Draw skeleton in original format
-                connected_pfm_indices = find_connections(i, dataset_config)
-                for pfm_idx in connected_pfm_indices:
-                    x2_kp, y2_kp, v2 = keypoints[pfm_idx]
-                    if v2 > 0:
-                        cv2.line(img, (int(x_kp), int(y_kp)), (int(x2_kp), int(y2_kp)), (0, 255, 0), 2)
+                if dataset_config["skeleton"] is not None:
+                    connected_pfm_indices = find_connections(i, dataset_config)
+                    for pfm_idx in connected_pfm_indices:
+                        x2_kp, y2_kp, v2 = keypoints[pfm_idx]
+                        if v2 > 0:
+                            cv2.line(img, (int(x_kp), int(y_kp)), (int(x2_kp), int(y2_kp)), (0, 255, 0), 2)
                 
     return img
 
@@ -549,7 +586,50 @@ def main():
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
              
                 # Display image with annotation
-                st.image(img_with_annotation, caption=f"{imageid2dataset[image_id]}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}", use_container_width=True)
+                
+                quality = "High"
+                # Convert quality settings to width
+                quality_width = {
+                    "Low": 800,
+                    "Medium": 1200,
+                    "High": 1600,
+                    "Original": None  # None means use original size
+                }
+                
+                # Display image with selected quality
+                image_name = image_info['file_name'].split('.')[-2]
+                image_type = image_info['file_name'].split('.')[-1]
+                st.image(
+                    img_with_annotation, 
+                    caption=f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}", 
+                    use_container_width=True,
+                    width=quality_width[quality]
+                )
+                
+                # Add download button for the current image
+                # Convert image to bytes
+                is_success, buffer = cv2.imencode(".png", cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR))
+                if is_success:
+
+                    print("image_name:", image_name)
+                    btn = st.download_button(
+                        label="Download annotated image",
+                        data=buffer.tobytes(),
+                        file_name=f"{image_name}_anoID_{annotation['id']}.{image_type}",
+                        mime="image/png"
+                    )
+                
+                # Add a button to save the annotated image in a specific directory with high quality
+                if st.button("Save Annotated Image"):
+                    # Define the directory path
+                    save_dir = f"/home/ti_wang/data/tiwang/st_saved_images/{imageid2dataset[image_id]}"
+                    # Create the directory if it doesn't exist
+                    os.makedirs(save_dir, exist_ok=True)
+                    # Define the file path
+                    save_path = os.path.join(save_dir, f"{image_name}_anoID_{annotation['id']}.{image_type}")
+                    # Save the image with high quality
+                    cv2.imwrite(save_path, cv2.cvtColor(img_with_annotation, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+                    st.success(f"Image saved successfully at {save_path}")
                 
                 # Display verification status
                 if annotation.get("verified", False):
