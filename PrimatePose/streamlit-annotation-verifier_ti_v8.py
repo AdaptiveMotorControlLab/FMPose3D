@@ -127,6 +127,35 @@ keypoints_simplified = [
             
 # Define dataset configurations
 DATASET_CONFIGS = {
+    "oap": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, 3, 1, 2, 0, -1, -1, 
+            -1, -1, -1, -1, 4, 5, 8, 
+            -1, -1, -1, -1, 6, 9, 7, 
+            10, -1, -1, -1, -1, 11, 12, 14, 
+            13, 15, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+                "nose",
+                "left_eye",
+                "right_eye",
+                "head",
+                "neck",
+                "left_shoulder",
+                "left_elbow",
+                "left_wrist",                                
+                "right_shoulder",
+                "right_elbow",
+                "right_wrist",
+                "hip/sacrum",
+                "left_knee",
+                "left_foot",
+                "right_knee",
+                "right_foot"
+            ],
+        "keypoints_simplified": None
+    },
     "aptv2": {
         "skeleton": [
             [1, 2], [1, 3], [2, 3], [3, 4], [4, 5],
@@ -217,12 +246,12 @@ DATASET_CONFIGS = {
     },
     "oms": {
         "skeleton": None,
-        "keypoint_mapping": 
-            [
-            -1, 3, -1, -1, 2, -1, -1, -1, -1, -1, -1,
-            4, 7, 5, -1, -1, -1, -1, -1, -1, -1, -1,
-            8, 6, -1, -1, 9, 12, 10, -1, -1, 13, 11,
-            -1, -1, -1, 14 
+        "keypoint_mapping": [
+            -1, 1, -1, -1, 0, -1, -1,
+            -1, -1, -1, -1, 2, 5, 3,
+            -1, -1, -1, -1, -1, -1, -1,
+            -1, 6, 4, -1, -1, 7, 10, 8,
+            -1, -1, 11, 9, -1, -1, -1, 12
             ],
         "keypoints": [
             "nose",
@@ -242,15 +271,15 @@ DATASET_CONFIGS = {
             "nose",
             "head",
             "neck",
-            "R_shoulder",
+            "R_S",
             "R_hand",
-            "L_shoulder",
+            "L_S",
             "L_hand",
             "hip",
-            "right_knee",
-            "right_foot",            
-            "left_knee",
-            "left_foot",
+            "R_knee",
+            "R_foot",            
+            "L_knee",
+            "L_foot",
             "tail"]
     },
     "riken": {
@@ -277,7 +306,7 @@ def get_dataset_config(image_id, images):
         
     # Get dataset name from image info
     dataset_name = image_info.get("source_dataset", "pfm").lower()
-    return DATASET_CONFIGS.get(dataset_name, DATASET_CONFIGS["pfm"])
+    return DATASET_CONFIGS.get(dataset_name, DATASET_CONFIGS["pfm"]), dataset_name
 
 def find_connections(pfm_idx, dataset_config):
     
@@ -334,7 +363,7 @@ def get_contrasting_color(bg_color):
     else:
         return (255, 255, 255)  # Use white text
     
-def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None, dataset_config=None, use_simplified_keypoints=False):
+def visualize_annotation(img, annotation, color_map, categories, skeleton, image_id, annotation_id=None, dataset_config=None, use_simplified_keypoints=False, dataset_name=None):
     # Bounding box visualization
     bbox = annotation["bbox"]
     if bbox is not None:
@@ -347,22 +376,18 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
     if "keypoints" in annotation:
         keypoints = np.array(annotation["keypoints"]).reshape(-1, 3)
         
-        print("dataset_config:", dataset_config)
+        # print("dataset_config:", dataset_config)
         if 'keypoints' in dataset_config and dataset_config["keypoints"] is not None:
-            print("keypoint in dataset_config")
-            if use_simplified_keypoints and 'keypoints_simplified' in dataset_config:
+            # print("keypoint in dataset_config")
+            if use_simplified_keypoints and dataset_config['keypoints_simplified'] is not None:
                 keypoint_names = dataset_config['keypoints_simplified']  # Get simplified keypoint names from dataset config
             else:
                 keypoint_names = dataset_config['keypoints']  # Get keypoint names from categories; pfm;
         else:
             keypoint_names = keypoints_simplified
         
-        # keypoint_names_idx = [str(i) for i in range(len(keypoint_names))]  # Create index list for keypoints
-        
         # Calculate scaling factor based on image size
         img_height, img_width = img.shape[:2]
-        # print("img.shape:", img.shape)
-        # print("img_width:", img_width, "img_height:", img_height)
         
         scale_factor = max(img_width, img_height) / 1000
         
@@ -372,14 +397,19 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         cmap = get_cmap(len(keypoints_simplified), "rainbow")
         
         for i, (x_kp, y_kp, v) in enumerate(keypoints):
-            if v > 0:           
+            if v > 0:
+                # print(dataset_config['keypoint_mapping'])
+                print("i:", i) 
+                print("v:", v)
+                print("idx:", dataset_config['keypoint_mapping'][i])
+                print("x_kp:", x_kp, "y_kp:", y_kp)
                 keypoint_label = keypoint_names[dataset_config['keypoint_mapping'][i]]
-
+                print(keypoint_label)
                 # Get color from colormap and convert to OpenCV BGR format
                 color_rgb = cmap(i)[:3]  # Get RGB values (ignore alpha)
                 color_bgr = tuple(int(c * 255) for c in color_rgb[::-1])  # Convert to BGR
-                print(dataset_config['keypoint_mapping'][i])
-                print(color_map)
+                # print(dataset_config['keypoint_mapping'][i])
+                # print(color_map)
                 # use the primate_color
                 # color = primate_color_list[dataset_config['keypoint_mapping'][i]]
                 # color_bgr = color
@@ -415,6 +445,11 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # Record this position
                 existing_text_positions.append((x_text, y_text))
                 
+                thickness_dict = {"oap": 2, "oms": 1, "aptv2": 1, "mit": 2, "riken": 2, "pfm": 2}
+                fontScale_dict = {"oap": 1.6, "oms": 0.9, "aptv2": 1.1, "mit": 1.2, "riken": 1.2, "pfm": 1.2}
+                thickness_dataset = thickness_dict.get(dataset_name, 1)
+                fontScale_dataset = fontScale_dict.get(dataset_name, 1.1)
+                 
                 # Draw colored text matching the keypoint color
                 cv2.putText(
                     img=img,
@@ -422,12 +457,12 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                     # keypoint_idx,  # Use index instead of name
                     org=(int(x_kp), y_text),
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=font_scale*1.2,
+                    fontScale=font_scale*fontScale_dataset,
                     color=color_bgr,  # Use same color as keypoint
-                    thickness=2,
+                    thickness=thickness_dataset,
                     lineType=cv2.LINE_AA,
                 )
-                
+
                 # Draw the black text as an outline
                 # cv2.putText(
                 #     img,
@@ -513,7 +548,7 @@ def main():
     # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
     #     annotation_file = json.load(f)
     
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/aptv2_test.json", "r") as f:
+    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/oap_test.json", "r") as f:
         annotation_file = json.load(f)
             
     if annotation_file is not None:
@@ -537,6 +572,10 @@ def main():
         imageid2dataset = {image['id']: image['source_dataset'] for image in images}
         # imageid2dataset = {image['id']: image['dataset_id'] for image in images}
         
+        # Create a dictionary mapping image_id to file_name
+        image_id_to_image = {image['id']: image for image in images}
+        st.session_state.image_id2image = image_id_to_image
+
         if image_dir and os.path.isdir(image_dir):
             # Navigation and verification
             col1, col2, col3 = st.columns(3)
@@ -557,8 +596,10 @@ def main():
             
             # todo optimize
             image_id = annotation["image_id"]
-            image_info = [img for img in st.session_state.data["images"] if img["id"] == image_id][0]
+            # image_info = [img for img in st.session_state.data["images"] if img["id"] == image_id][0]
+            image_info = st.session_state.image_id2image[image_id]
             image_path = os.path.join(image_dir, image_info["file_name"])
+            print("image_path:", image_path)
 
             if os.path.isfile(image_path):
                 img = cv2.imread(image_path)
@@ -566,7 +607,7 @@ def main():
                 
                 # Get dataset configuration
                 # TODO: rewrite this function, get the dataset config from json_file_path
-                dataset_config = get_dataset_config(
+                dataset_config, dataset_name = get_dataset_config(
                     image_id=image_id,
                     images=st.session_state.data["images"]
                 )
@@ -580,7 +621,8 @@ def main():
                     skeleton = st.session_state.skeleton,
                     image_id = image_id,
                     dataset_config = dataset_config,
-                    use_simplified_keypoints = True
+                    use_simplified_keypoints = True,
+                    dataset_name = dataset_name
                 )
             
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
