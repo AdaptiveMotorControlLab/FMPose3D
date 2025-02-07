@@ -214,6 +214,99 @@ DATASET_CONFIGS = {
             "RB_paw"
         ],
     },
+    "omc": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, 3, 1, 0, 2, -1, -1, 
+            -1, -1, -1, -1, 4, 8, 5, 
+            -1, -1, -1, -1, 9, 6, 10, 
+            7, -1, -1, -1, -1, -1, 14, 12, 
+            15, 13, -1, -1, 11, -1, -1, 16
+        ],
+        "keypoints": [
+            "right_eye",
+            "left_eye",
+            "nose",
+            "head",
+            "neck",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist",
+            "hip",
+            "right_knee",
+            "right_ankle",
+            "left_knee",
+            "left_ankle",
+            "tail"
+        ],
+        "keypoints_simplified": [
+            "R_eye",
+            "L_eye",
+            "nose",
+            "head",
+            "neck",
+            "R_S",
+            "R_elbow",
+            "R_wrist",
+            "L_S",
+            "L_elbow",
+            "L_wrist",
+            "hip",
+            "R_knee",
+            "R_ankle",
+            "L_knee",
+            "L_ankle",
+            "tail"
+        ]
+    },
+    "mp": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1, -1, 5, 6, -1, -1, -1, -1,
+            7, 8, 9, 10, -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "nose",
+            "left_eye",
+            "right_eye",
+            "left_ear",
+            "right_ear",
+            "left_shoulder",
+            "right_shoulder",
+            "left_elbow",
+            "right_elbow",
+            "left_wrist",
+            "right_wrist",
+            "left_hip",
+            "right_hip",
+            "left_knee",
+            "right_knee",
+            "left_ankle",
+            "right_ankle"
+        ],
+        "keypoints_simplified": [
+            "nose",
+            "L_eye",
+            "R_eye",
+            "L_ear",
+            "R_ear",
+            "L_S",
+            "R_S",
+            "L_elbow",
+            "R_elbow",
+            "L_wrist",
+            "R_wrist",
+            "L_hip",
+            "R_hip",
+            "L_knee",
+            "R_knee",
+            "L_ankle",
+            "R_ankle"
+        ]
+    },
     "mit": {
             "skeleton": [
                 [1, 2], [3, 4], [1, 3], [3, 13], [13, 14],
@@ -445,8 +538,8 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # Record this position
                 existing_text_positions.append((x_text, y_text))
                 
-                thickness_dict = {"oap": 2, "oms": 1, "aptv2": 1, "mit": 2, "riken": 2, "pfm": 2}
-                fontScale_dict = {"oap": 1.6, "oms": 0.9, "aptv2": 1.1, "mit": 1.2, "riken": 1.2, "pfm": 1.2}
+                thickness_dict = {"oap": 2, "oms": 1, "omc": 1, "aptv2": 1, "mit": 2, "riken": 2, "pfm": 2}
+                fontScale_dict = {"oap": 1.6, "oms": 0.9, "omc": 0.9, "aptv2": 1.1, "mit": 1.2, "riken": 1.2, "pfm": 1.2}
                 thickness_dataset = thickness_dict.get(dataset_name, 1)
                 fontScale_dataset = fontScale_dict.get(dataset_name, 1.1)
                  
@@ -542,14 +635,23 @@ def main():
         st.session_state.color_map = PRIMATE_COLOR_MAP
         st.session_state.skeleton = PFM_SKELETON    
         
-    # File uploader for annotation JSON
-    # annotation_file = st.file_uploader("Upload annotation JSON file", type="json")
-   
-    # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/splitted_val_datasets/chimpact_val_sampled_500.json", "r") as f:
-    #     annotation_file = json.load(f)
+    # Add input fields for dataset name and mode
+    dataset_name = st.text_input("Enter Dataset Name:")
+    mode = st.text_input("Enter Mode (e.g., train, val, test):", value="test")
+
+    # Add a button to load the annotation file
+    if st.button("Load Annotation File"):
+        annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
+        with open(annotation_file_path, "r") as f:
+            annotation_file = json.load(f)
+        st.session_state.data = annotation_file
+        st.success("Annotation file loaded successfully!")
+            
+    # todo: add a button to input dataset name, and model
+    # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
     
-    with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/oap_test.json", "r") as f:
-        annotation_file = json.load(f)
+    # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_val_datasets/omc_val.json", "r") as f:
+        # annotation_file = json.load(f)
             
     if annotation_file is not None:
         # Load data only if a new file is uploaded
