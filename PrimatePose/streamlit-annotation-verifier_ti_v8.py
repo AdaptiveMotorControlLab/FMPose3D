@@ -307,6 +307,188 @@ DATASET_CONFIGS = {
             "R_ankle"
         ]
     },
+    "ap10k": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, 7, 10, -1, -1,
+            11, 14, 4, 12, 15, 13, 16, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "left_eye",
+            "right_eye",
+            "nose",
+            "neck",
+            "root_of_tail",
+            "left_shoulder",
+            "left_elbow",
+            "left_front_paw",
+            "right_shoulder",
+            "right_elbow",
+            "right_front_paw",
+            "left_hip",
+            "left_knee",
+            "left_back_paw",
+            "right_hip",
+            "right_knee",
+            "right_back_paw"
+        ],
+        "keypoints_simplified": [
+            "L_eye",
+            "R_eye",
+            "nose",
+            "neck",
+            "root_of_tail",
+            "L_S",
+            "L_elbow",
+            "L_front_paw",
+            "R_S",
+            "R_elbow",
+            "R_front_paw",
+            "L_hip",
+            "L_knee",
+            "L_back_paw",
+            "R_hip",
+            "R_knee",
+            "R_back_paw"
+        ]
+    },
+    "ak": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1,
+            0,
+            1,
+            2,
+            -1,
+            -1,
+            -1,
+            3,
+            6,
+            4,
+            5,
+            -1,
+            7,
+            8,
+            -1,
+            13,
+            -1,
+            -1,
+            9,
+            10,
+            11,
+            12,
+            -1,
+            -1,
+            14,
+            15,
+            -1,
+            16,
+            17,
+            18,
+            19,
+            -1,
+            -1,
+            20,
+            21,
+            22,
+            -1
+        ],
+          "keypoints": [
+            "Head_Mid_Top",
+            "Eye_Left",
+            "Eye_Right",
+            "Mouth_Front_Top",
+            "Mouth_Back_Left",
+            "Mouth_Back_Right",
+            "Mouth_Front_Bottom",
+            "Shoulder_Left",
+            "Shoulder_Right",
+            "Elbow_Left",
+            "Elbow_Right",
+            "Wrist_Left",
+            "Wrist_Right",
+            "Torso_Mid_Back",
+            "Hip_Left",
+            "Hip_Right",
+            "Knee_Left",
+            "Knee_Right",
+            "Ankle_Left",
+            "Ankle_Right",
+            "Tail_Top_Back",
+            "Tail_Mid_Back",
+            "Tail_End_Back"
+        ],
+        "keypoints_simplified": [
+            "head_mid_top",
+            "eye_L",
+            "eye_R",
+            "mouth_front_top",
+            "mouth_back_L",
+            "mouth_back_R",
+            "mouth_front_bottom",
+            "shoulder_L",
+            "shoulder_R",
+            "elbow_L",
+            "elbow_R",
+            "wrist_L",
+            "wrist_R",
+            "torso_mid_back",
+            "hip_L",
+            "hip_R",
+            "knee_L",
+            "knee_R",
+            "ankle_L",
+            "ankle_R",
+            "tail_top_back",
+            "tail_mid_back",
+            "tail_end_back"
+        ]
+    },
+    "lote": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1, 3, 5, 8, -1, -1, -1,
+            -1, 6, 9, -1, -1, 7, 10, 11, 14, -1, 12, 15, -1, -1, 13, 16, 4,
+            -1, -1, -1
+            ],
+        "keypoints": [
+            "left_eye",
+            "right_eye",
+            "nose",
+            "neck",
+            "root_tail",
+            "left_shoulder",
+            "left_elbow",
+            "left_front_paw",
+            "right_shoulder",
+            "right_elbow",
+            "right_front_paw",
+            "left_hip",
+            "left_knee",
+            "left_back_paw",
+            "right_hip",
+            "right_knee",
+            "right_back_paw"],
+        "keypoints_simplified": [
+            "L_eye",
+            "R_eye",
+            "nose",
+            "neck",
+            "root_tail",
+            "L_S",
+            "L_elbow",
+            "L_front_paw",
+            "R_S",
+            "R_elbow",
+            "R_front_paw",
+            "L_hip",
+            "L_knee",
+            "L_back_paw",
+            "R_hip",
+            "R_knee",
+            "R_back_paw"]
+    },
     "mit": {
             "skeleton": [
                 [1, 2], [3, 4], [1, 3], [3, 13], [13, 14],
@@ -375,7 +557,238 @@ DATASET_CONFIGS = {
             "L_foot",
             "tail"]
     },
+    "deepwild": {  
+        "skeleton": None,
+          "keypoint_mapping": [
+            -1, -1, 2, 3, 4, 0, 1, -1, -1, -1, -1,
+            7, 5, 6, -1, -1, -1, -1, 8, 9, 10, 11, -1, -1,
+            12, 13, -1, 14, 15, 16, 17, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "left_ear",
+            "right_ear",
+            "left_eye",
+            "right_eye",
+            "nose",
+            "left_shoulder",
+            "right_shoulder",
+            "lower_neck",
+            "left_elbow",
+            "right_elbow",
+            "left_wrist",
+            "right_wrist",
+            "left_hip",
+            "right_hip",
+            "left_knee",
+            "right_knee",
+            "left_ankle",
+            "right_ankle"
+        ],
+        "keypoints_simplified": [
+            "L_ear",
+            "R_ear",
+            "L_eye",
+            "R_eye",
+            "nose",
+            "L_S",
+            "R_S",
+            "lower_neck",
+            "L_elbow",
+            "R_elbow",
+            "L_wrist",
+            "R_wrist",
+            "L_hip",
+            "R_hip",
+            "L_knee",
+            "R_knee",
+            "L_ankle",
+            "R_ankle"
+        ]
+    },
+    "chimpact": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, -1, 9, 8, -1, -1, -1, 6, 7, -1, -1,
+            5, 13, 10, -1, -1, -1, -1, 14, 11, 15, 12, -1, -1,
+            -1, -1, 0, 3, 1, 4, 2, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "root_of_hip",
+            "right_knee",
+            "right_ankle",
+            "left_knee",
+            "left_ankle",
+            "neck",
+            "upper_lip",
+            "lower_lip",
+            "right_eye",
+            "left_eye",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist"
+        ],
+        "keypoints_simplified": [
+            "root_of_hip",
+            "R_knee",
+            "R_ankle",
+            "L_knee",
+            "L_ankle",
+            "neck",
+            "upper_lip",
+            "lower_lip",
+            "R_eye",
+            "L_eye",
+            "R_S",
+            "R_elbow",
+            "R_wrist",
+            "L_S",
+            "L_elbow",
+            "L_wrist"
+        ]
+    },
     "riken": {
+        "skeleton": None,
+        "keypoint_mapping": [
+        -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
+        -1, 5, 6, -1, -1, 20, -1, 7, 8, 9, 10,
+        -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
+        17, 18, -1, 19
+    ],
+        "keypoints": [
+            "nose",
+            "left_eye",
+            "right_eye",
+            "left_ear",
+            "right_ear",
+            "left_shoulder",
+            "right_shoulder",
+            "left_elbow",
+            "right_elbow",
+            "left_wrist",
+            "right_wrist",
+            "left_hip",
+            "right_hip",
+            "left_knee",
+            "right_knee",
+            "left_ankle",
+            "right_ankle",
+            "tail1",
+            "tail2",
+            "tailend",
+            "center"
+        ],
+        "keypoints_simplified": [
+            "nose",
+            "L_eye",
+            "R_eye",
+            "L_ear",
+            "R_ear",
+            "L_S",
+            "R_S",
+            "L_elbow",
+            "R_elbow",
+            "L_wrist",
+            "R_wrist",
+            "L_hip",
+            "R_hip",
+            "L_knee",
+            "R_knee",
+            "L_ankle",
+            "R_ankle",
+            "tail1",
+            "tail2",
+            "tailend",
+            "center"
+        ]
+    },
+    "mbw": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            1, 2, 5, -1, 8, -1, -1, 3, 6, 4, 7, -1,
+            -1, 10, 13, 9, 11, 14, 12, 15, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "head",
+            "neck",
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+            "torso_mid_back",
+            "center_hip",
+            "left_hip",
+            "left_knee",
+            "left_ankle",
+            "right_hip",
+            "right_knee",
+            "right_ankle"
+        ],
+        "keypoints_simplified": [
+            "head",
+            "neck",
+            "L_S",
+            "L_elbow",
+            "L_wrist",
+            "R_S",
+            "R_elbow",
+            "R_wrist",
+            "torso_mid_back",
+            "center_hip",
+            "L_hip",
+            "L_knee",
+            "L_ankle",
+            "R_hip",
+            "R_knee",
+            "R_ankle"
+        ]
+    },
+    "mit": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            0, 3, -1, -1, -1, 1, 2, -1, -1, -1, -1, -1,
+            7, 9, 4, -1, -1, 5, -1, -1, 8, 10, -1, -1,
+            11, 13, -1, -1, -1, -1, -1, 12, 14, 6, -1, -1, -1
+        ],
+        "keypoints": [
+            "forehead",
+            "left_ear",
+            "right_ear",
+            "head",
+            "upper_back",
+            "lower_back",
+            "root_tail",
+            "left_shoulder",
+            "left_wrist",
+            "right_shoulder",
+            "right_wrist",
+            "left_hip",
+            "left_foot",
+            "right_hip",
+            "right_foot"
+        ],
+        "keypoints_simplified": [
+            "forehead",
+            "L_ear",
+            "R_ear",
+            "head",
+            "upper_back",
+            "lower_back",
+            "root_tail",
+            "L_S",
+            "L_wrist",
+            "R_S",
+            "R_wrist",
+            "L_hip",
+            "L_foot",
+            "R_hip",
+            "R_foot"
+        ]
     },
     "pfm": {
         "skeleton": PFM_SKELETON,
@@ -484,6 +897,9 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         
         scale_factor = max(img_width, img_height) / 1000
         
+        # only for riken
+        scale_factor = scale_factor * 0.5 
+        
         existing_text_positions = []
         
         # Create colormap
@@ -503,6 +919,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 color_bgr = tuple(int(c * 255) for c in color_rgb[::-1])  # Convert to BGR
                 # print(dataset_config['keypoint_mapping'][i])
                 # print(color_map)
+                
                 # use the primate_color
                 # color = primate_color_list[dataset_config['keypoint_mapping'][i]]
                 # color_bgr = color
@@ -512,7 +929,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 cv2.circle(
                     img,
                     center=(int(x_kp), int(y_kp)),
-                    radius=int(7 * scale_factor),
+                    radius=int(4 * scale_factor),
                     # color=color_map[keypoint_label],
                     color=color_bgr,
                     thickness=-1,
@@ -533,16 +950,19 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
             
                 # Avoid overlapping text: Adjust position if it overlaps with previously drawn text
                 for (existing_x, existing_y) in existing_text_positions:
-                    if abs(x_text - existing_x) < 50 and abs(y_text - existing_y) < 20:
-                        y_text += int(20 * scale_factor)  # Move text slightly downward if overlap detected
+                    if abs(x_text - existing_x) < 30 and abs(y_text - existing_y) < 20:
+                        y_text += int(8 * scale_factor)  # Move text slightly downward if overlap detected
                 # Record this position
                 existing_text_positions.append((x_text, y_text))
                 
-                thickness_dict = {"oap": 2, "oms": 1, "omc": 1, "aptv2": 1, "mit": 2, "riken": 2, "pfm": 2}
-                fontScale_dict = {"oap": 1.6, "oms": 0.9, "omc": 0.9, "aptv2": 1.1, "mit": 1.2, "riken": 1.2, "pfm": 1.2}
+                thickness_dict = {"oap": 2,   "oms": 1,   "omc": 1, "mp": 1,     "ap10k": 1,   "aptv2": 1,   "lote": 1,   "ak": 1,   "deepwild": 1,   "chimpact": 1,   "mit": 2,   "riken": 1,   "mbw": 1, "mit": 1, "pfm": 2}
+                fontScale_dict = {"oap": 1.6, "oms": 0.9, "omc": 0.9, "mp": 1.3, "ap10k": 0.8, "aptv2": 1.1, "lote": 0.8, "ak": 1.0, "deepwild": 0.6, "chimpact": 0.9, "mit": 1.2, "riken": 0.6, "mbw": 0.6, "mit": 1.4, "pfm": 1.2}
                 thickness_dataset = thickness_dict.get(dataset_name, 1)
                 fontScale_dataset = fontScale_dict.get(dataset_name, 1.1)
-                 
+
+                # scale_factor = 2  # Increase the resolution
+                # img_high_res = cv2.resize(img, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LINEAR)
+                # img = img_high_res
                 # Draw colored text matching the keypoint color
                 cv2.putText(
                     img=img,
@@ -555,7 +975,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                     thickness=thickness_dataset,
                     lineType=cv2.LINE_AA,
                 )
-
+                
                 # Draw the black text as an outline
                 # cv2.putText(
                 #     img,
@@ -636,19 +1056,24 @@ def main():
         st.session_state.skeleton = PFM_SKELETON    
         
     # Add input fields for dataset name and mode
-    dataset_name = st.text_input("Enter Dataset Name:")
-    mode = st.text_input("Enter Mode (e.g., train, val, test):", value="test")
+    # dataset_name = st.text_input("Enter Dataset Name:")
+    # mode = st.radio("Select Mode:", options=["train", "val", "test"], index=2)  # Default to 'test'
 
     # Add a button to load the annotation file
-    if st.button("Load Annotation File"):
-        annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
-        with open(annotation_file_path, "r") as f:
-            annotation_file = json.load(f)
-        st.session_state.data = annotation_file
-        st.success("Annotation file loaded successfully!")
+    # if st.button("Load Annotation File"):
+    #     annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
+    #     with open(annotation_file_path, "r") as f:
+    #         annotation_file = json.load(f)
+    #     st.session_state.data = annotation_file
+    #     st.success("Annotation file loaded successfully!")
             
     # todo: add a button to input dataset name, and model
+    dataset_name = "mit"
+    mode = "test"
     # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
+    annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
+    with open(annotation_file_path, "r") as f:
+        annotation_file = json.load(f)
     
     # with open("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_val_datasets/omc_val.json", "r") as f:
         # annotation_file = json.load(f)
