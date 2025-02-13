@@ -529,16 +529,16 @@ def main():
             batch_image_name,
         ):
             img_save_and_vis(
-                i.numpy(),
-                r,
-                os.path.join(args.output_root, os.path.basename(img_name)),
-                (input_shape[2], input_shape[1]),
-                scale,
-                KPTS_COLORS,
-                args.kpt_thr,
-                args.radius,
-                SKELETON_INFO,
-                args.thickness,
+                img = i.numpy(),
+                results = r,
+                output_path = os.path.join(args.output_root, os.path.basename(img_name)),
+                input_shape = (input_shape[2], input_shape[1]),
+                heatmap_scale = scale,
+                kpt_colors = KPTS_COLORS,
+                kpt_thr = args.kpt_thr,
+                radius = args.radius,
+                skeleton_info = SKELETON_INFO,
+                thickness = args.thickness,
             )
     #         for i, r, img_name in zip(
     #             batch_orig_imgs[:valid_images_len],
