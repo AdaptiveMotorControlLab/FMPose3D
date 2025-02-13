@@ -81,42 +81,50 @@ def img_save_and_viz(image, result, output_path, seg_dir):
         seg_dir,
         image_name.replace(".png", ".npy")
         .replace(".jpg", ".npy")
-        .replace(".jpeg", ".npy"),
+        .replace(".jpeg", ".npy")
+        .replace(".JPG", ".npy"),  # Add support for uppercase JPG
     )
-    mask = np.load(mask_path)
-
+    print("mask_path:", mask_path)
+    mask = np.load(mask_path, allow_pickle=True)
+    print("mask:", mask.shape)
+    
     ##-----------save depth_map to disk---------------------
     save_path = (
         output_path.replace(".png", ".npy")
         .replace(".jpg", ".npy")
         .replace(".jpeg", ".npy")
+        .replace(".JPG", ".npy")  # Add support for uppercase JPG
     )
     np.save(save_path, depth_map)
-
-    depth_map[~mask] = np.nan
-    depth_foreground = depth_map[mask]  ## value in range [0, 1]
+    
+    print("depth_map:", depth_map.shape)
+    
+    # Create a copy to avoid modifying the original depth_map
+    depth_viz = depth_map.copy()
+    depth_viz[~mask] = np.nan
+    
+    # Get only the valid depth values using boolean indexing
+    valid_depths = depth_viz[~np.isnan(depth_viz)]  ## value in range [0, 1]
+    
     processed_depth = np.full((mask.shape[0], mask.shape[1], 3), 100, dtype=np.uint8)
 
-    if len(depth_foreground) > 0:
-        min_val, max_val = np.min(depth_foreground), np.max(depth_foreground)
-        depth_normalized_foreground = 1 - (
-            (depth_foreground - min_val) / (max_val - min_val)
-        )  ## for visualization, foreground is 1 (white), background is 0 (black)
-        depth_normalized_foreground = (depth_normalized_foreground * 255.0).astype(
-            np.uint8
-        )
-
-        depth_colored_foreground = cv2.applyColorMap(
-            depth_normalized_foreground, cv2.COLORMAP_INFERNO
-        )
-        depth_colored_foreground = depth_colored_foreground.reshape(-1, 3)
-        processed_depth[mask] = depth_colored_foreground
+    if len(valid_depths) > 0:
+        min_val, max_val = np.nanmin(depth_viz), np.nanmax(depth_viz)
+        # Process only the masked region
+        depth_normalized = np.full_like(depth_viz, np.nan)
+        valid_mask = ~np.isnan(depth_viz)
+        depth_normalized[valid_mask] = 1 - ((depth_viz[valid_mask] - min_val) / (max_val - min_val))
+        depth_normalized = (depth_normalized * 255.0).astype(np.uint8)
+        
+        # Apply color map only to valid regions
+        valid_regions = ~np.isnan(depth_normalized)
+        depth_colored = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_INFERNO)
+        processed_depth[valid_regions] = depth_colored[valid_regions]
 
     ##---------get surface normal from depth map---------------
     depth_normalized = np.full((mask.shape[0], mask.shape[1]), np.inf)
-    depth_normalized[mask > 0] = 1 - (
-        (depth_foreground - min_val) / (max_val - min_val)
-    )
+    valid_mask = ~np.isnan(depth_viz)
+    depth_normalized[valid_mask] = 1 - ((depth_viz[valid_mask] - min_val) / (max_val - min_val))
 
     kernel_size = 7
     grad_x = cv2.Sobel(
