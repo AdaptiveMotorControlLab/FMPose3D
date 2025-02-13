@@ -52,35 +52,42 @@ BATCH_SIZE = 48
 
 
 def preprocess_pose(orig_img, bboxes_list, input_shape, mean, std):
+    """Preprocess images for pose estimation.
     
+    Args:
+        orig_img: Original input image
+        bboxes_list: List of bounding boxes to process
+        input_shape: Target shape for the processed image
+        mean: Mean values for normalization
+        std: Standard deviation values for normalization
+    
+    Returns:
+        preprocessed_images: List of preprocessed image tensors
+        centers: List of center points for each bbox
+        scales: List of scales for each bbox
+    """
     print("preprocess_pose")
-    """Preprocess pose images and bboxes."""
     preprocessed_images = []
     centers = []
     scales = []
-    print("bboxes_list:", len(bboxes_list))
+    # print("bboxes_list:", len(bboxes_list))
     for bbox in bboxes_list:
+        # Transform image based on bbox and get center/scale info
         img, center, scale = top_down_affine_transform(orig_img.copy(), bbox)
-        print("img:", img.shape)
+        # print("img:", img.shape)
+        # Resize and normalize the image
         img = cv2.resize(
             img, (input_shape[1], input_shape[0]), interpolation=cv2.INTER_LINEAR
         ).transpose(2, 0, 1)
-        # img = torch.from_numpy(img)
-        # print("img torch:", img.shape)
-        # print(img)
-        # print(img.min(), img.max())
         img = torch.from_numpy(img)
-        # print("transfer from numpy to torch")
-        img = img[[2, 1, 0], ...].float()
-        # print(img)
+        img = img[[2, 1, 0], ...].float()  # Convert BGR to RGB
+        # Apply normalization
         mean = torch.Tensor(mean).view(-1, 1, 1)
         std = torch.Tensor(std).view(-1, 1, 1)
         img = (img - mean) / std
-        # print("img after mean and std:", img.shape)
         preprocessed_images.append(img)
         centers.extend(center)
         scales.extend(scale)
-        # print("preprocessed_images:", len(preprocessed_images))
     return preprocessed_images, centers, scales
 
 
@@ -102,7 +109,21 @@ def batch_inference_topdown(
 def img_save_and_vis(
     img, results, output_path, input_shape, heatmap_scale, kpt_colors, kpt_thr, radius, skeleton_info, thickness
 ):
-    # pred_instances_list = split_instances(result)
+    """Save and visualize pose estimation results on the image.
+    
+    Args:
+        img: Input image
+        results: Dictionary containing pose estimation results
+        output_path: Path to save the visualization
+        input_shape: Original input shape
+        heatmap_scale: Scale factor for heatmap to image conversion
+        kpt_colors: Color scheme for keypoints
+        kpt_thr: Threshold for keypoint confidence
+        radius: Radius of keypoint circles
+        skeleton_info: Information about skeleton connections
+        thickness: Line thickness for skeleton visualization
+    """
+    # Extract results
     heatmap = results["heatmaps"]
     centres = results["centres"]
     scales = results["scales"]
@@ -110,19 +131,23 @@ def img_save_and_vis(
     img_shape = img.shape
     instance_keypoints = []
     instance_scores = []
-    # print(scales[0], centres[0])
+
+    # Process each instance's heatmap
     for i in range(len(heatmap)):
+        # Decode heatmaps into keypoint coordinates and scores
         result = udp_decode(
             heatmap[i].cpu().unsqueeze(0).float().data[0].numpy(),
             input_shape,
             (int(input_shape[0] / heatmap_scale), int(input_shape[1] / heatmap_scale)),
         )
-
+        
         keypoints, keypoint_scores = result
+        # Transform keypoints back to original image coordinates
         keypoints = (keypoints / input_shape) * scales[i] + centres[i] - 0.5 * scales[i]
         instance_keypoints.append(keypoints[0])
         instance_scores.append(keypoint_scores[0])
 
+    # Save results to JSON
     pred_save_path = output_path.replace(".jpg", ".json").replace(".png", ".json")
 
     with open(pred_save_path, "w") as f:
@@ -146,11 +171,13 @@ def img_save_and_vis(
     instance_scores = np.array(instance_scores).astype(np.float32)
 
     keypoints_visible = np.ones(instance_keypoints.shape[:-1])
+    # Draw keypoints and skeletons for each instance
     for kpts, score, visible in zip(
         instance_keypoints, instance_scores, keypoints_visible
     ):
         kpts = np.array(kpts, copy=False)
 
+        # Validate color scheme
         if (
             kpt_colors is None
             or isinstance(kpt_colors, str)
@@ -162,10 +189,10 @@ def img_save_and_vis(
                 f"that of keypoints ({len(kpts)})"
             )
 
-        # draw each point on image
+        # Draw keypoints
         for kid, kpt in enumerate(kpts):
             if score[kid] < kpt_thr or not visible[kid] or kpt_colors[kid] is None:
-                # skip the point that should not be drawn
+                # Skip low-confidence or invisible keypoints
                 continue
 
             color = kpt_colors[kid]
@@ -173,7 +200,7 @@ def img_save_and_vis(
                 color = tuple(int(c) for c in color[::-1])
             img = cv2.circle(img, (int(kpt[0]), int(kpt[1])), int(radius), color, -1)
         
-        # draw skeleton
+        # Draw skeleton connections
         for skid, link_info in skeleton_info.items():
             pt1_idx, pt2_idx = link_info['link']
             color = link_info['color'][::-1] # BGR
@@ -181,6 +208,7 @@ def img_save_and_vis(
             pt1 = kpts[pt1_idx]; pt1_score = score[pt1_idx]
             pt2 = kpts[pt2_idx]; pt2_score = score[pt2_idx]
 
+            # Only draw connections if both keypoints are confident
             if pt1_score > kpt_thr and pt2_score > kpt_thr:
                 x1_coord = int(pt1[0]); y1_coord = int(pt1[1])
                 x2_coord = int(pt2[0]); y2_coord = int(pt2[1])
@@ -192,6 +220,7 @@ def img_save_and_vis(
             x1, y1, x2, y2 = map(int, bbox)
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green color for bboxes
 
+    # Save the final visualization
     cv2.imwrite(output_path, img)
 
 def fake_pad_images_to_batchsize(imgs):
@@ -276,6 +305,7 @@ def main():
 
     args = parser.parse_args()
 
+    # Initialize detector if config is provided
     if args.det_config is None or args.det_config == "":
         use_det = False
     else:
@@ -289,11 +319,13 @@ def main():
             process_images_detector,
         )
 
+    # Validate inputs and setup
     assert args.input != ""
     ## if skeleton thickness is not specified, use radius as thickness
     if args.thickness == -1:
         args.thickness = args.radius
 
+    # Setup input shape
     if len(args.shape) == 1:
         input_shape = (3, args.shape[0], args.shape[0])
     elif len(args.shape) == 2:
@@ -339,6 +371,7 @@ def main():
         dtype = torch.float32  # TorchScript models use float32
         pose_estimator = pose_estimator.to(args.device)
 
+    # Process input images
     global BATCH_SIZE
     BATCH_SIZE = args.batch_size
 
@@ -375,14 +408,9 @@ def main():
         # num_workers=max(min(args.batch_size, cpu_count()) // 4, 4),
         num_workers=0,
     )
-    # pose_preprocess_pool = WorkerPool(
-    #     preprocess_pose, processes=max(min(args.batch_size, cpu_count()), 1)
-    # )
-    # img_save_pool = WorkerPool(
-    #     img_save_and_vis, processes=max(min(args.batch_size, cpu_count()), 1)
-    # )
 
-    KPTS_COLORS = COCO_WHOLEBODY_KPTS_COLORS  ## 133 keypoints
+    # Select appropriate keypoint format and colors
+    KPTS_COLORS = COCO_WHOLEBODY_KPTS_COLORS
     SKELETON_INFO = COCO_WHOLEBODY_SKELETON_INFO
 
     if args.num_keypoints == 17:
@@ -392,6 +420,7 @@ def main():
         KPTS_COLORS = GOLIATH_KPTS_COLORS
         SKELETON_INFO = GOLIATH_SKELETON_INFO
 
+    # Process images in batches
     for batch_idx, (batch_image_name, batch_orig_imgs, batch_imgs) in tqdm(
         enumerate(inference_dataloader), 
         total=len(inference_dataloader),
@@ -399,7 +428,6 @@ def main():
     ):
         print(f"Processing batch {batch_idx}, images: {batch_image_name}")
         orig_img_shape = batch_orig_imgs.shape
-        print("orig_img_shape:", orig_img_shape)
         valid_images_len = len(batch_orig_imgs)
         if use_det:
             imgs = batch_orig_imgs.clone()[
@@ -412,17 +440,21 @@ def main():
 
         assert len(bboxes_batch) == valid_images_len
 
-        print("bboxes_batch:", bboxes_batch)
+        print("bboxes_batch:", bboxes_batch) # list of numpy arrays; bboxes_batch[i].shape: (Num_bboxes, 4)
+        print("len(bboxes_batch):", bboxes_batch[0].shape)
+        # if no bboxes, set the bboxes to the whole image
         for i, bboxes in enumerate(bboxes_batch):
             if len(bboxes) == 0:
                 bboxes_batch[i] = np.array(
                     [[0, 0, orig_img_shape[1], orig_img_shape[0]]]
                 )
 
+        # create a map of image index to number of bboxes
         img_bbox_map = {}
         for i, bboxes in enumerate(bboxes_batch):
             img_bbox_map[i] = len(bboxes)
 
+        # preprocess the images for pose estimation 
         args_list = [
             (
                 i,
@@ -433,7 +465,7 @@ def main():
             )
             for i, bbox_list in zip(batch_orig_imgs.numpy(), bboxes_batch)
         ]
-        print("args_list:", len(args_list))
+        # print("args_list:", len(args_list))
         # pose_ops = pose_preprocess_pool.run(args_list)
         # print("pose_ops:", len(pose_ops))
         # pose_imgs, pose_img_centers, pose_img_scales = [], [], []
@@ -441,7 +473,9 @@ def main():
         #     pose_imgs.extend(op[0])
         #     pose_img_centers.extend(op[1])
         #     pose_img_scales.extend(op[2])
-            
+        
+        # preprocess the images for pose estimation 
+        # return the preprocessed images, centers, scales
         pose_imgs = []
         pose_centers = []
         pose_scales = []
@@ -451,17 +485,23 @@ def main():
             pose_centers.extend(centers)
             pose_scales.extend(scales)
 
+        # calculate the number of batches for pose estimation
         n_pose_batches = (len(pose_imgs) + args.batch_size - 1) // args.batch_size
 
         # use this to tell torch compiler the start of model invocation as in 'flip' mode the tensor output is overwritten
         torch.compiler.cudagraph_mark_step_begin()  
+        
+        # pose estimation
         pose_results = []
         for i in range(n_pose_batches):
+            # stack the images for pose estimation
             imgs = torch.stack(
                 pose_imgs[i * args.batch_size : (i + 1) * args.batch_size], dim=0
             )
             valid_len = len(imgs)
+            # fake pad the images to the batch size
             imgs = fake_pad_images_to_batchsize(imgs)
+            # pose estimation
             pose_results.extend(
                 batch_inference_topdown(pose_estimator, imgs, dtype=dtype)[:valid_len]
             )
@@ -516,7 +556,6 @@ def main():
     print(
         f"\033[92mTotal inference time: {total_time:.2f} seconds. FPS: {fps:.2f}\033[0m"
     )
-
 
 if __name__ == "__main__":
     main()
