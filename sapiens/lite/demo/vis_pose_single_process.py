@@ -66,21 +66,21 @@ def preprocess_pose(orig_img, bboxes_list, input_shape, mean, std):
             img, (input_shape[1], input_shape[0]), interpolation=cv2.INTER_LINEAR
         ).transpose(2, 0, 1)
         # img = torch.from_numpy(img)
-        print("img torch:", img.shape)
+        # print("img torch:", img.shape)
         # print(img)
-        print(img.min(), img.max())
+        # print(img.min(), img.max())
         img = torch.from_numpy(img)
-        print("transfer from numpy to torch")
+        # print("transfer from numpy to torch")
         img = img[[2, 1, 0], ...].float()
-        print(img)
+        # print(img)
         mean = torch.Tensor(mean).view(-1, 1, 1)
         std = torch.Tensor(std).view(-1, 1, 1)
         img = (img - mean) / std
-        print("img after mean and std:", img.shape)
+        # print("img after mean and std:", img.shape)
         preprocessed_images.append(img)
         centers.extend(center)
         scales.extend(scale)
-        print("preprocessed_images:", len(preprocessed_images))
+        # print("preprocessed_images:", len(preprocessed_images))
     return preprocessed_images, centers, scales
 
 
@@ -106,6 +106,7 @@ def img_save_and_vis(
     heatmap = results["heatmaps"]
     centres = results["centres"]
     scales = results["scales"]
+    bboxes = results.get("bboxes", None)  # Get bboxes if available
     img_shape = img.shape
     instance_keypoints = []
     instance_scores = []
@@ -184,6 +185,12 @@ def img_save_and_vis(
                 x1_coord = int(pt1[0]); y1_coord = int(pt1[1])
                 x2_coord = int(pt2[0]); y2_coord = int(pt2[1])
                 cv2.line(img, (x1_coord, y1_coord), (x2_coord, y2_coord), color, thickness=thickness)
+
+    # Draw bounding boxes if available
+    if bboxes is not None:
+        for bbox in bboxes:
+            x1, y1, x2, y2 = map(int, bbox)
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green color for bboxes
 
     cv2.imwrite(output_path, img)
 
@@ -460,11 +467,12 @@ def main():
             )
 
         batched_results = []
-        for _, bbox_len in img_bbox_map.items():
+        for img_idx, bbox_len in img_bbox_map.items():
             result = {
                 "heatmaps": pose_results[:bbox_len].copy(),
                 "centres": pose_centers[:bbox_len].copy(),
                 "scales": pose_scales[:bbox_len].copy(),
+                "bboxes": bboxes_batch[img_idx].copy() if use_det else None,  # Add bboxes to results
             }
             batched_results.append(result)
             del (
