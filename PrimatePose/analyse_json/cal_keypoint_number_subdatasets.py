@@ -3,13 +3,6 @@ import os
 from pathlib import Path
 from collections import defaultdict
 
-# Define input and output directories
-input_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets"
-output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/analyse_json/keypint_number_subdatasets"
-
-# Create output directory if it doesn't exist
-os.makedirs(output_dir, exist_ok=True)
-
 def analyze_keypoints(json_file_path):
     # Load JSON file
     with open(json_file_path, 'r') as f:
@@ -39,10 +32,14 @@ def analyze_keypoints(json_file_path):
     return keypoint_counts, total_annotations, keypoint_names
 
 def cal_keypoint_number_folder_level():
+
     # Define input and output directories
     input_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets"
     output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/analyse_json/keypint_number_subdatasets"
-    
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
     # Process each JSON file in the input directory
     for json_file in os.listdir(input_dir):
         if not json_file.endswith('.json'):
@@ -73,33 +70,35 @@ def cal_keypoint_number_folder_level():
 
 def cal_keypoint_number_file_level():
     # Define input and output directories
-    input_file = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets"
-    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/analyse_json/keypint_number_subdatasets"
+    input_file = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/Marmosets_woTail-Banty-2022-07-01_coco/annotations/train.json"
+    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/analyse_json/keypint_number_subdatasets/riken_bandy_wo_tail"
+    
+    os.makedirs(output_dir, exist_ok=True)
     
     json_file = input_file
     # Process each JSON file in the input directory            
     json_file_path = os.path.join(input_file)
-    dataset_name = json_file.split('.')[0]  # Extract dataset name from filename
-    
+    # dataset_name = json_file.split('/')[-1].split('.')[0]  # Extract dataset name from filename
+    dataset_name = "riken_bandy_wo_tail"
+    print(dataset_name)
     # Analyze keypoints
     keypoint_counts, total_annotations, keypoint_names = analyze_keypoints(json_file_path)
     
     # Prepare output file
     output_file = os.path.join(output_dir, f"{dataset_name}_keypoints_number.txt")
-    
+    print(output_file)
     # Write results to file
     with open(output_file, 'w') as f:
         f.write(f"Dataset: {dataset_name}\n")
         f.write(f"Total number of annotations: {total_annotations}\n")
         f.write("\nKeypoint statistics:\n")
-        f.write("-" * 50 + "\n")
-        f.write(f"{'Keypoint Name':<30} {'Count':>8} {'Percentage':>12}\n")
-        f.write("-" * 50 + "\n")
+        f.write("-" * 40 + "\n")  # Reduced width since we removed percentage
+        f.write(f"{'Keypoint Name':<30} {'Count':>8}\n")  # Removed percentage column
+        f.write("-" * 40 + "\n")  # Reduced width since we removed percentage
         
         for keypoint_name in keypoint_names:
             count = keypoint_counts[keypoint_name]
-            # percentage = (count / total_annotations) * 100
-            f.write(f"{keypoint_name:<30} {count:>8} %\n") # {percentage:>11.2f}
+            f.write(f"{keypoint_name:<30} {count:>8}\n")  # Removed percentage
                 
 if __name__ == "__main__":
     # cal_keypoint_number_folder_level()
