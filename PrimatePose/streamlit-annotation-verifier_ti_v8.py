@@ -154,7 +154,24 @@ DATASET_CONFIGS = {
                 "right_knee",
                 "right_foot"
             ],
-        "keypoints_simplified": None
+        "keypoints_simplified": [
+                "nose",
+                "L_eye",
+                "R_eye",
+                "head",
+                "neck",
+                "L_S",
+                "L_elbow",
+                "L_wrist",
+                "R_S",
+                "R_elbow",
+                "R_wrist",
+                "hip/sacrum",
+                "L_knee",
+                "L_foot",
+                "R_knee",
+                "R_foot"
+        ]
     },
     "aptv2": {
         "skeleton": [
@@ -908,12 +925,12 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
         for i, (x_kp, y_kp, v) in enumerate(keypoints):
             if v > 0:
                 # print(dataset_config['keypoint_mapping'])
-                print("i:", i) 
-                print("v:", v)
-                print("idx:", dataset_config['keypoint_mapping'][i])
-                print("x_kp:", x_kp, "y_kp:", y_kp)
+                # print("i:", i) 
+                # print("v:", v)
+                # print("idx:", dataset_config['keypoint_mapping'][i])
+                # print("x_kp:", x_kp, "y_kp:", y_kp)
                 keypoint_label = keypoint_names[dataset_config['keypoint_mapping'][i]]
-                print(keypoint_label)
+                # print(keypoint_label)
                 # Get color from colormap and convert to OpenCV BGR format
                 color_rgb = cmap(i)[:3]  # Get RGB values (ignore alpha)
                 color_bgr = tuple(int(c * 255) for c in color_rgb[::-1])  # Convert to BGR
@@ -926,10 +943,14 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 
                 # print("color:", color)
                 # draw the keypoint
+                circle_radius_dict = {"oap": 1, "oms": 1, "omc": 1, "mp": 1, "ap10k": 1, "aptv2": 1, "lote": 1, "ak": 5, "deepwild": 1, "chimpact": 1, "mit": 1, "riken": 1, "mbw": 1, "mit": 1, "pfm": 1}
+                circle_radius = circle_radius_dict.get(dataset_name, 1)
+                print("circle_radius:", circle_radius)
+                
                 cv2.circle(
                     img,
                     center=(int(x_kp), int(y_kp)),
-                    radius=int(4 * scale_factor),
+                    radius=int(4 * scale_factor*circle_radius),
                     # color=color_map[keypoint_label],
                     color=color_bgr,
                     thickness=-1,
@@ -937,7 +958,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # print("x_kp:", x_kp, "y_kp:", y_kp)
                 # bg_color = img[int(y_kp), int(x_kp)].astype(int)
                 # txt_color = get_contrasting_color(bg_color)
-                
+
                 # adjust font scale and thickness based on scale factor
                 font_scale = max(0.2, min(scale_factor, 1))*0.8
                 thickness = max(1, int(scale_factor))
@@ -955,8 +976,8 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # Record this position
                 existing_text_positions.append((x_text, y_text))
                 
-                thickness_dict = {"oap": 2,   "oms": 1,   "omc": 1, "mp": 1,     "ap10k": 1,   "aptv2": 1,   "lote": 1,   "ak": 1,   "deepwild": 1,   "chimpact": 1,   "mit": 2,   "riken": 1,   "mbw": 1, "mit": 1, "pfm": 2}
-                fontScale_dict = {"oap": 1.6, "oms": 0.9, "omc": 0.9, "mp": 1.3, "ap10k": 0.8, "aptv2": 1.1, "lote": 0.8, "ak": 1.0, "deepwild": 0.6, "chimpact": 0.9, "mit": 1.2, "riken": 0.6, "mbw": 0.6, "mit": 1.4, "pfm": 1.2}
+                thickness_dict = {"oap": 3,   "oms": 1,   "omc": 1, "mp": 1,     "ap10k": 1,   "aptv2": 1,   "lote": 1,   "ak": 1,   "deepwild": 1,   "chimpact": 1,   "mit": 2,   "riken": 1,   "mbw": 1, "mit": 1, "pfm": 2}
+                fontScale_dict = {"oap": 2.6, "oms": 0.9, "omc": 0.9, "mp": 1.3, "ap10k": 0.8, "aptv2": 1.1, "lote": 0.8, "ak": 1.0, "deepwild": 0.6, "chimpact": 0.9, "mit": 1.2, "riken": 0.6, "mbw": 0.6, "mit": 1.4, "pfm": 1.2}
                 thickness_dataset = thickness_dict.get(dataset_name, 1)
                 fontScale_dataset = fontScale_dict.get(dataset_name, 1.1)
 
@@ -1068,10 +1089,11 @@ def main():
     #     st.success("Annotation file loaded successfully!")
             
     # todo: add a button to input dataset name, and model
-    dataset_name = "mit"
+    dataset_name = "ak"
     mode = "test"
-    # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
-    annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
+    annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
+    # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
+    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples/with_tail/ak_test_with_tails.json"
     with open(annotation_file_path, "r") as f:
         annotation_file = json.load(f)
     
@@ -1092,7 +1114,8 @@ def main():
         # Image directory input
         image_dir = st.text_input("Enter the path to the image directory:")
 
-        image_dir = "/mnt/data/tiwang/v8_coco/images"
+        # image_dir = "/mnt/data/tiwang/v8_coco/images"
+        image_dir = "/home/ti_wang/data/tiwang/v8_coco/images"
         
         images = st.session_state.data['images']
         # imageid2dataset_name 
@@ -1176,8 +1199,8 @@ def main():
                 )
                 
                 # Add download button for the current image                
-                # Create three columns for the buttons
-                col1, col2, col3 = st.columns(3)
+                # Create four columns for the buttons
+                col1, col2, col3, col4 = st.columns(4)
 
                 with col1:
                     if st.button("Save Annotated Image"):
@@ -1212,7 +1235,15 @@ def main():
                             file_name=f"{image_name}_anoID_{annotation['id']}.{image_type}",
                             mime="image/png"
                         )
-                    
+                with col4:
+                    if st.button("Save Original Image"):
+                        # Define the directory path
+                        save_dir = f"/home/ti_wang/data/tiwang/st_original_images/{imageid2dataset[image_id]}"
+                        # Create the directory if it doesn't exist
+                        os.makedirs(save_dir, exist_ok=True)
+                        # Define the file path
+                        save_path = os.path.join(save_dir, f"original_{image_name}_anoID_{annotation['id']}.{image_type}")
+                        cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
                 # Display verification status
                 if annotation.get("verified", False):
                     st.info("This annotation has been verified.")
