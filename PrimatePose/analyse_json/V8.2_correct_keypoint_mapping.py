@@ -25,6 +25,23 @@ PROBLEMATIC_DATASETS = {
             7, 10, -1, -1, 11, 12, 14, 
             13, 15, -1, -1, -1, -1, -1, -1
         ]
+    },
+    "omc": {
+        "original_num_keypoints": 16,
+        "V8.0_keypoint_mapping": [
+            -1, 3, 1, 0, 2, -1, -1, 
+            -1, -1, -1, -1, 4, 8, 5, 
+            -1, -1, -1, -1, 9, 6, 10, 
+            7, -1, -1, -1, -1, -1, 14, 12, 
+            15, 13, -1, -1, 11, -1, -1, 16
+        ],
+        "V8.2_keypoint_mapping": [
+            -1, 3, 1, 0, 2, -1, -1, 
+            -1, -1, -1, -1, 4, 8, 5, 
+            -1, -1, -1, -1, 9, 6, 10, 
+            7, -1, -1, -1, -1, 11, 14, 12, 
+            15, 13, -1, -1, -1, -1, -1, 16
+        ],
     }
     # Add more problematic datasets here as needed
 }
@@ -56,19 +73,6 @@ def transform_keypoints(keypoints: List[int], v80_mapping: List[int], v82_mappin
     logging.debug(f"V8.0 mapping: {v80_mapping}")
     logging.debug(f"V8.2 mapping: {v82_mapping}")
     
-    # Plan A: use keypoint in V80 to replace keypoint in V82
-    # v82_keypoint = [-1] * len(v82_mapping)*3
-    # for pfm_idx_v82, v82_orig_idx in v82_mapping:
-    #   if v82_orig_idx == -1, continue
-    #   for pfm_idx_v80, v80_orig_idx in v80_mapping:
-    #       if v80_orig_idx == v82_orig_idx:
-    #           v82_keypoint[pfm_idx_v82*3] = v81_keypoint[pfm_idx_v80*3]
-    #           v82_keypoint[pfm_idx_v82*3+1] = v81_keypoint[pfm_idx_v80*3+1]   
-                # v82_keypoint[pfm_idx_v82*3+2] = v81_keypoint[pfm_idx_v80*3+2]
-                # brea
-    # Plan B: record the keypoint mapping from original to pfm of v80 and v82. like: v80[original_idx] = pfm_idx;
-    #  use one for loop to fill the value of v82_keypoint using v80_keypoint.
-    # plan B is faster and more efficient;
     orig_to_pfm_mapping_v80 = {}
     
     # Build the mappings
