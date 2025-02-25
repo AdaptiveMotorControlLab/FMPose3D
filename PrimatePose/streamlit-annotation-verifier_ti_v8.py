@@ -132,6 +132,13 @@ DATASET_CONFIGS = {
         "keypoint_mapping": [
             -1, 3, 1, 2, 0, -1, -1, 
             -1, -1, -1, -1, 4, 5, 8, 
+            -1, -1, -1, -1, 6, 9, -1, -1,  
+            7, 10, -1, -1, 11, 12, 14, 
+            13, 15, -1, -1, -1, -1, -1, -1
+        ],
+        "ori_keypoint_mapping": [
+            -1, 3, 1, 2, 0, -1, -1, 
+            -1, -1, -1, -1, 4, 5, 8, 
             -1, -1, -1, -1, 6, 9, 7, 
             10, -1, -1, -1, -1, 11, 12, 14, 
             13, 15, -1, -1, -1, -1, -1, -1
@@ -171,6 +178,54 @@ DATASET_CONFIGS = {
                 "L_foot",
                 "R_knee",
                 "R_foot"
+        ]
+    },
+    "omc": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, 3, 1, 0, 2, -1, -1, 
+            -1, -1, -1, -1, 4, 8, 5, 
+            -1, -1, -1, -1, 9, 6, 10, 
+            7, -1, -1, -1, -1, -1, 14, 12, 
+            15, 13, -1, -1, 11, -1, -1, 16
+        ],
+        "keypoints": [
+            "right_eye",
+            "left_eye",
+            "nose",
+            "head",
+            "neck",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist",
+            "hip",
+            "right_knee",
+            "right_ankle",
+            "left_knee",
+            "left_ankle",
+            "tail"
+        ],
+        "keypoints_simplified": [
+            "R_eye",
+            "L_eye",
+            "nose",
+            "head",
+            "neck",
+            "R_S",
+            "R_elbow",
+            "R_wrist",
+            "L_S",
+            "L_elbow",
+            "L_wrist",
+            "hip",
+            "R_knee",
+            "R_ankle",
+            "L_knee",
+            "L_ankle",
+            "tail"
         ]
     },
     "aptv2": {
@@ -230,54 +285,6 @@ DATASET_CONFIGS = {
             "R_knee",
             "RB_paw"
         ],
-    },
-    "omc": {
-        "skeleton": None,
-        "keypoint_mapping": [
-            -1, 3, 1, 0, 2, -1, -1, 
-            -1, -1, -1, -1, 4, 8, 5, 
-            -1, -1, -1, -1, 9, 6, 10, 
-            7, -1, -1, -1, -1, -1, 14, 12, 
-            15, 13, -1, -1, 11, -1, -1, 16
-        ],
-        "keypoints": [
-            "right_eye",
-            "left_eye",
-            "nose",
-            "head",
-            "neck",
-            "right_shoulder",
-            "right_elbow",
-            "right_wrist",
-            "left_shoulder",
-            "left_elbow",
-            "left_wrist",
-            "hip",
-            "right_knee",
-            "right_ankle",
-            "left_knee",
-            "left_ankle",
-            "tail"
-        ],
-        "keypoints_simplified": [
-            "R_eye",
-            "L_eye",
-            "nose",
-            "head",
-            "neck",
-            "R_S",
-            "R_elbow",
-            "R_wrist",
-            "L_S",
-            "L_elbow",
-            "L_wrist",
-            "hip",
-            "R_knee",
-            "R_ankle",
-            "L_knee",
-            "L_ankle",
-            "tail"
-        ]
     },
     "mp": {
         "skeleton": None,
@@ -945,7 +952,7 @@ def visualize_annotation(img, annotation, color_map, categories, skeleton, image
                 # draw the keypoint
                 circle_radius_dict = {"oap": 1, "oms": 1, "omc": 1, "mp": 1, "ap10k": 1, "aptv2": 1, "lote": 1, "ak": 5, "deepwild": 1, "chimpact": 1, "mit": 1, "riken": 1, "mbw": 1, "mit": 1, "pfm": 1}
                 circle_radius = circle_radius_dict.get(dataset_name, 1)
-                print("circle_radius:", circle_radius)
+                # print("circle_radius:", circle_radius)
                 
                 cv2.circle(
                     img,
@@ -1093,7 +1100,7 @@ def main():
     mode = "test"
     annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
     # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
-    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples/with_tail/ak_test_with_tails.json"
+    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/oap_test.json"
     with open(annotation_file_path, "r") as f:
         annotation_file = json.load(f)
     
