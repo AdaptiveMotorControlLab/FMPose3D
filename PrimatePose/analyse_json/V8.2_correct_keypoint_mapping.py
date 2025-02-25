@@ -44,7 +44,20 @@ PROBLEMATIC_DATASETS = {
         ],
     },
     "ap10k": {
-        "original_num_keypoints": None,
+        "original_num_keypoints": 17,
+        "V8.0_keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, 7, 10, -1, -1,
+            11, 14, 4, 12, 15, 13, 16, -1, -1, -1, -1, -1, -1
+        ],
+        "V8.2_keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, -1, -1, 7, 10, 
+            11, 14, -1, 12, 15, -1, -1, 13, 16, 4, -1, -1, -1
+        ],
+    },
+    "aptv2": {
+        "original_num_keypoints": 17,
         "V8.0_keypoint_mapping": [
             -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
             3, 5, 8, -1, -1, -1, -1, 6, 9, 7, 10, -1, -1,
@@ -194,7 +207,7 @@ def process_dataset_files(input_base_path: str, output_base_path: str) -> None:
                     logging.info(f"No correction needed for {filename}, copying file")
                     # Copy non-problematic dataset directly here instead of calling a function
                     shutil.copy2(input_file_path, output_file_path)
-                    logging.info(f"Copied file from {input_file_path} to {output_file_path}")
+                    # logging.info(f"Copied file from {input_file_path} to {output_file_path}")
                     copied_files += 1
             except Exception as e:
                 logging.error(f"Error processing file {filename}: {str(e)}")
