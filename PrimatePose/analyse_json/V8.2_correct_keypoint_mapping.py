@@ -20,7 +20,7 @@ logging.basicConfig(
 PROBLEMATIC_DATASETS = {
     # Example of a dataset with actual mapping changes (based on the oap example)
     "oap": {
-        "num_keypoints": 17,
+        "original_num_keypoints": 17,
         "V8.0_keypoint_mapping": [
             -1, 3, 1, 2, 0, -1, -1, 
             -1, -1, -1, -1, 4, 5, 8, 
@@ -38,18 +38,6 @@ PROBLEMATIC_DATASETS = {
     }
     # Add more problematic datasets here as needed
 }
-
-def create_output_directory(base_path: str) -> str:
-    """Create the output directory for V8.2 data"""
-    output_dir = os.path.join(base_path, "PFM_V8.2")
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Create subdirectories for train, test, val
-    for subset in ["splitted_train_datasets", "splitted_test_datasets", "splitted_val_datasets"]:
-        os.makedirs(os.path.join(output_dir, subset), exist_ok=True)
-    
-    logging.info(f"Created output directory structure at {output_dir}")
-    return output_dir
 
 def validate_keypoints_structure(json_data: Dict[str, Any], dataset_name: str) -> bool:
     """Validate the keypoints structure in the JSON data"""
@@ -84,8 +72,8 @@ def transform_keypoints(keypoints: List[int], v80_mapping: List[int], v82_mappin
     
     Args:
         keypoints: The original keypoints array (flat array with x,y,v values)
-        v80_mapping: The V8.0 keypoint mapping array
-        v82_mapping: The V8.2 keypoint mapping array
+        v80_mapping: The V8.0 keypoint mapping array (PFM index -> original dataset index)
+        v82_mapping: The V8.2 keypoint mapping array (PFM index -> original dataset index)
         
     Returns:
         The transformed keypoints array
@@ -96,36 +84,48 @@ def transform_keypoints(keypoints: List[int], v80_mapping: List[int], v82_mappin
     # Get the number of keypoints (each keypoint has 3 values: x, y, visibility)
     num_keypoints = len(keypoints) // 3
     
+    # Create a new keypoints array for V8.2 with the same shape as keypoints but filled with -1
+    keypoint_v82 = [-1] * len(keypoints)
+    
     # Check if the mapping arrays have the expected length
     if len(v80_mapping) != len(v82_mapping):
         logging.warning(f"Mapping arrays have different lengths: {len(v80_mapping)} vs {len(v82_mapping)}")
         return keypoints  # Return original keypoints if mapping arrays are invalid
     
-    # Create a mapping from V8.0 positions to V8.2 positions
-    position_mapping = {}
-    for i, (v80_pos, v82_pos) in enumerate(zip(v80_mapping, v82_mapping)):
-        if v80_pos != -1 and v82_pos != -1 and v80_pos != v82_pos:
-            position_mapping[v80_pos] = v82_pos
+    # Log the mapping arrays for debugging
+    logging.debug(f"V8.0 mapping: {v80_mapping}")
+    logging.debug(f"V8.2 mapping: {v82_mapping}")
     
-    # If there are no changes in the mapping, return the original keypoints
-    if not position_mapping:
-        return keypoints
+    # Plan A: use keypoint in V80 to replace keypoint in V82
+    # v82_keypoint = [-1] * len(v82_mapping)*3
+    # for pfm_idx_v82, v82_orig_idx in v82_mapping:
+    #   if v82_orig_idx == -1, continue
+    #   for pfm_idx_v80, v80_orig_idx in v80_mapping:
+    #       if v80_orig_idx == v82_orig_idx:
+    #           v82_keypoint[pfm_idx_v82*3] = v81_keypoint[pfm_idx_v80*3]
+    #           v82_keypoint[pfm_idx_v82*3+1] = v81_keypoint[pfm_idx_v80*3+1]   
+                # v82_keypoint[pfm_idx_v82*3+2] = v81_keypoint[pfm_idx_v80*3+2]
+                # brea
+    # Plan B: record the keypoint mapping from original to pfm of v80 and v82. like: v80[original_idx] = pfm_idx;
+    #  use one for loop to fill the value of v82_keypoint using v80_keypoint.
+    # plan B is faster and more efficient;
+    orig_to_pfm_mapping_v80 = {}
     
-    # Apply the mapping to transform keypoints
-    for v80_pos, v82_pos in position_mapping.items():
-        if v80_pos < num_keypoints and v82_pos < num_keypoints:
-            # Copy the x, y, visibility values from the old position to the new position
-            new_keypoints[v82_pos*3] = keypoints[v80_pos*3]       # x
-            new_keypoints[v82_pos*3+1] = keypoints[v80_pos*3+1]   # y
-            new_keypoints[v82_pos*3+2] = keypoints[v80_pos*3+2]   # visibility
+    # Build the mappings
+    for pfm_idx, orig_idx in enumerate(v80_mapping):
+        if orig_idx != -1:
+            orig_to_pfm_mapping_v80[orig_idx] = pfm_idx
             
-            # Set the old position to invalid if it's different from the new position
-            if v80_pos != v82_pos:
-                new_keypoints[v80_pos*3] = 0       # x
-                new_keypoints[v80_pos*3+1] = 0     # y
-                new_keypoints[v80_pos*3+2] = -1    # visibility (invalid)
+    for pfm_idx, orig_idx_v82 in enumerate(v82_mapping):
+        if orig_idx_v82 != -1:
+            # for orig_idx_v82, find the same keypoint in v80_mapping in pfm format
+            orig_v82_to_pfm_v80 = orig_to_pfm_mapping_v80[orig_idx_v82]
+            
+            keypoint_v82[pfm_idx * 3] = new_keypoints[orig_v82_to_pfm_v80 * 3]
+            keypoint_v82[pfm_idx * 3 + 1] = new_keypoints[orig_v82_to_pfm_v80 * 3 + 1]
+            keypoint_v82[pfm_idx * 3 + 2] = new_keypoints[orig_v82_to_pfm_v80 * 3 + 2]
     
-    return new_keypoints
+    return keypoint_v82
 
 def correct_keypoint_mapping(json_data: Dict[str, Any], dataset_name: str) -> Dict[str, Any]:
     """Correct the keypoint mapping for a specific dataset"""
@@ -256,9 +256,15 @@ def main():
         logging.error(f"Input path {input_path} does not exist. Aborting.")
         return
     
-    # Create output directory
-    output_path = create_output_directory(base_path)
-    logging.info(f"Output path: {output_path}")
+    # Create output directory directly in main()
+    output_path = os.path.join(base_path, "PFM_V8.2")
+    os.makedirs(output_path, exist_ok=True)
+    
+    # Create subdirectories for train, test, val
+    for subset in ["splitted_train_datasets", "splitted_test_datasets", "splitted_val_datasets"]:
+        os.makedirs(os.path.join(output_path, subset), exist_ok=True)
+    
+    logging.info(f"Created output directory structure at {output_path}")
     
     # Process all dataset files
     process_dataset_files(input_path, output_path)
