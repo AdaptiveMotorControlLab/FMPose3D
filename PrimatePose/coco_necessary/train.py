@@ -28,7 +28,7 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 64,
+    batch_size: int = 32,
     dataloader_workers: int = 16,
     detector_batch_size: int = 32,
     detector_dataloader_workers: int= 12,

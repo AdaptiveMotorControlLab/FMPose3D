@@ -1,6 +1,100 @@
 import json
 import os
 from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+def plot_single_keypoint_distribution(single_keypoint_dist, keypoint_names, title="Distribution of Single Keypoint Annotations", filename="single_keypoint_distribution.png"):
+    """
+    Create a pie chart for the distribution of single keypoint annotations.
+    Group small percentages into 'Others' category for better visualization.
+    
+    Args:
+        single_keypoint_dist: Dictionary with keypoint indices as keys and counts as values
+        keypoint_names: Dictionary mapping keypoint indices to their names
+        title: Title for the plot
+        filename: Name of the file to save the plot
+    """
+    # Sort the distribution by count
+    sorted_dist = sorted(single_keypoint_dist.items(), key=lambda x: x[1], reverse=True)
+    
+    # Calculate total for percentages
+    total = sum(x[1] for x in sorted_dist)
+    
+    # Separate data into main slices and 'Others'
+    threshold = 5.0  # percentage threshold for grouping into 'Others'
+    main_data = []
+    others_count = 0
+    others_details = []
+    
+    for idx, count in sorted_dist:
+        percentage = (count/total) * 100
+        if percentage >= threshold:
+            main_data.append((idx, count, percentage))
+        else:
+            others_count += count
+            others_details.append((idx, count, percentage))
+    
+    # Prepare final data for plotting
+    counts = [x[1] for x in main_data]
+    names = [keypoint_names.get(x[0], f"Keypoint {x[0]}") for x in main_data]
+    percentages = [x[2] for x in main_data]
+    
+    # Add 'Others' category if it exists
+    if others_count > 0:
+        counts.append(others_count)
+        others_percentage = (others_count/total) * 100
+        names.append("Others")
+        percentages.append(others_percentage)
+    
+    # Create figure with adjusted size for better proportions
+    plt.figure(figsize=(8, 8))
+    
+    # Create subplot to control pie chart size
+    plt.subplot(121)  # 1 row, 2 cols, first position
+    
+    # Create pie chart with improved label formatting
+    patches, texts, autotexts = plt.pie(counts, 
+                                      labels=[f"{name}" for name in names],
+                                      autopct='%1.1f%%',
+                                      startangle=90,
+                                      radius=1.2)  # Slightly larger pie
+    
+    # Adjust font sizes
+    plt.setp(autotexts, size=10, weight='bold')
+    plt.setp(texts, size=10)
+    
+    # Add title
+    plt.title(title, fontsize=14, pad=20)
+    
+    # Create subplot for legend and details
+    plt.subplot(122)  # 1 row, 2 cols, second position
+    plt.axis('off')  # Hide axes
+    
+    # Add a legend with detailed information
+    legend_labels = [f"{name}\n({count:,}, {pct:.1f}%)" for name, count, pct in zip(names, counts, percentages)]
+    legend = plt.legend(patches, legend_labels, 
+                       title="Keypoint Distribution",
+                       loc="center left",
+                       bbox_to_anchor=(0, 0.5),
+                       fontsize=10)
+    plt.setp(legend.get_title(), fontsize=12)
+    
+    # Add 'Others' details in text box if they exist
+    if others_count > 0:
+        others_text = "Others includes:\n"
+        for idx, count, pct in others_details:
+            keypoint_name = keypoint_names.get(idx, f"Keypoint {idx}")
+            others_text += f"{keypoint_name}: {count} ({pct:.1f}%)\n"
+        plt.text(0.1, 0.1, others_text, fontsize=9, transform=plt.gca().transAxes)
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save the plot with adjusted padding
+    plt.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.2)
+    plt.close()
 
 def analyze_annotations(json_path):
     """
@@ -71,6 +165,26 @@ def analyze_annotations(json_path):
     return (one_annotation_count, only_tail_count, only_body_center_count, empty_count, total_annotations, single_keypoint_dist, keypoint_names)
 
 def main():
+    # Create a file to save the output
+    output_file = "riken_annotation_analysis.txt"
+    
+    # Redirect print output to both console and file
+    class Logger:
+        def __init__(self, filename):
+            self.terminal = sys.stdout
+            self.log = open(filename, 'w')
+        
+        def write(self, message):
+            self.terminal.write(message)
+            self.log.write(message)
+            
+        def flush(self):
+            self.terminal.flush()
+            self.log.flush()
+    
+    # Add sys import at the top
+    sys.stdout = Logger(output_file)
+    
     # Define the root directory for PFM_V8.2 data
     root_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2"
     
@@ -105,24 +219,25 @@ def main():
             if not keypoint_names and kp_names:
                 keypoint_names = kp_names
             
+            ann_with_pose = total_count - empty_count
             results[dataset_name] = {
                 "file_path": json_file,
                 "total_annotations": total_count,
-                "annotations_with_pose": total_count - empty_count,
+                "annotations_with_pose": ann_with_pose,
                 "one_annotation": one_count,
                 "only_tail": tail_count,
                 "only_body_center": body_center_count,
                 "empty": empty_count,
-                "one_annotation_percentage": round((one_count / total_count) * 100, 2) if total_count > 0 else 0,
-                "only_tail_percentage": round((tail_count / total_count) * 100, 2) if total_count > 0 else 0,
-                "only_body_center_percentage": round((body_center_count / total_count) * 100, 2) if total_count > 0 else 0,
-                "empty_percentage": round((empty_count / total_count) * 100, 2) if total_count > 0 else 0,
+                "one_annotation_percentage": round((one_count / ann_with_pose) * 100, 2) if ann_with_pose > 0 else 0,
+                "only_tail_percentage": round((tail_count / ann_with_pose) * 100, 2) if ann_with_pose > 0 else 0,
+                "only_body_center_percentage": round((body_center_count / ann_with_pose) * 100, 2) if ann_with_pose > 0 else 0,
+                "empty_percentage": round((empty_count / ann_with_pose) * 100, 2) if ann_with_pose > 0 else 0,
                 "single_keypoint_dist": single_dist
             }
             
             # Update totals
             total_stats["total_annotations"] += total_count
-            total_stats["annotations_with_pose"] += total_count - empty_count
+            total_stats["annotations_with_pose"] += ann_with_pose
             total_stats["one_annotation"] += one_count
             total_stats["only_tail"] += tail_count
             total_stats["only_body_center"] += body_center_count
@@ -165,9 +280,19 @@ def main():
                 keypoint_name = keypoint_names.get(keypoint_idx, f"Keypoint {keypoint_idx}")
                 percentage = round((count / stats['one_annotation']) * 100, 2)
                 print(f"    {keypoint_name}: {count} ({percentage}%)")
+            
+            # Create plot for this dataset's distribution
+            mode = dataset.split('_')[1]  # Extract train/val/test from dataset name
+            plot_single_keypoint_distribution(
+                single_dist, 
+                keypoint_names,
+                f"Distribution of Single Keypoint Annotations - Riken {mode.capitalize()} Set",
+                f"riken_keypoint_distribution_{mode}.png"
+            )
     
     print("\n=== Overall Riken Statistics ===")
     print(f"Total annotations across all riken splits: {total_stats['total_annotations']}")
+    print(f"Total annotations with pose: {total_stats['annotations_with_pose']}")
     print(f"Total annotations with only one keypoint: {total_stats['one_annotation']} ({total_stats['one_annotation_percentage']}%)")
     print(f"Total annotations with only tail keypoints (multiple keypoints): {total_stats['only_tail']} ({total_stats['only_tail_percentage']}%)")
     # print(f"Total annotations with only body center keypoint(s): {total_stats['only_body_center']} ({total_stats['only_body_center_percentage']}%)")
@@ -182,6 +307,19 @@ def main():
             keypoint_name = keypoint_names.get(keypoint_idx, f"Keypoint {keypoint_idx}")
             percentage = round((count / total_stats['one_annotation']) * 100, 2)
             print(f"  {keypoint_name}: {count} ({percentage}%)")
+        
+        # Create plot for overall distribution
+        plot_single_keypoint_distribution(
+            total_stats['single_keypoint_dist'],
+            keypoint_names,
+            "Distribution of Single Keypoint Annotations - Riken Dataset (All Splits)",
+            "riken_keypoint_distribution_all.png"
+        )
+
+    # Close the output file
+    sys.stdout.log.close()
+    # Restore original stdout
+    sys.stdout = sys.stdout.terminal
 
 if __name__ == "__main__":
     main()

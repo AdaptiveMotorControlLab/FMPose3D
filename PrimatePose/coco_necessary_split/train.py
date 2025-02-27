@@ -10,7 +10,6 @@ from deeplabcut.pose_estimation_pytorch.apis.train import train
 from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
 from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
-
 import wandb
 # wandb.init(project="primatepose", tags=["debug_SSDLite"])
 # wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
@@ -154,7 +153,6 @@ if __name__ == "__main__":
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
     parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
     args = parser.parse_args()
-    
     
     # backup the train.sh file and the current file in the same folder    
     train_dir = os.path.dirname(args.pytorch_config)

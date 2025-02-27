@@ -134,6 +134,15 @@ def main(
         cropping=None,
     )
 
+    # Create bboxes_list in the required format
+    bboxes_list = []
+    for frame_pred in predictions:
+        frame_dict = {
+            "bboxes": frame_pred["bboxes"], # Shape: (N, 4) with x,y,w,h format
+            "bbox_scores": frame_pred["bbox_scores"] # Shape: (N,) with confidence scores
+        }
+        bboxes_list.append(frame_dict)
+
     pred_bodyparts = np.stack([p["bodyparts"][..., :3] for p in predictions])
     pred_unique_bodyparts = None
     if len(predictions) > 0 and "unique_bodyparts" in predictions[0]:
@@ -173,10 +182,20 @@ def main(
     print(f"- Number of coordinates per frame: {pred_bodyparts.shape[1]}")
     print(f"- Number of individuals in config: {len(cfg['individuals'])}")
     
+    # _ = create_df_from_prediction(
+    #     predictions=predictions,  # Use original predictions containing full data
+    #     dlc_scorer=dlc_scorer,
+    #     cfg=cfg,
+    #     model_cfg=model_cfg,
+    #     output_path=output_path,
+    #     output_prefix=output_prefix,
+    #     save_as_csv=False
+    # )
+
     _ = create_df_from_prediction(
         predictions=predictions,  # Use original predictions containing full data
         dlc_scorer=dlc_scorer,
-        cfg=cfg,
+        multi_animal=True,
         model_cfg=model_cfg,
         output_path=output_path,
         output_prefix=output_prefix,
@@ -184,13 +203,14 @@ def main(
     )
     
     # Create labeled video with keypoint confidences from predictions
-    
+     
     _create_labeled_video(
         str(video_path),
         str(output_h5),
         pcutoff=0.6,
         fps=video_iterator.fps,
         bbox=bbox,
+        bboxes_list=bboxes_list,
         output_path=str(output_path / f"{output_prefix}_labeled.mp4"),
         skeleton_edges=PFM_SKELETON,
         confidence_to_alpha=default_confidence_to_alpha,  # Use confidence scores from predictions

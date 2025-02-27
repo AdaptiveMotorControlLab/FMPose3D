@@ -43,6 +43,7 @@ def load_json(file_path):
 def analyze_annotations(data):
     """Analyze annotations to find different types of errors and count them."""
     error_counts = {
+        # 'missing_bbox': 0,  # Counter for annotations without bbox
         'w_h_negative_or_zero': 0,  # Combined count for negative or zero width/height
         'xmin+w_out_of_bounds': 0,   # Count of bboxes where width goes out of bounds
         'ymin+h_out_of_bounds': 0,   # Count of bboxes where height goes out of bounds
@@ -57,6 +58,11 @@ def analyze_annotations(data):
         if img_id not in image_dims:
             error_counts['missing_image_reference'] += 1
             continue
+        
+        # Check if 'bbox' is present and not empty
+        # if 'bbox' not in annotation or not annotation['bbox']:
+        #     error_counts['missing_bbox'] += 1
+        #     continue
         
         img_width, img_height = image_dims[img_id]
         xmin, ymin, width, height = annotation['bbox']
@@ -86,8 +92,11 @@ def analyze_annotations(data):
 
 def main():
     
-    input_file = '/app/Ti_workspace/PrimatePose/data/primate_data/pfm_val_v8.json'
-    # input_file = '/app/Ti_workspace/PrimatePose/data/v7/annotations/pfm_train_apr15.json'
+    # input_file = '/app/data/primate_data/pfm_train_v8.json'
+    # input_file = '/app/data/v7/annotations/pfm_train_apr15.json'
+    # input_file = '/app/data/primate_data/pfm_train_v8.json'
+    # input_file = '/app/data/primate_data/splitted_test_datasets/chimpact_test.json'
+    input_file = '/app/data/primate_data/splitted_train_datasets/ak_new_train.json'
     
     # Load data from the JSON file
     data = load_json(input_file)
@@ -104,7 +113,7 @@ def main():
         print(f"{category}: {count}")
 
     # Visualize the error counts using a bar chart
-    image_path = "/app/Ti_workspace/PrimatePose/analyse_json/annotations_{}.png".format(file_name.split('.')[0])
+    image_path = "/app/analyse_json/annotations_{}.png".format(file_name.split('.')[0])
     visualize_error_counts(error_counts, num_annotations, file_name, image_path)
 
 if __name__ == "__main__":

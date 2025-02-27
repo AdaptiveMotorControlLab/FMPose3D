@@ -127,6 +127,32 @@ def select_sample_by_id(path, id):
     results = [item for item in data["annotations"] if item.get("id") == id]
     print("results", len(results))
 
+def select_sample_by_image_id(path, id):
+    with open(path, "r") as f:
+        data = json.load(f)
+    # Find all data with id=xx
+    results = [item for item in data["images"] if item.get("id") == id]
+    print("results", results)
+    
+
+def select_sample_by_annotations_id(path, id):
+    with open(path, "r") as f:
+        data = json.load(f)
+    # Find all data with id=xx
+    results = [item for item in data["annotations"] if item.get("id") == id]
+    print("results", results)
+    
+import shutil
+def save_image_by_id(id, json_file_path, image_folder, target_folder):
+    with open(json_file_path, "r") as f:
+        data = json.load(f)
+    # Find all data with id=xx
+    results = [item for item in data["images"] if item.get("id") == id]
+    for item in results:
+        img_name = item["file_name"]
+        img_path = Path(image_folder) / img_name
+        shutil.copy(img_path, target_folder)
+
 def extract_json(path):
     with open(path, "r") as f:
         data = json.load(f)
@@ -154,14 +180,6 @@ def extract_json(path):
     else:
         print("No data to extract")
           
-def print_json(path):
-           
-    with open(path, "r") as f:
-        data = json.load(f)
-        # print(data.keys())
-        # print(data)
-        print(data["categories"])
-
 def search_file_by_id(path, id):
     with open(path, "r") as f:
         data = json.load(f)
@@ -245,11 +263,17 @@ if __name__ == "__main__":
     train_json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/annotations/pfm_train_apr15.json"
     # valid_json_path = "/mnt/tiwang/v7/annotations/pfm_val_apr15.json"
     # test_json_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
-    
+    test_json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/annotations/pfm_test_apr15.json"
     # Count datasets in each file
     # count_datasets(train_json_path)
     # count_datasets(valid_json_path)
     # count_datasets(test_json_path)
-    key = "pfm_keypoints"
-    target_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/processed/{key}_pfm_train.json"
-    extract_key_to_file(train_json_path, target_path, key)
+    key = "categories"
+    # key = "pfm_keypoints"
+    target_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v7/processed/{key}_pfm_test.json"
+    
+    # extract_key_to_file(test_json_path, target_path, key)
+    
+    # select_sample_by_annotations_id(test_json_path, 37402)
+    
+    save_image_by_id(160490, test_json_path, "/mediaPFM/data/datasets/final_datasets/v7/test", "/home/ti_wang/Ti_workspace/PrimatePose/data/image_sample_sub_datasets/mbw_zoo")

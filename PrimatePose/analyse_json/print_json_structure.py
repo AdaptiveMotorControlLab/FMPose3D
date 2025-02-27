@@ -17,18 +17,19 @@ def print_json_structure(data, indent=0):
     else:
         print(" " * indent + "(" + str(type(data).__name__) + ")")
 
+if __name__ == "__main__":
+    # Define the path to the JSON file
+    # json_file_path = "/home/ti/projects/PrimatePose/ti_data/test.json"
 
-# Define the path to the JSON file
-# json_file_path = "/home/ti/projects/PrimatePose/ti_data/test.json"
+    # json_file_path = "/mnt/data/tiwang/primate_data/pfm_test_v8.json" # v8
+    # json_file_path = "/mnt/data/tiwang/v7/annotations/pfm_test_apr15.json" # v7
+    # json_file_path = "/app/project/split/ak_2_train/results/snapshot-200snapshot-detector-020-test-predictions.json"
+    json_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_v8.0/splitted_test_datasets/oap_test.json"
+    
+    # Read and parse the JSON file
+    with open(json_file_path, 'r') as f:
+        data = json.load(f)
 
-json_file_path = "/mnt/tiwang/v7/annotations/pfm_test_apr15.json"
-
-# json_file_path = "/home/ti/projects/PrimatePose/ti_data/primate_val_1.1.json"
-
-# Read and parse the JSON file
-with open(json_file_path, 'r') as f:
-    data = json.load(f)
-
-# Print the structure of the JSON file
-print("JSON structure:")
-print_json_structure(data)
+    # Print the structure of the JSON file
+    print("JSON structure:")
+    print_json_structure(data)

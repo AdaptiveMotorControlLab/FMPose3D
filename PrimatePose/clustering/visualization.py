@@ -117,7 +117,7 @@ def visualize_annotation_pfm(
     if vis_bbox and "bbox" in annotation:
         bbox = annotation["bbox"]
         x1, y1, width, height = [int(x) for x in bbox]
-        rect = plt.Rectangle((x1, y1), width, height, fill=False, color='g', linewidth=1)
+        rect = plt.Rectangle((x1, y1), width, height, fill=False, color='black', linewidth=1)
         ax.add_patch(rect)
     
     # Draw keypoints if they exist
@@ -230,6 +230,7 @@ def visualize_sample_by_image_ids(
                 mode=mode,
                 confidence_threshold=confidence_threshold,
                 vis_text=vis_text,
+                vis_bbox=True,
                 colormap_name=colormap_name,
                 dpi=dpi
             )
@@ -254,14 +255,18 @@ def visualize_sample_by_image_ids(
 if __name__ == "__main__":
     # Example usage
     dataset_name = "ak"
-    mode = "test"
+    mode = "train"
     json_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
     image_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/v8_coco/images"
     output_dir = f"/home/ti_wang/Ti_workspace/PrimatePose/clustering/data/{dataset_name}_{mode}"
     os.makedirs(output_dir, exist_ok=True)
     
     # Visualize some images
-    image_ids = [39050, 39051, 39052]  # Replace with actual image IDs
+    image_ids = [129718, 129524]  # Replace with actual image IDs
+    # ak train.json
+    image_ids = [129718, 129516, 129791, 129405, 129642, 129304, 129532, 129090, 129652, 129702, 129573, 129010,  129524, 129199]
+    
+    
     visualize_sample_by_image_ids(
         image_ids=image_ids,
         json_file_path=json_file_path,

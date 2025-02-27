@@ -74,7 +74,8 @@ def process_json_data(json_path):
     
     # Process each image
     for img_id, img_name in image_ids_to_image_name.items():
-        index.append(img_name)
+        index_name = f"{img_id}_{img_name}"
+        index.append(index_name)
         
         # Get annotations for this image
         img_annotations = image_to_annotations.get(img_id, [])
@@ -83,20 +84,26 @@ def process_json_data(json_path):
         img_data = []
         for i in range(max_individuals):
             if i < len(img_annotations):
-                # Get keypoints from annotation
-                keypoints = np.array(img_annotations[i]["keypoints"])
+                # Get keypoints from annotation and convert to float type
+                keypoints = np.array(img_annotations[i]["keypoints"], dtype=np.float32)
                 keypoints = keypoints.reshape(-1, 3)  # reshape to (num_keypoints, 3)
                 
-                # Handle visibility: if vis_label == -1, set coordinates to 0
-                keypoints[keypoints[:, 2] == -1, :2] = 0
+                # Create mask for non-visible or non-existent keypoints
+                non_visible_mask = (keypoints[:, 2] == -1) # visibility is -1
+                invalid_mask = non_visible_mask
+                
+                # Set coordinates to np.nan for invalid keypoints
+                # keypoints[invalid_mask, :2] = np.nan
+                keypoints[invalid_mask, :2] = 0
                 
                 # Add only x, y coordinates
                 img_data.extend(keypoints[:, :2].flatten())
             else:
-                # Pad with zeros for missing individuals
+                # Pad with np.nan for missing individuals
                 num_coords = len(bodyparts) * 2  # x,y for each bodypart
-                img_data.extend([0] * num_coords) # I may need to set the value as np.nan?
-        
+                # img_data.extend([np.nan] * num_coords)
+                img_data.extend([0] * num_coords)
+                
         prediction_data.append(img_data)
     
     return np.array(prediction_data), index, bodyparts, individuals
@@ -128,7 +135,7 @@ def transfer_json_to_h5(json_path, output_dir):
     # Build DataFrame
     columns = build_dlc_dataframe_columns(scorer[0], bodyparts, individuals)
     df = pd.DataFrame(prediction_data, index=index, columns=columns)
-        
+    
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -149,7 +156,10 @@ def transfer_json_to_h5(json_path, output_dir):
 
 def test_function():
     """Test the transfer function"""
-    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/ap10k_test.json"
+    
+    file_name = "ap10k"
+    mode = "test"
+    json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{file_name}_{mode}.json"
     output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/clustering/data"
     
     print("Converting JSON to H5 and CSV...")

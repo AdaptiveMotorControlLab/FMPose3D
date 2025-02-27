@@ -228,12 +228,14 @@ def main(
                 print(result_line.strip())  # Print to console
                 f.write(result_line)  # Write to file
 
+        print(predictions)
         visualize_predictions(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
-            num_samples=50,  # Added to limit visualization to 10 samples
+            num_samples=5,  # Added to limit visualization to 10 samples
             random_select=True,
+            skeleton=PFM_SKELETON,
         )
         
 if __name__ == "__main__":

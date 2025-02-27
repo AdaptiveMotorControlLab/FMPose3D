@@ -56,7 +56,7 @@ def split_json_dataset(
     for img in data['images']:
         if img['id'] in train_image_ids:
             train_data['images'].append(img)
-        else:
+        if img['id'] in test_image_ids:
             test_data['images'].append(img)
     
     # Split annotations
@@ -92,8 +92,8 @@ def split_json_dataset(
 def test_split():
     """Test the dataset splitting function"""
     # Input JSON file
-    json_path = "/path/to/your/input.json"
-    
+    # json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/deepwild_train.json"
+    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/mit_train.json"
     # Output directory
     output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/split_for_original_dataset_without_testset"
     
@@ -110,4 +110,5 @@ def test_split():
     print(f"Test: {test_path}")
 
 if __name__ == "__main__":
+    
     test_split()

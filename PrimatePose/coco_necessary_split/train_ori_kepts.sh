@@ -12,10 +12,11 @@ debug=0
 gpu_id="1"
 name=riken
 # file=${name}_detector_fasterrcnn
-# train_detector=1
 # file=${name}_pose_reset
-file=${name}_ori_kepts_bbox_pose_hrnet
+# file=${name}_ori_kepts_bbox_pose_hrnet
+file=${name}_ori_detector_pose_hrnet
 train_pose=1
+train_detector=1
 
 dataset_name=${name}
 mode="train"

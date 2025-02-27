@@ -9,7 +9,7 @@ project_root=$(dirname $(dirname $(realpath $0)))
 debug=0
 name=riken
 # file=${name}_detector_fasterrcnn
-file=${name}_V3_pose_hrnet
+file=${name}_pose_hrnet_20250225
 # file=${name}_pose_hrnet
 
 dataset_name=${name}
@@ -22,8 +22,6 @@ test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${da
 # for splitted datasets V8.0
 # train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
 # test_json="${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_name}_test.json"
-
-
 # for dataset without testset
 # train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_name}_train_${mode}.json"
 # test_json="${data_path_prefix}/primate_data/splitted_test_datasets/${dataset_name}_train_test.json"

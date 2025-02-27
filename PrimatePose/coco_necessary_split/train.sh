@@ -11,7 +11,7 @@ name=riken
 # file=${name}_detector_fasterrcnn
 # train_detector=1
 # file=${name}_pose_reset
-file=${name}_V3_pose_hrnet
+file=${name}_pose_hrnet_20250225
 train_pose=1
 
 dataset_name=${name}

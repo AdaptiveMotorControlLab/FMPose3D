@@ -15,62 +15,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from analyse_json.split_v8_json import get_file_name_from_image_id
 
-PRIMATE_COLOR_MAP = {
-    "head": (0, 180, 0), # wait
-    "neck": (0, 0, 180), # wait
-    "nose": (255, 0, 0), # "
-    "mouth_front_top": (0, 255, 0), # "upper_jaw"
-    "mouth_front_bottom": (0, 0, 255), # "lower_jaw"
-    "mouth_back_right": (255, 255, 0), # "mouth_end_right"
-    "mouth_back_left": (255, 0, 255), # "mouth_end_left"
-    "right_ear": (128, 0, 0), # "right_earbase"
-    "left_ear": (0, 128, 128), # "left_earbase": (0, 128, 128),
-    "neck": (255, 128, 0), # "neck_base"
-    "upper_back": (128, 255, 0), # "neck_end"
-    "throat_base": (0, 255, 128), # "throat_base"
-    "upper_back": (255, 0, 128), # "back_base"
-    "lower_back": (255, 128, 128), # "back_end"
-    "torso_mid_back": (128, 255, 255), # "back_middle"
-    "root_tail": (128, 0, 64), # "tail_base"
-    "end_tail": (64, 0, 128), # "tail_end"
-    "left_shoulder": (128, 64, 0), # "front_left_thai"
-    "left_elbow": (64, 128, 0), # "front_left_knee"
-    "left_hand": (0, 64, 128), # "front_left_paw"
-    "right_shoulder": (255, 64, 64), # "front_right_thai"
-    "right_elbow": (64, 255, 64), # "front_right_knee"
-    "left_foot": (255, 255, 64), # "back_left_paw"
-    "left_hip": (255, 64, 255), # "back_left_thai"
-    "left_knee": (192, 64, 192), # "back_left_knee"
-    "right_knee": (192, 192, 64), # "back_right_knee"
-    "right_foot": (64, 192, 192), # "back_right_paw"
-    "body_center": (192, 192, 192), #  "belly_bottom"
-    "right_hip": (128, 64, 64), # "body_middle_right"`
-    "left_hip": (64, 128, 128),  # "body_middle_left"
-    "right_hand": (64, 64, 255), # "front_right_paw"
-    "left_wrist": (128, 0, 128),
-    "right_wrist": (0, 255, 255),
-    "forehead": (0, 128, 0),
-    "center_hip": (64, 255, 255),
-    "left_ankle": (128, 128, 128),
-    "right_ankle": (0, 0, 128),
-    "mid_tail": (192, 192, 192),
-    "mid_end_tail": (0, 128, 255), 
-    "right_eye": (0, 255, 255),
-    "left_eye": (128, 0, 128),
-}
-
-# Define the skeleton structure
-PFM_SKELETON = [
-    [3, 5], [4, 5], [6, 3], [7, 4],
-    [5, 12], [13, 12], [14, 12], [2, 17],
-    [19, 13], [20, 14], [21, 19], [22, 20],
-    [23, 21], [24, 22], [25, 12], [26, 12],
-    [25, 27], [26, 27], [25, 28], [26, 29],
-    [27, 28], [27, 29], [28, 30], [29, 31],
-    [30, 32], [31, 33], [27, 34], [34, 35],
-    [35, 36], [36, 37]
-]
-
 def compute_brightness(img, x, y, radius=20):
     crop = img[
         max(0, y - radius): min(img.shape[0], y + radius),
@@ -225,6 +169,8 @@ def main(
             output_dir=output_path,
             num_samples=10,  # Added to limit visualization to 10 samples
             random_select=True,
+            plot_bboxes=True
+            # show_ground_truth=False
         )
         
 if __name__ == "__main__":

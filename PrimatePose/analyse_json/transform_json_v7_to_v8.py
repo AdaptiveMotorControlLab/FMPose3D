@@ -84,3 +84,6 @@ output_data['categories'].append(output_category)
 # Save the converted data to a new JSON file
 with open(output_file, 'w') as f:
     json.dump(output_data, f, indent=4)
+    
+def split_v8_json(json_file, output_dir):
+    pass

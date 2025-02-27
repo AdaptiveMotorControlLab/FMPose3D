@@ -11,6 +11,7 @@ dataset_file=${name}
 mode="train"
 # for splitted datasets
 train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_file}_${mode}.json"
+
 # for whole dataset
 # train_json="/mnt/data/tiwang/primate_data/${file}.json"
 # model_arch="top_down_resnet_50"

@@ -186,6 +186,13 @@ DATASET_CONFIGS = {
             -1, 3, 1, 0, 2, -1, -1, 
             -1, -1, -1, -1, 4, 8, 5, 
             -1, -1, -1, -1, 9, 6, 10, 
+            7, -1, -1, -1, -1, 11, 14, 12, 
+            15, 13, -1, -1, -1, -1, -1, 16
+        ],
+        "ori_keypoint_mapping": [
+            -1, 3, 1, 0, 2, -1, -1, 
+            -1, -1, -1, -1, 4, 8, 5, 
+            -1, -1, -1, -1, 9, 6, 10, 
             7, -1, -1, -1, -1, -1, 14, 12, 
             15, 13, -1, -1, 11, -1, -1, 16
         ],
@@ -228,112 +235,14 @@ DATASET_CONFIGS = {
             "tail"
         ]
     },
-    "aptv2": {
-        "skeleton": [
-            [1, 2], [1, 3], [2, 3], [3, 4], [4, 5],
-            [4, 6], [6, 7], [7, 8], [4, 9], [9, 10],
-            [10, 11], [5, 12], [12, 13], [13, 14],
-            [5, 15], [15, 16], [16, 17]
-        ],
-        "keypoint_mapping": [
-            -1, -1,  # 0-1
-            0, 1, 2,  # 2-4
-            -1, -1, -1, -1, -1, -1,  # 5-10
-            3, 5, 8,  # 11-13
-            -1, -1, -1, -1,  # 14-17
-            6, 9, 7, 10,  # 18-21
-            -1, -1,  # 22-23
-            11, 14, 4,  # 24-26
-            12, 15, 13, 16,  # 27-30
-            -1, -1, -1, -1, -1, -1  # 31-36
-        ],
-        "keypoints": [
-            "left_eye",
-            "right_eye",
-            "nose",
-            "neck",
-            "root_of_tail",
-            "left_shoulder",
-            "left_elbow",
-            "left_front_paw",
-            "right_shoulder",
-            "right_elbow",
-            "right_front_paw",
-            "left_hip",
-            "left_knee",
-            "left_back_paw",
-            "right_hip",
-            "right_knee",
-            "right_back_paw"
-        ],
-        "keypoints_simplified": [
-            "L_eye",
-            "R_eye",
-            "nose",
-            "neck",
-            "R_tail",
-            "L_S",
-            "L_elbow",
-            "L_F_paw",
-            "R_S",
-            "R_elbow",
-            "RF_paw",
-            "L_hip",
-            "L_knee",
-            "LB_paw",
-            "R_hip",
-            "R_knee",
-            "RB_paw"
-        ],
-    },
-    "mp": {
-        "skeleton": None,
-        "keypoint_mapping": [
-            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1, -1, 5, 6, -1, -1, -1, -1,
-            7, 8, 9, 10, -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1, -1, -1, -1, -1
-        ],
-        "keypoints": [
-            "nose",
-            "left_eye",
-            "right_eye",
-            "left_ear",
-            "right_ear",
-            "left_shoulder",
-            "right_shoulder",
-            "left_elbow",
-            "right_elbow",
-            "left_wrist",
-            "right_wrist",
-            "left_hip",
-            "right_hip",
-            "left_knee",
-            "right_knee",
-            "left_ankle",
-            "right_ankle"
-        ],
-        "keypoints_simplified": [
-            "nose",
-            "L_eye",
-            "R_eye",
-            "L_ear",
-            "R_ear",
-            "L_S",
-            "R_S",
-            "L_elbow",
-            "R_elbow",
-            "L_wrist",
-            "R_wrist",
-            "L_hip",
-            "R_hip",
-            "L_knee",
-            "R_knee",
-            "L_ankle",
-            "R_ankle"
-        ]
-    },
     "ap10k": {
         "skeleton": None,
         "keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, -1, -1, 7, 10, 
+            11, 14, -1, 12, 15, -1, -1, 13, 16, 4, -1, -1, -1
+        ],
+        "ori_keypoint_mapping": [
             -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
             3, 5, 8, -1, -1, -1, -1, 6, 9, 7, 10, -1, -1,
             11, 14, 4, 12, 15, 13, 16, -1, -1, -1, -1, -1, -1
@@ -377,47 +286,78 @@ DATASET_CONFIGS = {
             "R_back_paw"
         ]
     },
+    "aptv2": {
+        "skeleton": [
+            [1, 2], [1, 3], [2, 3], [3, 4], [4, 5],
+            [4, 6], [6, 7], [7, 8], [4, 9], [9, 10],
+            [10, 11], [5, 12], [12, 13], [13, 14],
+            [5, 15], [15, 16], [16, 17]
+        ],
+        "keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, -1, -1, 7, 10, 
+            11, 14, -1, 12, 15, -1, -1, 13, 16, 4, -1, -1, -1
+        ],
+        "ori_keypoint_mapping": [
+            -1, -1, 0, 1, 2, -1, -1, -1, -1, -1, -1,
+            3, 5, 8, -1, -1, -1, -1, 6, 9, 7, 10, -1, -1,
+            11, 14, 4, 12, 15, 13, 16, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "left_eye",
+            "right_eye",
+            "nose",
+            "neck",
+            "root_of_tail",
+            "left_shoulder",
+            "left_elbow",
+            "left_front_paw",
+            "right_shoulder",
+            "right_elbow",
+            "right_front_paw",
+            "left_hip",
+            "left_knee",
+            "left_back_paw",
+            "right_hip",
+            "right_knee",
+            "right_back_paw"
+        ],
+        "keypoints_simplified": [
+            "L_eye",
+            "R_eye",
+            "nose",
+            "neck",
+            "R_tail",
+            "L_S",
+            "L_elbow",
+            "L_F_paw",
+            "R_S",
+            "R_elbow",
+            "RF_paw",
+            "L_hip",
+            "L_knee",
+            "LB_paw",
+            "R_hip",
+            "R_knee",
+            "RB_paw"
+        ],
+    },
     "ak": {
         "skeleton": None,
         "keypoint_mapping": [
-            -1,
-            0,
-            1,
-            2,
-            -1,
-            -1,
-            -1,
-            3,
-            6,
-            4,
-            5,
-            -1,
-            7,
-            8,
-            -1,
-            13,
-            -1,
-            -1,
-            9,
-            10,
-            11,
-            12,
-            -1,
-            -1,
-            14,
-            15,
-            -1,
-            16,
-            17,
-            18,
-            19,
-            -1,
-            -1,
-            20,
-            21,
-            22,
-            -1
-        ],
+            -1, 0, 1, 2, -1, -1, -1, 3, 6,
+            4, 5, -1, 7, 8, -1, 13, -1, -1,
+            9, 10, 11, 12, -1, -1, 14, 15,
+            -1, 16, 17, 18, 19, -1, -1, 20,
+            21, 22, -1
+            ],
+        "ori_keypoint_mapping": [
+            -1, 0, 1, 2, -1, -1, -1, 3, 6,
+            4, 5, -1, 7, 8, -1, 13, -1, -1,
+            9, 10, 11, 12, -1, -1, 14, 15,
+            -1, 16, 17, 18, 19, -1, -1, 20,
+            21, 22, -1
+            ],
           "keypoints": [
             "Head_Mid_Top",
             "Eye_Left",
@@ -467,6 +407,51 @@ DATASET_CONFIGS = {
             "tail_top_back",
             "tail_mid_back",
             "tail_end_back"
+        ]
+    },
+    "mp": {
+        "skeleton": None,
+        "keypoint_mapping": [
+            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1, -1, 5, 6, -1, -1, -1, -1,
+            7, 8, 9, 10, -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1, -1, -1, -1, -1
+        ],
+        "keypoints": [
+            "nose",
+            "left_eye",
+            "right_eye",
+            "left_ear",
+            "right_ear",
+            "left_shoulder",
+            "right_shoulder",
+            "left_elbow",
+            "right_elbow",
+            "left_wrist",
+            "right_wrist",
+            "left_hip",
+            "right_hip",
+            "left_knee",
+            "right_knee",
+            "left_ankle",
+            "right_ankle"
+        ],
+        "keypoints_simplified": [
+            "nose",
+            "L_eye",
+            "R_eye",
+            "L_ear",
+            "R_ear",
+            "L_S",
+            "R_S",
+            "L_elbow",
+            "R_elbow",
+            "L_wrist",
+            "R_wrist",
+            "L_hip",
+            "R_hip",
+            "L_knee",
+            "R_knee",
+            "L_ankle",
+            "R_ankle"
         ]
     },
     "lote": {
@@ -676,11 +661,17 @@ DATASET_CONFIGS = {
     "riken": {
         "skeleton": None,
         "keypoint_mapping": [
-        -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
-        -1, 5, 6, -1, -1, 20, -1, 7, 8, 9, 10,
-        -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
-        17, 18, -1, 19
-    ],
+            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
+            -1, 5, 6, -1, -1, -1, -1, 7, 8, 9, 10,
+            -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
+            17, 18, -1, 19
+            ],
+        "ori_keypoint_mapping": [
+            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
+            -1, 5, 6, -1, -1, 20, -1, 7, 8, 9, 10,
+            -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
+            17, 18, -1, 19
+            ],
         "keypoints": [
             "nose",
             "left_eye",
@@ -1100,7 +1091,7 @@ def main():
     mode = "test"
     annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
     # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
-    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/oap_test.json"
+    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/ap10k_test.json"
     with open(annotation_file_path, "r") as f:
         annotation_file = json.load(f)
     

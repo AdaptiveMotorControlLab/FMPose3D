@@ -237,7 +237,7 @@ if __name__ == "__main__":
     # Define your input and output paths
     # input_file = '/mnt/tiwang/primate_data/primate_test_1.2.json'
 
-    model = "test" # train test val
+    model = "train" # train test val
      # val
     input_file = f'/mnt/data/tiwang/v7/annotations/pfm_{model}_apr15.json'
     output_dir = f'/mnt/data/tiwang/primate_data/data_v8.1/splitted_{model}_datasets/'

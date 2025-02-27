@@ -230,7 +230,7 @@ def main(
             random_select=True,
             keypoint_vis_mask=keypoint_vis_mask,
             plot_bboxes=True,
-            keypoint_names=keypoint_name_simplified
+            # keypoint_names=keypoint_name_simplified
         )
         
 def visualize_PFM_predictions(
@@ -363,7 +363,7 @@ def plot_gt_and_predictions_PFM(
         dot_size = base_size
         
     # Ensure dot size stays within reasonable bounds
-    dot_size = int(max(4, min(dot_size, 15)))  # Tighter bounds for dots
+    dot_size = int(max(4, min(dot_size, 15)))*0.8  # Tighter bounds for dots
     
     # filter out the individuals that without GT keypoints 
     # if all the keypoints are 0, then this individual will be delete
@@ -494,7 +494,7 @@ def plot_gt_and_predictions_PFM(
                 if keypoint_vis_mask[idx_keypoint]:
                     
                     keypoint_confidence = pred_bodyparts[idx_individual, idx_keypoint, 2]
-                    print("keypoint_confidence_individual:", keypoint_confidence)
+                    # print("keypoint_confidence_individual:", keypoint_confidence)
                     if keypoint_confidence > p_cutoff:
                         x_kp = pred_bodyparts[idx_individual, idx_keypoint, 0]
                         y_kp = pred_bodyparts[idx_individual, idx_keypoint, 1]
