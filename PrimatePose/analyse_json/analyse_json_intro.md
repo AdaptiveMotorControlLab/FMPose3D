@@ -153,6 +153,39 @@ target: calculate for riken dataset:
             - how many empty annotations; 
                 - all vis_labels are -1;
 
+## remove_annotation_w_only_one_point.py
+
+remove all annotations that only has one keypoint;
+
+
+## transfom_riken_bandy_to_PFM_format.py
+
+riken_bandy dataset path: /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/Marmosets-Banty-2022-07-01_coco/annotations
+in the folder of annotations, exists: train.json and test.json
+
+in train.json file, exists "images", "annotations", and "categories".
+
+please keep the images, and modify the "annotations" according the following demands:
+
+keypoint_in_riken_bandy: 
+- len: 21
+mapping: [0,1,2,3,4,5,..., 20]
+
+PFM format:  
+- num keypoint: 37
+the mapping from riken_bandy to PFM format: 
+```bash
+        "keypoint_mapping":[
+            -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
+            -1, 5, 6, -1, -1, -1, -1, 7, 8, 9, 10,
+            -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
+            17, 18, -1, 19]
+```
+
+for the categories, please use the "categories" in /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/riken_test_pose.json.
+
+save the converted json file to this folder: /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples
+
 
 # Dataset Version
 

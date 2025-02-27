@@ -44,9 +44,9 @@ def find_annotations_with_pose(input_json_path: str, output_json_path: str) -> N
         json.dump(output_data, f, indent=4)
         print(f"Output saved to {output_json_path}")
 if __name__ == '__main__':
-    mode = 'test'
-    dataset_name = 'chimpact'
-    input_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json'
-    output_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/samples/{dataset_name}_{mode}_pose.json'
+    mode = 'train'
+    dataset_name = 'riken'
+    input_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets/{dataset_name}_{mode}.json'
+    output_path = f'/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/{dataset_name}_{mode}_pose.json'
     
     find_annotations_with_pose(input_path, output_path)
