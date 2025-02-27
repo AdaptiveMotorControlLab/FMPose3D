@@ -151,7 +151,7 @@ def draw_predictions(frame, mask, bbox, keypoints, confidences):
             
             # Draw keypoints
             for kp_idx, (kp, conf) in enumerate(zip(instance_keypoints, instance_confidences)):
-                if conf > 0.5:
+                if conf > 0.6:
                     x, y = int(kp[0]), int(kp[1])
                     cv2.circle(frame_vis, (x, y), point_size, (0, 0, 255), -1)
     
@@ -209,7 +209,7 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
             raise ValueError("No detection in first frame")
        
         print("detections:", detections)
-        all_bboxes = detections[0]['bboxes']  # 获取所有检测到的bbox
+        all_bboxes = detections[0]['bboxes']  # all the detected bboxes
         first_bbox = all_bboxes[0]
         # all_bboxes = [all_bboxes[0]]
         logger.info(f"Detected {len(all_bboxes)} objects in first frame")

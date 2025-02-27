@@ -174,6 +174,7 @@ def process_video_with_tracking(video_path, bbox_path, output_path, pose_config,
             x, y, w, h = first_bbox
             initial_bbox = (int(x), int(y), int(x+w), int(y+h))
             _, _, masks = samurai_predictor.add_new_points_or_box(state, box=initial_bbox, frame_idx=0, obj_id=0)
+            
             # print("masks:", type(masks))
             # print("masks:", masks.shape)
             # Process frames one by one
