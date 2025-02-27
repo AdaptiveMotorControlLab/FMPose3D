@@ -1,0 +1,52 @@
+# FROM mmathislab/utils:base
+FROM nvidia/cuda:12.0.0-cudnn8-runtime-ubuntu22.04
+
+ARG user_name
+ARG uid
+ARG gid
+ARG src
+# 
+# [ADD your packages to install here:] 
+# RUN pip3 install prog1 prog2
+
+# [MODIFY if needed:]
+RUN mkdir /app /logs /data /notebooks 
+
+RUN groupadd -g ${gid} ${user_name} \
+    && useradd -m -u ${uid} -g ${gid} ${user_name} \
+    && chown -R ${uid}:${gid} /home /app /logs /data
+
+# [UNCOMMENT to add your src code in /app if production mode]
+# COPY ${src} /app
+
+USER root
+RUN apt-get update && apt-get install -y zsh wget git curl
+
+ENV HOME /home/${user_name}
+
+# [if production mode - change to /app] 
+WORKDIR ${HOME}/${user_name}
+
+USER ${user_name}
+
+ENV key=value
+
+# Install Oh My Zsh for the 'brave' user
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+# Set up Oh My Zsh plugins (e.g., zsh-syntax-highlighting and zsh-autosuggestions)
+
+# RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
+    # git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
+    # sed -i 's/plugins=(git)/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/g' ~/.zshrc
+
+
+# RUN apt-get update && apt-get install -y python3 python3-pip zsh wget git && pip3 install --upgrade pip
+
+# RUN pip3 install jupyter 
+# RUN jupyter notebook --generate-config
+# RUN echo 'alias start_jupyter="jupyter notebook --no-browser --ip 0.0.0.0"' >> ~/.bashrc
+
+# [if production mode -define the entrypont]
+ENTRYPOINT ["bash"]
+
+# RUN pip3 install cebra #add to Dockerfile.core
