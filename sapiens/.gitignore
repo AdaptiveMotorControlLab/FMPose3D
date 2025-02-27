@@ -14,3 +14,10 @@ __pycache__/
 *.DS_Store
 *._*
 *.egg
+*.pth
+*.pt2
+*.jpg
+*.JPG
+*.npy
+*.json
+# For Sapiens
