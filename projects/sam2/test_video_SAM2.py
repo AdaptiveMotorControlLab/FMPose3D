@@ -134,9 +134,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
         frame_path = os.path.join(ori_frame_dir, f"{frame_idx:05d}.jpg")
         frame = cv2.imread(frame_path)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert to RGB
-        
-        
-        
+     
         # Apply mask overlay
         if len(output_masks) > 0:
             masked_frame = apply_mask_to_image(frame, output_masks[0])  # Using first mask if multiple objects

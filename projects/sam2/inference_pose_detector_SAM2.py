@@ -262,6 +262,7 @@ def process_video_with_tracking(video_path, frames_dir, bbox_path, output_path, 
             
             # Propagate masks using SAM2
             with torch.autocast("cuda", dtype=torch.bfloat16):
+                # this needs to be fixed; refers to inference_pose_detector_SAM2_aptv2.py
                 sam_frame_idx, object_ids, masks = next(sam2_predictor.propagate_in_video(state))
                 # Move mask to CPU before converting to numpy
                 current_mask = masks[0].cpu().numpy()  # Add .cpu() here

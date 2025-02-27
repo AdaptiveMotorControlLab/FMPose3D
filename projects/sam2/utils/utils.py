@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, Any, List
 import os.path as osp
 from pathlib import Path
-
+import subprocess
 
 def read_bbox(bbox_path):
     """Read initial bbox from file"""

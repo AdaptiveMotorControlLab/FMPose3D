@@ -1,0 +1,20 @@
+# .vscode/
+# .DS_Store
+# __pycache__/
+# *-checkpoint.ipynb
+# .venv
+# *.egg*
+# build/*
+# _C.*
+# outputs/*
+# checkpoints/*.pt
+
+*.jpg
+*.png
+*.mp4
+*.npy
+prompt*
+results/
+results2/
+backup/
+coco_necessary_split/

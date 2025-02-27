@@ -162,4 +162,5 @@ visualization/*
 # .DS_Store
 .DS_Store
 
+# my personal file
 coco_necessary_split/

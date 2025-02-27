@@ -12,7 +12,7 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 GPU :=_gpu_all
 
 # [USER: AD_JUST TAG]
-TAG :=_sam2_V2 #_train|_test|_daemon 
+TAG :=_sam2_V4 #_train|_test|_daemon 
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
