@@ -32,7 +32,7 @@ DETECTION_CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/detector/checkpoints/rtmpose/rtmde
 
 #---------------------------VISUALIZATION PARAMS--------------------------------------------------
 LINE_THICKNESS=3 ## line thickness of the skeleton
-RADIUS=6 ## keypoint radius
+RADIUS=15 ## keypoint radius
 KPT_THRES=0.3 ## confidence threshold
 
 ##-------------------------------------inference-------------------------------------
@@ -81,7 +81,7 @@ for ((i=0; i<TOTAL_JOBS; i++)); do
   fi
 done
 
-CUDA_VISIBLE_DEVICES=${VALID_GPU_IDS[0]}
+CUDA_VISIBLE_DEVICES=${VALID_GPU_IDS[1]}
 
 python3 ${RUN_FILE} \
   ${CHECKPOINT} \
@@ -109,7 +109,7 @@ python3 ${RUN_FILE} \
 #     --kpt-thr ${KPT_THRES} ## add & to process in background
 #   # Allow a short delay between starting each job to reduce system load spikes
 #   # sleep 1
-done
+# done
 
 # Wait for all background processes to finish
 wait

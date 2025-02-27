@@ -40,8 +40,7 @@ try:
     has_mmdet = True
 except (ImportError, ModuleNotFoundError):
     has_mmdet = False
-
-
+    
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 warnings.filterwarnings("ignore", category=UserWarning, module="mmengine")
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.functional")
@@ -218,7 +217,7 @@ def img_save_and_vis(
     if bboxes is not None:
         for bbox in bboxes:
             x1, y1, x2, y2 = map(int, bbox)
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green color for bboxes
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)  # Green color for bboxes
 
     # Save the final visualization
     cv2.imwrite(output_path, img)
@@ -440,8 +439,8 @@ def main():
 
         assert len(bboxes_batch) == valid_images_len
 
-        print("bboxes_batch:", bboxes_batch) # list of numpy arrays; bboxes_batch[i].shape: (Num_bboxes, 4)
-        print("len(bboxes_batch):", bboxes_batch[0].shape)
+        # print("bboxes_batch:", bboxes_batch) # list of numpy arrays; bboxes_batch[i].shape: (Num_bboxes, 4)
+        # print("len(bboxes_batch):", bboxes_batch[0].shape)
         # if no bboxes, set the bboxes to the whole image
         for i, bboxes in enumerate(bboxes_batch):
             if len(bboxes) == 0:

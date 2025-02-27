@@ -1,7 +1,8 @@
 #!/bin/bash
 
 cd ../../.. || exit
-SAPIENS_CHECKPOINT_ROOT=/uca/${USER}/sapiens_lite_host
+# SAPIENS_CHECKPOINT_ROOT=/uca/${USER}/sapiens_lite_host
+SAPIENS_CHECKPOINT_ROOT=/home/ti_wang/Ti_workspace/sapiens/sapiens_lite_host
 
 MODE='torchscript' ## original. no optimizations (slow). full precision inference.
 # MODE='bfloat16' ## A100 gpus. faster inference at bfloat16
@@ -9,14 +10,21 @@ MODE='torchscript' ## original. no optimizations (slow). full precision inferenc
 SAPIENS_CHECKPOINT_ROOT=$SAPIENS_CHECKPOINT_ROOT/$MODE
 
 #----------------------------set your input and output directories----------------------------------------------
-INPUT='../pose/demo/data/itw_videos/reel1'
-SEG_DIR="/home/${USER}/Desktop/sapiens/seg/Outputs/vis/itw_videos/reel1_seg/sapiens_1b"
-OUTPUT="/home/${USER}/Desktop/sapiens/seg/Outputs/vis/itw_videos/reel1_normal"
+# INPUT='../pose/demo/data/itw_videos/reel1'
+# SEG_DIR="/home/${USER}/Desktop/sapiens/seg/Outputs/vis/itw_videos/reel1_seg/sapiens_1b"
+# OUTPUT="/home/${USER}/Desktop/sapiens/seg/Outputs/vis/itw_videos/reel1_normal"
+
+INPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/st_original_image"
+# SEG_DIR="/home/ti_wang/Ti_workspace/sapiens/primate_data/processed_images/seg/sapiens_0.3b"
+SEG_DIR=None
+OUTPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/processed_images/normal"
 
 #--------------------------MODEL CARD---------------
 # MODEL_NAME='sapiens_0.3b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/normal/checkpoints/sapiens_0.3b/sapiens_0.3b_normal_render_people_epoch_66_$MODE.pt2
 # MODEL_NAME='sapiens_0.6b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/normal/checkpoints/sapiens_0.6b/sapiens_0.6b_normal_render_people_epoch_200_$MODE.pt2
-MODEL_NAME='sapiens_1b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/normal/checkpoints/sapiens_1b/sapiens_1b_normal_render_people_epoch_115_$MODE.pt2
+MODEL_NAME='sapiens_1b'; 
+# CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/normal/checkpoints/sapiens_1b/sapiens_1b_normal_render_people_epoch_115_$MODE.pt2
+CHECKPOINT=/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-normal-2b-torchscript/sapiens_2b_normal_render_people_epoch_70_torchscript.pt2
 # MODEL_NAME='sapiens_2b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/normal/checkpoints/sapiens_2b/sapiens_2b_normal_render_people_epoch_70_$MODE.pt2
 
 OUTPUT=$OUTPUT/$MODEL_NAME
@@ -27,7 +35,7 @@ RUN_FILE='demo/vis_normal.py'
 # JOBS_PER_GPU=1; TOTAL_GPUS=8; VALID_GPU_IDS=(0 1 2 3 4 5 6 7)
 JOBS_PER_GPU=1; TOTAL_GPUS=1; VALID_GPU_IDS=(0)
 
-BATCH_SIZE=8
+BATCH_SIZE=1
 
 # Find all images and sort them, then write to a temporary text file
 IMAGE_LIST="${INPUT}/image_list.txt"
@@ -72,9 +80,9 @@ for ((i=0; i<TOTAL_JOBS; i++)); do
   CUDA_VISIBLE_DEVICES=${VALID_GPU_IDS[GPU_ID]} python ${RUN_FILE} \
     ${CHECKPOINT} \
     --input "${INPUT}/image_paths_$((i+1)).txt" \
-    --seg_dir ${SEG_DIR} \
     --batch-size="${BATCH_SIZE}" \
     --output-root="${OUTPUT}" ## add & to process in background
+    # --seg_dir ${SEG_DIR}
   # Allow a short delay between starting each job to reduce system load spikes
   sleep 1
 done

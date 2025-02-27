@@ -14,14 +14,17 @@ Proj_path="/home/ti_wang/Ti_workspace/sapiens"
 # INPUT='../pose/demo/data/itw_videos/reel1'
 # OUTPUT="/home/${USER}/Desktop/sapiens/seg/Outputs/vis/itw_videos/reel1_seg"
 # OUTPUT="${Proj_path}/sapiens/seg/Outputs/vis/itw_videos/reel1_seg"
-INPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/st_original_images"
+INPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/st_original_image"
 OUTPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/processed_images/seg"
 # OUTPUT="/home/ti_wang/Ti_workspace/sapiens/seg/Outputs/"
 
 #--------------------------MODEL CARD---------------
-MODEL_NAME='sapiens_0.3b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/seg/checkpoints/sapiens_0.3b/sapiens_0.3b_goliath_best_goliath_mIoU_7673_epoch_194_$MODE.pt2
+MODEL_NAME='sapiens_0.3b'; 
+CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/seg/checkpoints/sapiens_0.3b/sapiens_0.3b_goliath_best_goliath_mIoU_7673_epoch_194_$MODE.pt2
 # MODEL_NAME='sapiens_0.6b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/seg/checkpoints/sapiens_0.6b/sapiens_0.6b_goliath_best_goliath_mIoU_7777_epoch_178_$MODE.pt2
-# MODEL_NAME='sapiens_1b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/seg/checkpoints/sapiens_1b/sapiens_1b_goliath_best_goliath_mIoU_7994_epoch_151_$MODE.pt2
+# MODEL_NAME='sapiens_1b'; 
+# CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/seg/checkpoints/sapiens_1b/sapiens_1b_goliath_best_goliath_mIoU_7994_epoch_151_$MODE.pt2
+# CHECKPOINT=/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-seg-1b-torchscript/sapiens_1b_goliath_best_goliath_mIoU_7994_epoch_151_torchscript.pt2
 
 OUTPUT=$OUTPUT/$MODEL_NAME
 

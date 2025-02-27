@@ -74,9 +74,10 @@ def img_save_and_viz(image, result, output_path, seg_dir):
             os.path.basename(output_path)
             .replace(".png", ".npy")
             .replace(".jpg", ".npy")
-            .replace(".jpeg", ".npy"),
+            .replace(".jpeg", ".npy")
+            .replace(".JPG", ".npy"),
         )
-        mask = np.load(mask_path)
+        mask = np.load(mask_path, allow_pickle=True)
     else:
         mask = np.ones_like(normal_map)
     normal_map_norm = np.linalg.norm(normal_map, axis=-1, keepdims=True)
