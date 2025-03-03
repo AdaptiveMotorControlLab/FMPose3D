@@ -10,13 +10,13 @@ import copy
 PROBLEMATIC_DATASETS = {
     # Example of a dataset with actual mapping changes (based on the oap example)
     "oap": {
-        "original_num_keypoints": 17,
+        "original_num_keypoints": 16,
         "V8.0_keypoint_mapping": [
             -1, 3, 1, 2, 0, -1, -1, 
             -1, -1, -1, -1, 4, 5, 8, 
             -1, -1, -1, -1, 6, 9, 7, 
             10, -1, -1, -1, -1, 11, 12, 14, 
-            13, 15, -1, -1, -1, -1, -1, -1
+            -1, -1, 13, 15, -1, -1, -1, -1
         ],
         "V8.2_keypoint_mapping": [ 
             -1, 3, 1, 2, 0, -1, -1, 
@@ -27,7 +27,7 @@ PROBLEMATIC_DATASETS = {
         ]
     },
     "omc": {
-        "original_num_keypoints": 16,
+        "original_num_keypoints": 17,
         "V8.0_keypoint_mapping": [
             -1, 3, 1, 0, 2, -1, -1, 
             -1, -1, -1, -1, 4, 8, 5, 
@@ -69,8 +69,38 @@ PROBLEMATIC_DATASETS = {
             11, 14, -1, 12, 15, -1, -1, 13, 16, 4, -1, -1, -1
         ],
     },
+    "ak":{
+        "original_num_keypoints": 23,
+        "V8.0_keypoint_mapping": [
+            -1, 0, 1, 2, -1, -1, -1, 3, 6,
+            4, 5, -1, 7, 8, -1, 13, -1, -1,
+            9, 10, 11, 12, -1, -1, 14, 15,
+            -1, 16, 17, 18, 19, -1, -1, 20,
+            21, 22, -1
+            ],
+        "V8.2_keypoint_mapping": [
+            -1, 0, 1, 2, -1, -1, -1, 3, 6,
+            4, 5, -1, 7, 8, -1, -1, -1, -1,
+            9, 10, 11, 12, -1, -1, 14, 15,
+            -1, 16, 17, 18, 19, -1, -1, 20,
+            21, 22, -1
+            ]
+    },
+    "mbw":{
+        "original_num_keypoints": 16,
+        "V8.0_keypoint_mapping": [
+            -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            1, 2, 5, -1, 8, -1, -1, 3, 6, 4, 7, -1,
+            -1, 10, 13, 9, 11, 14, 12, 15, -1, -1, -1, -1, -1, -1
+        ],
+        "V8.2_keypoint_mapping": [
+            -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            1, 2, 5, -1, -1, -1, -1, 3, 6, 4, 7, -1,
+            -1, 10, 13, 9, 11, 14, 12, 15, -1, -1, -1, -1, -1, -1
+        ]
+    },
     "riken": {
-        "original_num_keypoints": 17,
+        "original_num_keypoints": 21,
         "V8.0_keypoint_mapping": [
             -1, -1, 1, 2, 0, 3, 4, -1, -1, -1, -1,
             -1, 5, 6, -1, -1, 20, -1, 7, 8, 9, 10,
@@ -82,6 +112,19 @@ PROBLEMATIC_DATASETS = {
             -1, -1, 11, 12, -1, 13, 14, 15, 16, -1, -1,
             17, 18, -1, 19],
     },
+    "mit": {
+        "original_num_keypoints": 17,
+        "V8.0_keypoint_mapping": [
+            0, 3, -1, -1, -1, 1, 2, -1, -1, -1, -1, -1,
+            7, 9, 4, -1, -1, 5, -1, -1, 8, 10, -1, -1,
+            11, 13, -1, -1, -1, -1, -1, 12, 14, 6, -1, -1, -1
+        ],
+        "V8.2_keypoint_mapping": [
+            -1, 3, -1, -1, -1, 1, 2, -1, -1, -1, -1, -1,
+            7, 9, 4, -1, -1, 5, -1, -1, 8, 10, -1, -1,
+            11, 13, -1, -1, -1, -1, -1, 12, 14, 6, -1, -1, -1
+        ]
+    }    
     # Add more problematic datasets here as needed
 }
 
@@ -188,7 +231,7 @@ def process_dataset_files(input_base_path: str, output_base_path: str) -> None:
         
         # Process each JSON file in the directory
         for filename in os.listdir(input_dir):
-                        
+            logging.info(f"__________________Processing {filename}__________________")        
             total_files += 1
             
             # Extract dataset name from filename (e.g., "riken_train.json" -> "riken")
