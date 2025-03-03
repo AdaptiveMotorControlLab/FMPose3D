@@ -384,8 +384,41 @@ class JSONProcessor:
         with open(output_path, 'w') as f:
             json.dump(output_data, f, indent=4)
             print(f"Output saved to {output_json_path}")
+    
+    def remove_annotaions_w_wrong_bbox(self, input_json_path: str, output_json_path: str) -> None:
+        """
+        Remove annotations with wrong bbox.
+        if we find the bbox is out of the image or has invalid dimensions (width/height <= 0), we remove the annotation.
+        """
+        with open(input_json_path, 'r') as f:
+            data = json.load(f)
+        
+        image_id_to_image_info = {img['id']: img for img in data['images']}
+        
+        # Create a new list of valid annotations instead of modifying the list while iterating
+        valid_annotations = []
+        for ann in data['annotations']:
+            img_id = ann['image_id']
+            img_width = image_id_to_image_info[img_id]['width']
+            img_height = image_id_to_image_info[img_id]['height']
+            xmin, ymin, width, height = ann['bbox']
             
+            # Keep annotation only if all conditions are met
+            if (xmin >= 0 and ymin >= 0 and 
+                width > 0 and height > 0 and 
+                xmin + width <= img_width and 
+                ymin + height <= img_height):
+                valid_annotations.append(ann)
+        
+        # Update the annotations list with valid ones
+        data['annotations'] = valid_annotations
+                
+        with open(output_json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        print(f"Output saved to {output_json_path}")
+
 # Example usage:
+
 if __name__ == "__main__":
     
     # processor = JSONProcessor("/app/data/v7/annotations/pfm_train_apr15.json")
@@ -398,12 +431,16 @@ if __name__ == "__main__":
     # Print JSON structure
     # processor.print_structure()
     
-    mode_list = ["train", "test", "val"]
+    mode_list = ["train", "test"] #  "val"]
     for mode in mode_list:
-        processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
-                               output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json")
-        processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json", \
-                                        output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json")
+        # processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
+                            #    output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json")
+        # processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json", \
+                                        # output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json")
+    
+        processor.remove_annotaions_w_wrong_bbox(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json", \
+                                                output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82_no_wrong_bbox.json")
+    
     
     # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_goodpose_merged.json")
     
