@@ -2,8 +2,13 @@ import json
 import os
 import random
 import matplotlib.pyplot as plt
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Set
 
 class JSONProcessor:
+    
     def __init__(self, json_path):
         self.json_path = json_path
         self.data = self._load_json()
@@ -245,60 +250,145 @@ class JSONProcessor:
             print("-" * 40)
             print(f"Total number of keypoints: {len(keypoints)}")
 
-    def merge_json_files(self, json_folder_path, output_path):
+    def merge_json_files(self, json_folder_path, output_path, exclude_datasets=None):
         """Merge multiple JSON files from a folder into a single JSON file.
-        Preserves original image and annotation IDs.
+        Dataset names are extracted from filenames (first part before '_').
         
         Args:
             json_folder_path (str): Path to folder containing JSON files to merge
             output_path (str): Path where the merged JSON file will be saved
+            exclude_datasets (list, optional): List of dataset names to exclude from merging
         """
+        # Setup logging
+        log_dir = os.path.dirname(output_path)
+        output_name = os.path.splitext(os.path.basename(output_path))[0]
+        log_file = os.path.join(log_dir, f"{output_name}.log")
+        
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+
+        if not os.path.exists(json_folder_path):
+            logging.error(f"Folder path does not exist: {json_folder_path}")
+            raise ValueError(f"Folder path does not exist: {json_folder_path}")
+            
+        exclude_datasets = set(exclude_datasets or [])
         merged_data = {
             'images': [],
             'annotations': [],
-            'categories': []  # We'll take categories from the first file
+            'categories': None,  # Will be set from first valid file
+            'datasets': []
         }
             
-        # Get all JSON files in the folder
         json_files = [f for f in os.listdir(json_folder_path) if f.endswith('.json')]
-        
         if not json_files:
-            print(f"No JSON files found in {json_folder_path}")
+            logging.warning(f"No JSON files found in {json_folder_path}")
             return
         
-        print(f"Found {len(json_files)} JSON files to merge")
+        logging.info(f"Found {len(json_files)} JSON files to merge")
+        if exclude_datasets:
+            logging.info(f"Excluding datasets: {', '.join(exclude_datasets)}")
+        else:
+            logging.info("No datasets excluded")
         
-        # Process each JSON file
-        for json_file in json_files:
-            file_path = os.path.join(json_folder_path, json_file)
-            print(f"Processing {json_file}...")
+        processed_files = 0
+        
+        for file_name in json_files:
+            dataset_name = file_name.split('_')[0] 
+            if dataset_name in exclude_datasets:
+                logging.info(f"Skipping {file_name} (dataset: {dataset_name})")
+                continue
             
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                # Take categories from first file if not yet set
-                if not merged_data['categories'] and 'categories' in data:
-                    merged_data['categories'] = data['categories']
-                
-                # Simply append images and annotations
-                merged_data['images'].extend(data.get('images', []))
-                merged_data['annotations'].extend(data.get('annotations', []))
-                
-            except Exception as e:
-                print(f"Error processing {json_file}: {e}")
+            with open(os.path.join(json_folder_path, file_name), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Set categories from first valid file
+            if not merged_data['categories'] and 'categories' in data:
+                merged_data['categories'] = data['categories']
+                logging.debug(f"Categories set from {file_name}")
+            
+            # Add dataset info from filename
+            merged_data['datasets'].append(dataset_name)
+            
+            # Simply append images and annotations
+            merged_data['images'].extend(data.get('images', []))
+            merged_data['annotations'].extend(data.get('annotations', []))
+            
+            processed_files += 1
+            logging.info(f"Processed {file_name}")
         
-        # Save the merged JSON data to the output path
+        if processed_files == 0:
+            logging.warning("No files were successfully processed")
+            return
+            
+        # Log merge summary
+        logging.info("\nMerge Summary:")
+        logging.info(f"Files processed: {processed_files}")
+        logging.info(f"Total images: {len(merged_data['images'])}")
+        logging.info(f"Total annotations: {len(merged_data['annotations'])}")
+        logging.info(f"Datasets included: {merged_data['datasets']}")
+        
+        # Save merged data
         with open(output_path, 'w') as f:
             json.dump(merged_data, f, indent=4)
-        print(f"Merged JSON data saved to {output_path}")
+        logging.info(f"Merged data saved to {output_path}")
+        logging.info(f"Log file saved to {log_file}")
 
-
+    def find_annotations_with_pose(self, input_json_path: str, output_json_path: str) -> None:
+        """
+        Find annotations with pose data and save them to a new JSON file while maintaining structure.
+        An annotation is considered to have pose if NOT ALL visibility labels are -1.
+        
+        Args:
+            input_json_path: Path to input JSON file
+            output_json_path: Path to save filtered JSON file
+        """
+        # Read input JSON
+        with open(input_json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Pre-allocate data structures
+        valid_image_ids: Set[int] = set()
+        filtered_annotations: List[Dict] = []
+        
+        # Process annotations in a single pass
+        for ann in data['annotations']:
+            # Get visibility labels (every 3rd element starting from index 2)
+            vis_labels = ann['keypoints'][2::3]
+            
+            # Check if NOT ALL visibility labels are -1
+            if not all(label == -1 for label in vis_labels):
+                filtered_annotations.append(ann)
+                valid_image_ids.add(ann['image_id'])
+        
+        # Create output JSON with same structure using dict comprehension for images
+        output_data = {
+            'images': [img for img in data['images'] if img['id'] in valid_image_ids],
+            'annotations': filtered_annotations,
+            'categories': data['categories']
+        }
+        
+        # Include datasets if they exist in the input data
+        if 'datasets' in data:
+            output_data['datasets'] = data['datasets']
+        
+        # Ensure output directory exists and save
+        output_path = Path(output_json_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w') as f:
+            json.dump(output_data, f, indent=4)
+            print(f"Output saved to {output_json_path}")
+            
 # Example usage:
 if __name__ == "__main__":
     
     # processor = JSONProcessor("/app/data/v7/annotations/pfm_train_apr15.json")
-
     # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_v8.json")
     # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/oms_test.json")
     # processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_merged.json")
@@ -308,7 +398,13 @@ if __name__ == "__main__":
     # Print JSON structure
     # processor.print_structure()
     
-    # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/train_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_train_goodpose_merged.json")
+    mode_list = ["train", "test", "val"]
+    for mode in mode_list:
+        processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
+                               output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json")
+        processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json", \
+                                        output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json")
+    
     # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_goodpose_merged.json")
     
     # processor.print_all_datasets_content()
