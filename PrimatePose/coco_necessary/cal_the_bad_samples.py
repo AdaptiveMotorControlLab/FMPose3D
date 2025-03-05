@@ -70,6 +70,7 @@ def analyze_annotations(data):
 
         # Check for negative or zero width and height
         if width <= 0 or height <= 0:
+            # print("width:", width, "height:", height)
             error_counts['w_h_negative_or_zero'] += 1
             continue
 
@@ -77,11 +78,11 @@ def analyze_annotations(data):
         xmax = xmin + width
         ymax = ymin + height
         # Check if the entire bbox is out of image boundaries
-        if xmax >= img_width:
+        if xmax > img_width:
             error_counts['xmin+w_out_of_bounds'] += 1
             continue
             
-        elif ymax >= img_height:
+        elif ymax > img_height:
             error_counts['ymin+h_out_of_bounds'] += 1
             continue
         
