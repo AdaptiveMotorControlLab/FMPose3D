@@ -433,13 +433,14 @@ if __name__ == "__main__":
     
     mode_list = ["train", "test"] #  "val"]
     for mode in mode_list:
-        # processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
-                            #    output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json")
-        # processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_V82.json", \
-                                        # output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json")
+        processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
+                               output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_chimpact_V82.json",
+                               exclude_datasets=["riken", "chimpact"])
+        processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_chimpact_V82.json", \
+                                        output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_wo_riken_chimpact_V82.json")
     
-        processor.remove_annotaions_w_wrong_bbox(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json", \
-                                                output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82_no_wrong_bbox.json")
+        # processor.remove_annotaions_w_wrong_bbox(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json", \
+                                                # output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82_no_wrong_bbox.json")
     
     
     # processor.merge_json_files(json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/test_goodpose_datasets", output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/pfm_test_goodpose_merged.json")
