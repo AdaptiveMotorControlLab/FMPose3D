@@ -6,7 +6,7 @@ import argparse
 import copy
 from pathlib import Path
 from deeplabcut.pose_estimation_pytorch import COCOLoader, utils
-from deeplabcut.pose_estimation_pytorch.apis.train import train
+from deeplabcut.pose_estimation_pytorch.apis.training import train
 from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
 from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
@@ -51,29 +51,25 @@ def main(
     if save_epochs is None:
         save_epochs = loader.model_cfg["runner"]["snapshots"]["save_epochs"]
 
-    updates = dict(
-        runner=dict(snapshots=dict(save_epochs=save_epochs)),
-        train_settings=dict(
-            batch_size=batch_size,
-            dataloader_workers=dataloader_workers,
-            epochs=epochs,
-        ),
-    )
-
+    updates = {
+        "runner.snapshots.save_epochs": save_epochs,
+        "train_settings.epochs": epochs,
+        "train_settings.batch_size": batch_size,
+        "train_settings.dataloader_workers": dataloader_workers,   
+    }
+    
     det_cfg = loader.model_cfg["detector"]
     if det_cfg is not None:
         if detector_epochs is None:
             detector_epochs = det_cfg["train_settings"]["epochs"]
+        else:
+            updates["detector.train_settings.epochs"] = detector_epochs
         if detector_save_epochs is None:
             detector_save_epochs = det_cfg["runner"]["snapshots"]["save_epochs"]
-        updates_detector = dict(
-            runner=dict(snapshots=dict(save_epochs=detector_save_epochs)),
-            train_settings=dict(
-                batch_size=detector_batch_size,
-                dataloader_workers=detector_dataloader_workers,
-            ),
-        )
-        updates["detector"] = updates_detector
+        else:
+            updates["detector.runner.snapshots.save_epochs"] = detector_save_epochs
+        updates["detector.train_settings.batch_size"] = detector_batch_size
+        updates["detector.train_settings.dataloader_workers"] = detector_dataloader_workers
 
     loader.update_model_cfg(updates) # update model_cfg with the updates dictionary
 
