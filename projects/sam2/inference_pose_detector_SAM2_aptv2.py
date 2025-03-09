@@ -16,14 +16,15 @@ from sam2.build_sam import build_sam2_video_predictor
 from collections import defaultdict
 from utils.metrics import MOTATracker
 from utils.visualization import draw_predictions
-from utils.utils import load_json_data, get_video_data, get_frame_path, save_video_data_to_json, save_processed_data_to_json, create_video_from_frames
+from utils.utils import load_json_data, get_video_data, get_frame_path, save_video_data_to_json, save_processed_data_to_json
+import re
 
 # Import pose estimation components
 from deeplabcut.pose_estimation_pytorch.apis.analyze_videos import VideoIterator
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.config import read_config_as_dict
 from deeplabcut.pose_estimation_pytorch.task import Task
-from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_gt_and_predictions
+from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_gt_and_predictions, plot_gt_and_predictions_PFM
 
 # Reserved colors (BGR format)
 GT_COLOR = (0, 0, 255)       # Red for ground truth
@@ -144,8 +145,8 @@ def process_video_from_json(
                 ] for bbox in first_bboxes
             ])
             print(f"Found {len(first_bboxes)} objects in ground truth")
-            print(f"GT bboxes [x_min, y_min, w, h]: {first_bboxes}")
-            print(f"Input boxes [x1, y1, x2, y2]: {input_boxes}")
+            # print(f"GT bboxes [x_min, y_min, w, h]: {first_bboxes}")
+            # print(f"Input boxes [x1, y1, x2, y2]: {input_boxes}")
         else:
             # Use detector to get all bboxes
             detections = detector_runner.inference([first_frame])
@@ -163,7 +164,7 @@ def process_video_from_json(
             state = sam2_predictor.init_state(video_path=str(frames_dir))
             
             # Initialize tracking for all objects at once
-            print("Input boxes shape:", input_boxes.shape)
+            # print("Input boxes shape:", input_boxes.shape)
             # Initialize each object separately since SAM2 expects single object IDs
             initial_masks = []
             for obj_id in range(len(input_boxes)):
@@ -187,7 +188,7 @@ def process_video_from_json(
         with torch.autocast("cuda", dtype=torch.bfloat16):
             for out_frame_idx, out_object_ids, out_masks in sam2_predictor.propagate_in_video(state):
                 print(f"Processing frame {frame_idx}/{total_frames}")
-                print("out_object_ids:", out_object_ids)
+                # print("out_object_ids:", out_object_ids)
                 # Get the current frame's image
                 image_data = video_images[out_frame_idx]
                 frame_path = get_frame_path(image_data, base_image_path)
@@ -209,12 +210,12 @@ def process_video_from_json(
                 
                 # Process each object's mask
                 for obj_id in range(len(out_object_ids)):
-                    print(f"Processing object {obj_id}")
+                    # print(f"Processing object {obj_id}")
                     current_mask = current_masks[obj_id]
                     
                     # Get bbox from mask
                     non_zero_indices = np.nonzero(current_mask)
-                    print(f"non_zero_indices: {non_zero_indices}")
+                    # print(f"non_zero_indices: {non_zero_indices}")
                     if len(non_zero_indices[0]) > 0:
                         y_min, x_min = non_zero_indices[0].min(), non_zero_indices[1].min()
                         y_max, x_max = non_zero_indices[0].max(), non_zero_indices[1].max()
@@ -319,7 +320,7 @@ def process_video_from_json(
                 # Convert to numpy array with shape (num_animals, num_keypoints, 3)
                 if current_pred_bodyparts:
                     pred_bodyparts = np.concatenate(current_pred_bodyparts, axis=0)  # Concatenate along animals dimension
-                    print("pred_bodyparts.shape:", pred_bodyparts.shape)
+                    # print("pred_bodyparts.shape:", pred_bodyparts.shape)
                 else:
                     num_keypoints = len(model_cfg["metadata"]["bodyparts"])
                     pred_bodyparts = np.zeros((0, num_keypoints, 3))
@@ -353,20 +354,34 @@ def process_video_from_json(
 
                 # Plot predictions and ground truth
                 print("plotting...")
-                print("gt_bodyparts.shape:", gt_bodyparts.shape)
-                print("pred_bodyparts.shape:", pred_bodyparts.shape)
+                # print("gt_bodyparts.shape:", gt_bodyparts.shape)
+                # # print("pred_bodyparts.shape:", pred_bodyparts.shape)
                 
-                plot_gt_and_predictions(
+                # plot_gt_and_predictions(
+                #     image_path=original_frame_path,  # Original image from frames_dir
+                #     output_dir=frame_path,  # Directory where output will be saved
+                #     gt_bodyparts=gt_bodyparts,
+                #     pred_bodyparts=pred_bodyparts,
+                #     mode="individual",  # Color by individual animal
+                #     dot_size=12,
+                #     alpha_value=0.7,
+                #     p_cutoff=0.6,
+                #     bounding_boxes=bounding_boxes,  # Tuple of (boxes, scores)
+                #     bboxes_pcutoff=0.6,  # Confidence threshold for showing boxes
+                # )
+                
+                plot_gt_and_predictions_PFM(
                     image_path=original_frame_path,  # Original image from frames_dir
                     output_dir=frame_path,  # Directory where output will be saved
-                    gt_bodyparts=gt_bodyparts,
+                    # gt_bodyparts=gt_bodyparts,
                     pred_bodyparts=pred_bodyparts,
-                    mode="individual",  # Color by individual animal
+                    # mode="individual",  # Color by individual animal
                     dot_size=12,
                     alpha_value=0.7,
                     p_cutoff=0.6,
                     bounding_boxes=bounding_boxes,  # Tuple of (boxes, scores)
                     bboxes_pcutoff=0.6,  # Confidence threshold for showing boxes
+                    skeleton=1
                 )
         
                 frame_paths.append(str(frame_path))
@@ -401,16 +416,19 @@ def process_video_from_json(
     video_name = f"videoID_{video_id}"
     output_video = output_dir / f"{video_name}_tracked.mp4"
     
-    fps = 15  # Default FPS, adjust if known
+    fps = 10  # Default FPS=15, adjust if known
     
     # Use ffmpeg to create video from processed frames
     if frame_paths:
         print(f"Creating video at {output_video}")
+        # create_video_from_frames(processed_frames_dir, output_video, fps)
+        
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-framerate', str(fps),
-            # '-i', str(processed_frames_dir / 'frame_%04d.jpg'),
-            '-i', str(processed_frames_dir / 'Test-frames-%04d.jpg'),
+            '-i', str(processed_frames_dir / 'frame_%04d.jpg'),
+            # '-i', str(processed_frames_dir / 'Test-frames-%04d.jpg'),
+            # '-i', str(processed_frames_dir / '%04d_predictions.png'),
             '-vcodec', 'mpeg4',
             '-q:v', '1',
             '-pix_fmt', 'yuv420p',
@@ -418,10 +436,146 @@ def process_video_from_json(
         ]
         
         subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+        
         print(f"Video successfully saved to {output_video}")
         return str(output_video)
+    
+        success = create_video_from_frames(processed_frames_dir, output_video, fps)    
+        if success:
+            print(f"Video successfully saved to {output_video}")
+            return str(output_video)
+        else:
+            print(f"Failed to create video at {output_video}")
+            return str(output_video)
+    # return str(output_video)
 
-    return str(output_video)
+def create_video_from_frames(frames_dir, output_video_path, fps=15):
+    """
+    Create a video from a directory of frames using OpenCV.
+    
+    Args:
+        frames_dir (str or Path): Directory containing the frame images
+        output_video_path (str or Path): Path where the output video will be saved
+        fps (int): Frames per second for the output video
+    
+    Returns:
+        bool: True if video creation was successful, False otherwise
+    """
+    frames_dir = Path(frames_dir)
+    output_video_path = Path(output_video_path)
+    
+    # Ensure output directory exists
+    output_video_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Check if there are any prediction files in the directory
+        prediction_files = list(frames_dir.glob("*_predictions.png"))
+        
+        if not prediction_files:
+            print(f"No prediction frames found in {frames_dir}")
+            return False
+        
+        # Sort the files numerically to ensure correct order
+        prediction_files.sort(key=lambda x: int(x.stem.split('_')[0]))
+        
+        if not prediction_files:
+            print(f"No frames found in {frames_dir}")
+            return False
+            
+        print(f"Found {len(prediction_files)} frames to process")
+        
+        # Read the first frame to get dimensions
+        first_frame = cv2.imread(str(prediction_files[0]))
+        if first_frame is None:
+            print(f"Failed to read first frame: {prediction_files[0]}")
+            return False
+            
+        height, width, channels = first_frame.shape
+        
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4 codec
+        video_writer = cv2.VideoWriter(
+            str(output_video_path), 
+            fourcc, 
+            fps, 
+            (width, height)
+        )
+        
+        if not video_writer.isOpened():
+            print("Failed to open video writer")
+            return False
+        
+        # Process each frame
+        for i, frame_path in enumerate(prediction_files):
+            if i % 10 == 0:  # Print progress every 10 frames
+                print(f"Processing frame {i+1}/{len(prediction_files)}")
+                
+            frame = cv2.imread(str(frame_path))
+            if frame is not None:
+                video_writer.write(frame)
+            else:
+                print(f"Warning: Failed to read frame {frame_path}")
+        
+        # Release the video writer
+        video_writer.release()
+        print(f"Video successfully created at {output_video_path}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error creating video: {e}")
+        return False
+
+def create_video_from_frames_imageio(frames_dir, output_video_path, fps=15):
+    """
+    Create a video from a directory of frames using imageio.
+    
+    Args:
+        frames_dir (str or Path): Directory containing the frame images
+        output_video_path (str or Path): Path where the output video will be saved
+        fps (int): Frames per second for the output video
+    
+    Returns:
+        bool: True if video creation was successful, False otherwise
+    """
+    try:
+        import imageio
+        
+        frames_dir = Path(frames_dir)
+        output_video_path = Path(output_video_path)
+        
+        # Ensure output directory exists
+        output_video_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Find all prediction files
+        prediction_files = list(frames_dir.glob("*_predictions.png"))
+        
+        if not prediction_files:
+            print(f"No prediction frames found in {frames_dir}")
+            return False
+        
+        # Sort the files numerically
+        prediction_files.sort(key=lambda x: int(x.stem.split('_')[0]))
+        
+        print(f"Creating video from {len(prediction_files)} frames")
+        
+        # Create writer object
+        with imageio.get_writer(str(output_video_path), fps=fps) as writer:
+            # Add each frame to the video
+            for i, frame_path in enumerate(prediction_files):
+                if i % 10 == 0:  # Print progress every 10 frames
+                    print(f"Processing frame {i+1}/{len(prediction_files)}")
+                
+                # Read the image and add it to the video
+                frame = imageio.imread(frame_path)
+                writer.append_data(frame)
+        
+        print(f"Video successfully created at {output_video_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating video: {e}")
+        return False
 
 if __name__ == "__main__":
     # Update paths
@@ -430,15 +584,16 @@ if __name__ == "__main__":
     
     BASE_IMAGE_PATH = "/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/images"
     # VIDEO_ID = 1000013  # Example video_id
-    VIDEO_ID = 1000008
+    # VIDEO_ID = 1000008
     # VIDEO_ID = 1000012
-    # VIDEO_ID = 1000027
+    VIDEO_ID = 1000027
     # VIDEO_ID = 16
     BASE_OUTPUT_DIR = Path("/home/ti_wang/Ti_workspace/projects/sam2/results2/aptv2")
     
     # Pose estimation paths
     POSE_CONFIG = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/pytorch_config.yaml"
-    POSE_SNAPSHOT = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-best-056.pt"
+    # POSE_SNAPSHOT = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-best-056.pt"
+    POSE_SNAPSHOT = "/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_V82_wo_riken_chimpact_20250304/train/snapshot-116.pt"
     DETECTOR_PATH = "/home/ti_wang/Ti_workspace/projects/samurai/pre_trained_models/snapshot-detector-best-171.pt"
     
     output_path = process_video_from_json(
