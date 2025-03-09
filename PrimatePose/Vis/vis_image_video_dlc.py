@@ -13,12 +13,11 @@ from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.config import read_config_as_dict
 from deeplabcut.pose_estimation_pytorch.task import Task
 
-from deeplabcut.pose_estimation_pytorch.apis.evaluate import plot_gt_and_predictions_PFM
+from deeplabcut.pose_estimation_pytorch.apis.evaluation import plot_gt_and_predictions_PFM
 
 # from utils import plot_gt_and_predictions_PFM
 
-
-keypoint_name_simplified = [
+keypoint_name_simplified_V1 = [
     "forehead",
     "head",
     "L_E",
@@ -37,8 +36,8 @@ keypoint_name_simplified = [
     "torso_M_B",
     "body_C",
     "lower_B",
-    "L_E",
-    "R_E",
+    "L_Elbow",
+    "R_Elbow",
     "L_W",
     "R_W",
     "L_H",
@@ -57,6 +56,47 @@ keypoint_name_simplified = [
     "M_end_tail",
     "end_tail"
 ]
+
+keypoint_name_simplified_V2 = [
+    "forehead",
+    "head",
+    "L_E",
+    "R_E",
+    "nose",
+    "L_ear",
+    "R_ear",
+    "mouth_front_top",
+    "mouth_front_bottom",
+    "mouth_B_L",
+    "mouth_B_R",
+    "neck",
+    "L_shoulder",
+    "R_shoulder",
+    "upper_B",
+    "torso_M_B",
+    "body_C",
+    "lower_B",
+    "L_Elbow",
+    "R_Elbow",
+    "L_Wrist",
+    "R_Wrist",
+    "L_Hand",
+    "R_Hand",
+    "L_hip",
+    "R_hip",
+    "C_hip",
+    "L_Knee",
+    "R_Knee",
+    "L_Ankle",
+    "R_Ankle",
+    "L_foot",
+    "R_foot",
+    "root_tail",
+    "M_tail",
+    "M_end_tail",
+    "end_tail"
+]
+
 # Define skeleton for visualization - same as in the reference file
 # PFM_SKELETON = [
 #     [3, 5], [4, 5], [6, 3], [7, 4],
@@ -94,10 +134,10 @@ PFM_SKELETON_NAME = [
     ["L_S", "neck"],      # [12, 11]
     ["R_S", "neck"],      # [13, 11]
     # ["head", "lower_B"],  # [1, 16]
-    ["L_E", "L_S"],       # [18, 12]
-    ["R_E", "R_S"],       # [19, 13]
-    ["L_W", "L_E"],       # [20, 18]
-    ["R_W", "R_E"],       # [21, 19]
+    ["L_Elbow", "L_S"],       # [18, 12]
+    ["R_Elbow", "R_S"],       # [19, 13]
+    ["L_W", "L_Elbow"],       # [20, 18]
+    ["R_W", "R_Elbow"],       # [21, 19]
     ["L_H", "L_W"],       # [22, 20]
     ["R_H", "R_W"],       # [23, 21]
     # ["L_hip", "neck"],    # [24, 11]
@@ -126,7 +166,7 @@ keypoint_vis_mask = [ 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1
 # mask: forehead:0; upper_back: 14; torso_mid_back: 15; body_center:16; lower_back:17;
 keypoint_vis_mask = [ 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]  
 
-def initialize_model(pose_config_path, pose_snapshot_path, detector_path, device="cuda"):
+def initialize_model(pose_config_path, pose_snapshot_path, detector_path, max_individuals=8, device="cuda"):
     """
     Initialize pose estimation model
     
@@ -162,7 +202,7 @@ def initialize_model(pose_config_path, pose_snapshot_path, detector_path, device
         pose_runner, detector_runner = get_inference_runners(
             model_config=model_cfg,
             snapshot_path=pose_snapshot_path,
-            max_individuals=2, # 
+            max_individuals=max_individuals, # 
             num_bodyparts=len(model_cfg["metadata"]["bodyparts"]),
             num_unique_bodyparts=len(model_cfg["metadata"]["unique_bodyparts"]),
             with_identity=model_cfg["metadata"].get("with_identity", False),
@@ -174,75 +214,6 @@ def initialize_model(pose_config_path, pose_snapshot_path, detector_path, device
         torch.load = original_torch_load
     
     return pose_runner, detector_runner, model_cfg
-
-def calculate_point_size(frame_width, frame_height):
-    """Calculate appropriate point size based on image resolution"""
-    base_size = 5
-    scale_factor = min(frame_width, frame_height) / 500
-    return max(3, int(base_size * scale_factor))
-
-def draw_predictions(frame, keypoints, confidences, threshold=0.5, bbox=None, instance_idx=None):
-    """
-    Draw pose estimation predictions on frame
-    
-    Args:
-        frame: Input image frame
-        keypoints: Detected keypoints coordinates
-        confidences: Confidence scores for keypoints
-        threshold: Confidence threshold for displaying keypoints
-        bbox: Bounding box to draw (optional)
-        instance_idx: Instance index for color variation (optional)
-    Returns:
-        frame_vis: Visualization frame with drawn predictions
-    """
-    frame_vis = frame.copy()
-    height, width = frame.shape[:2]
-    
-    # Calculate appropriate point size and line thickness
-    point_size = calculate_point_size(width, height)
-    line_thickness = max(1, int(point_size / 2))
-    
-    # Generate colors based on instance index
-    colors = [
-        (0, 255, 0),   # Green
-        (0, 0, 255),   # Red
-        (255, 0, 0),   # Blue
-        (255, 255, 0), # Cyan
-        (255, 0, 255), # Magenta
-        (0, 255, 255), # Yellow
-        (128, 0, 128), # Purple
-        (0, 128, 128), # Teal
-        (128, 128, 0), # Olive
-        (128, 0, 0)    # Maroon
-    ]
-    
-    # Default to first color if no instance index
-    instance_color = colors[instance_idx % len(colors)] if instance_idx is not None else colors[0]
-    keypoint_color = (0, 0, 255) if instance_idx is None else colors[(instance_idx + 5) % len(colors)]
-    
-    # Draw bounding box if provided
-    if bbox is not None:
-        x, y, w, h = map(int, bbox)
-        cv2.rectangle(frame_vis, (x, y), (x + w, y + h), instance_color, 2)
-    
-    # Draw skeleton lines
-    for start_idx, end_idx in PFM_SKELETON:
-        if (confidences[start_idx] > threshold and 
-            confidences[end_idx] > threshold and
-            start_idx < len(keypoints) and 
-            end_idx < len(keypoints)):
-            
-            start_point = (int(keypoints[start_idx][0]), int(keypoints[start_idx][1]))
-            end_point = (int(keypoints[end_idx][0]), int(keypoints[end_idx][1]))
-            
-            cv2.line(frame_vis, start_point, end_point, instance_color, line_thickness)
-    
-    # Draw keypoints
-    for i, (x, y) in enumerate(keypoints):
-        if confidences[i] > threshold:
-            cv2.circle(frame_vis, (int(x), int(y)), point_size, keypoint_color, -1)
-    
-    return frame_vis
 
 def process_image(image_path, pose_runner, detector_runner=None, output_path=None):
     """
@@ -283,46 +254,17 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
     
     # Run pose estimation with context (bounding boxes)
     with torch.inference_mode():
-        # print(f"bboxes: {bboxes}")
-        # if len(bboxes) > 0:
-        #     # Process each bounding box separately
-        #     for i, bbox in enumerate(bboxes):
-        #         # Create frame with context for pose runner
-        #         context = {"bboxes": np.array([bbox])}
-        #         frame_with_context = (frame, context)
-        #         # Run inference with context
-        #         predictions = pose_runner.inference([frame_with_context])
-        #         print(f"predictions len: {len(predictions)}")
-        #         print(f"predictions: {predictions}")
-                
-        #         # Extract keypoints and confidences
-        #         keypoints = predictions[0]["bodyparts"][..., :2]
-        #         print(f"keypoints shape: {keypoints.shape}")
-        #         confidences = predictions[0]["bodyparts"][..., 2]
-        #         # Store results
-        #         pred_keypoints_list.append(keypoints)
-        #  
-        # print("bboxes0:", bboxes[0])
-        # context = {"bboxes": np.array(bboxes[0])}
-        # print(f"context: {context}")
-        # frame_with_context = (frame, context)
-        # print(f"frame_with_context: {frame_with_context}")
-        # predictions = pose_runner.inference([frame_with_context])
         
-        # the context containt the bboxes and confidences;
-        
-        # context: bboxes, bbox_scores
+        # the context containt the bboxes and confidences;  context: {bboxes, bbox_scores}
         context = detections_bboxes[0] 
-        # print(f"context: {context}")
         predictions = pose_runner.inference([(frame, context)])
 
         # why we need to use [0] here?
         pred_keypoints = predictions[0]["bodyparts"] 
         pred_bboxs = predictions[0]["bboxes"]
         pred_scores = predictions[0]["bbox_scores"]
-        pred_bboxes_scores = (pred_bboxs, pred_scores)
+        pred_bboxes_scores = (pred_bboxs, pred_scores) # if we use GT bboxes for pose_runner.inference, here pred_bboxes will be the GT bboxes
         print("pred_scores:", pred_scores)
-        # print(f"pred_bboxes_scores: {pred_bboxes_scores}")
         
         plot_gt_and_predictions_PFM(
         image_path=image_path,
@@ -330,16 +272,17 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
         pred_bodyparts=pred_keypoints,
         bounding_boxes=pred_bboxes_scores,
         skeleton=PFM_SKELETON,
-        keypoint_names=keypoint_name_simplified,
+        keypoint_names=keypoint_name_simplified_V2,
         p_cutoff=0.6,
         keypoint_vis_mask=keypoint_vis_mask, # Pass the mask to plotting function
         )
-    
+        
     return result_image, pred_keypoints_list, pred_confidences_list, bboxes
 
-def process_video(video_path, pose_runner, detector_runner=None, output_path=None):
+def process_video_pose(video_path, pose_runner, detector_runner=None, output_path=None):
     """
-    Process video for pose estimation
+    Process video for pose estimation by extracting frames, processing each frame,
+    and reconstructing the video.
     
     Args:
         video_path: Path to input video
@@ -350,110 +293,79 @@ def process_video(video_path, pose_runner, detector_runner=None, output_path=Non
     Returns:
         None
     """
-    # Open video
+    # Create directory structure
+    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    target_folder = os.path.dirname(output_path)
+    
+    # Create a dedicated folder for this video
+    video_folder = os.path.join(target_folder, video_name)
+    ori_frames_dir = os.path.join(video_folder, "ori_frames")
+    results_dir = os.path.join(video_folder, "results")
+    
+    os.makedirs(video_folder, exist_ok=True)
+    os.makedirs(ori_frames_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Extract frames from video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Could not open video at: {video_path}")
     
     # Get video properties
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    # Setup output video writer if path is provided
-    if output_path:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    
-    # Process frames
+    print(f"Extracting frames from video...")
     frame_count = 0
-    detection_interval = 10  # Update detection every N frames
-    max_bboxes = 5  # Maximum number of bounding boxes to track
-    bboxes = []
-    
-    with torch.inference_mode():
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            # Get bounding boxes using detector
-            if frame_count % detection_interval == 0 and detector_runner is not None:
-                detections = detector_runner.inference([frame])
-                if (detections and isinstance(detections, list) and len(detections) > 0 and 
-                    'bboxes' in detections[0] and 
-                    isinstance(detections[0]['bboxes'], np.ndarray) and 
-                    detections[0]['bboxes'].size > 0):
-                    
-                    # Get all bounding boxes, limited to max_bboxes
-                    new_bboxes = detections[0]['bboxes'].tolist() if isinstance(detections[0]['bboxes'], np.ndarray) else detections[0]['bboxes']
-                    new_bboxes = new_bboxes[:max_bboxes]
-                    bboxes = new_bboxes
-                    print(f"\rFrame {frame_count}: Detected {len(bboxes)} instances", end="")
-            
-            # Create copy of frame for drawing
-            result_frame = frame.copy()
-            
-            # Process each bounding box
-            if len(bboxes) > 0:
-                for i, bbox in enumerate(bboxes):
-                    # Create frame with context for pose runner
-                    context = {"bboxes": np.array([bbox])}
-                    frame_with_context = (frame, context)
-                    
-                    # Run inference with context
-                    predictions = pose_runner.inference([frame_with_context])
-                    
-                    if (predictions and isinstance(predictions, list) and len(predictions) > 0 and 
-                        "bodyparts" in predictions[0] and 
-                        isinstance(predictions[0]["bodyparts"], np.ndarray) and 
-                        predictions[0]["bodyparts"].shape[0] > 0):
-                        
-                        # Extract keypoints and confidences
-                        keypoints = predictions[0]["bodyparts"][..., :2]
-                        confidences = predictions[0]["bodyparts"][..., 2]
-                        
-                        # Draw predictions for this instance
-                        result_frame = draw_predictions(
-                            result_frame, 
-                            keypoints, 
-                            confidences, 
-                            bbox=bbox, 
-                            instance_idx=i
-                        )
-            else:
-                # No detection, run without bounding box
-                predictions = pose_runner.inference([frame])
-                
-                if (predictions and isinstance(predictions, list) and len(predictions) > 0 and
-                    "keypoints" in predictions[0] and len(predictions[0]["keypoints"]) > 0):
-                    
-                    # Extract keypoints and confidences
-                    keypoints = predictions[0]["keypoints"][0]  # Assuming single animal
-                    confidences = predictions[0]["confidences"][0]
-                    
-                    # Draw predictions
-                    result_frame = draw_predictions(result_frame, keypoints, confidences)
-            
-            # Write frame to output video
-            if output_path:
-                out.write(result_frame)
-            
-            # Display progress
-            frame_count += 1
-            if frame_count % 10 == 0:
-                print(f"\rProcessing frame {frame_count}/{total_frames} ({frame_count/total_frames*100:.1f}%)", end="")
-                
-    # Clean up
-    cap.release()
-    if output_path:
-        out.release()
-        print(f"\nOutput video saved to: {output_path}")
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
         
-    # Free GPU memory
-    torch.cuda.empty_cache()
+        # Save frame
+        frame_path = os.path.join(ori_frames_dir, f"frame_{frame_count:06d}.jpg")
+        cv2.imwrite(frame_path, frame)
+        
+        frame_count += 1
+        if frame_count % 10 == 0:
+            print(f"\rExtracted {frame_count}/{total_frames} frames ({frame_count/total_frames*100:.1f}%)", end="")
+    
+    cap.release()
+    print("\nFrame extraction complete.")
+    
+    # Process each frame
+    print("\nProcessing frames...")
+    frame_files = sorted(os.listdir(ori_frames_dir))
+    for i, frame_file in enumerate(frame_files):
+        frame_path = os.path.join(ori_frames_dir, frame_file)
+        
+        # Process frame using process_image
+        process_image(frame_path, pose_runner, detector_runner, results_dir)
+        
+        if i % 10 == 0:
+            print(f"\rProcessed {i+1}/{len(frame_files)} frames ({(i+1)/len(frame_files)*100:.1f}%)", end="")
+    
+    print("\nFrame processing complete.")
+    
+    # Combine frames into video
+    print("\nCreating output video...")
+    first_frame = cv2.imread(os.path.join(results_dir, frame_files[0]))
+    height, width = first_frame.shape[:2]
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    result_files = sorted(os.listdir(results_dir))
+    for i, result_file in enumerate(result_files):
+        frame_path = os.path.join(results_dir, result_file)
+        frame = cv2.imread(frame_path)
+        out.write(frame)
+        
+        if i % 10 == 0:
+            print(f"\rWriting frame {i+1}/{len(result_files)} ({(i+1)/len(result_files)*100:.1f}%)", end="")
+    
+    out.release()
+    print(f"\nOutput video saved to: {output_path}")
 
 def main():
     # Parse command line arguments
@@ -471,15 +383,16 @@ def main():
         raise FileNotFoundError(f"Input file not found: {args.input}")
     # create the output directory if it does not exist
     os.makedirs(args.output, exist_ok=True)
-    
+       
     # Initialize model
     pose_runner, detector_runner, model_cfg = initialize_model(
-        args.pose_config, 
-        args.pose_snapshot, 
-        args.detector, 
-        args.device
+        pose_config_path=args.pose_config, 
+        pose_snapshot_path=args.pose_snapshot, 
+        detector_path=args.detector, 
+        max_individuals=1,
+        device=args.device,
     )
-     
+    
     # Determine output path if not specified
     if not args.output:
         input_path = Path(args.input)
@@ -494,7 +407,7 @@ def main():
         process_image(args.input, pose_runner, detector_runner, args.output)
     elif input_lower.endswith(('.mp4', '.avi', '.mov', '.mkv')):
         print(f"Processing video: {args.input}")
-        # process_video(args.input, pose_runner, detector_runner, args.output)
+        process_video_pose(args.input, pose_runner, detector_runner, args.output)
     else:
         raise ValueError(f"Unsupported file format: {args.input}")
 
