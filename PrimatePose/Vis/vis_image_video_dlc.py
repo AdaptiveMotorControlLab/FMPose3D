@@ -65,10 +65,10 @@ keypoint_name_simplified_V2 = [
     "nose",
     "L_ear",
     "R_ear",
-    "mouth_front_top",
-    "mouth_front_bottom",
-    "mouth_B_L",
-    "mouth_B_R",
+    "M_T",
+    "M_B",
+    "M_L",
+    "M_R",
     "neck",
     "L_shoulder",
     "R_shoulder",
@@ -272,8 +272,8 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
         pred_bodyparts=pred_keypoints,
         bounding_boxes=pred_bboxes_scores,
         skeleton=PFM_SKELETON,
-        keypoint_names=keypoint_name_simplified_V2,
-        p_cutoff=0.6,
+        # keypoint_names=keypoint_name_simplified_V2,
+        p_cutoff=0.65,
         keypoint_vis_mask=keypoint_vis_mask, # Pass the mask to plotting function
         )
         
