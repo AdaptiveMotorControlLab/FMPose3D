@@ -8,7 +8,7 @@ project_root=$(dirname $(dirname $(realpath $0)))
 # name=pfm_merged_checked
 name=pfm
 # file=${name}_detector_fasterrcnn
-file=${name}_pose_V82_wo_riken_chimpact_20250304
+file=${name}_pose_V82_wo_riken_V82_20250313
 dataset_file=${name}
 mode="train"
 debug=0
@@ -22,8 +22,8 @@ debug=0
 # train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_pose_V82_no_wrong_bbox.json"
 
 
-# PFM V82 wo riken and chimpact; only pose
-train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_wo_riken_chimpact_V82.json"
+# PFM V82 wo riken; only pose
+train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_pose_wo_riken_V82.json"
 
 # model_arch="top_down_resnet_50"
 model_arch="top_down_hrnet_w32"

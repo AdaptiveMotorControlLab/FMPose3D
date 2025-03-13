@@ -6,11 +6,10 @@ import argparse
 import copy
 from pathlib import Path
 from deeplabcut.pose_estimation_pytorch import COCOLoader, utils
-from deeplabcut.pose_estimation_pytorch.apis.train import train
+from deeplabcut.pose_estimation_pytorch.apis.training import train
 from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
 from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
-
 import wandb
 # wandb.init(project="primatepose", tags=["debug_SSDLite"])
 # wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
@@ -29,9 +28,9 @@ def main(
     snapshot_path: str | None,
     detector_path: str | None,
     batch_size: int = 64,
-    dataloader_workers: int = 16,
+    dataloader_workers: int = 24,
     detector_batch_size: int = 32,
-    detector_dataloader_workers: int= 12,
+    detector_dataloader_workers: int= 16,
     debug: bool = False,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
@@ -52,29 +51,25 @@ def main(
     if save_epochs is None:
         save_epochs = loader.model_cfg["runner"]["snapshots"]["save_epochs"]
 
-    updates = dict(
-        runner=dict(snapshots=dict(save_epochs=save_epochs)),
-        train_settings=dict(
-            batch_size=batch_size,
-            dataloader_workers=dataloader_workers,
-            epochs=epochs,
-        ),
-    )
-
+    updates = {
+        "runner.snapshots.save_epochs": save_epochs,
+        "train_settings.epochs": epochs,
+        "train_settings.batch_size": batch_size,
+        "train_settings.dataloader_workers": dataloader_workers,   
+    }
+    
     det_cfg = loader.model_cfg["detector"]
     if det_cfg is not None:
         if detector_epochs is None:
             detector_epochs = det_cfg["train_settings"]["epochs"]
+        else:
+            updates["detector.train_settings.epochs"] = detector_epochs
         if detector_save_epochs is None:
             detector_save_epochs = det_cfg["runner"]["snapshots"]["save_epochs"]
-        updates_detector = dict(
-            runner=dict(snapshots=dict(save_epochs=detector_save_epochs)),
-            train_settings=dict(
-                batch_size=detector_batch_size,
-                dataloader_workers=detector_dataloader_workers,
-            ),
-        )
-        updates["detector"] = updates_detector
+        else:
+            updates["detector.runner.snapshots.save_epochs"] = detector_save_epochs
+        updates["detector.train_settings.batch_size"] = detector_batch_size
+        updates["detector.train_settings.dataloader_workers"] = detector_dataloader_workers
 
     loader.update_model_cfg(updates) # update model_cfg with the updates dictionary
 
@@ -104,10 +99,10 @@ def main(
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
-                                group = "PFM_v8_server8",
+                                group = "split_datasets_v8_server8",
                                 run_name = args.run_name,
                                 )
-          
+        
         # skipping detector training if a detector_path is given
         if args.detector_path is None and detector_epochs > 0 and args.train_detector:
             train(
@@ -119,7 +114,7 @@ def main(
                 logger_config=logger_config,
                 snapshot_path=detector_path,
             )
-            
+             
     if epochs > 0 and args.train_pose:
         train(
             loader=loader,
@@ -154,7 +149,6 @@ if __name__ == "__main__":
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
     parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
     args = parser.parse_args()
-    
     
     # backup the train.sh file and the current file in the same folder    
     train_dir = os.path.dirname(args.pytorch_config)

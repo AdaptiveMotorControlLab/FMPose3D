@@ -11,7 +11,8 @@ name=pfm
 # name=pfm_merged_checked
 # file=${name}_detector_fasterrcnn
 # train_detector=1
-file=${name}_pose_V82_wo_riken_chimpact_20250304
+# file=${name}_pose_V82_wo_riken_chimpact_20250304
+file=${name}_pose_V82_wo_riken_V82_20250313
 train_pose=1
 dataset_file=${name}
 
@@ -36,8 +37,12 @@ run_name="${file}_lr1e-4_B64"
 # test_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_test_pose_V82_no_wrong_bbox.json"
 
 # PFM V82 wo riken and chimpact; only pose
-train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_wo_riken_chimpact_V82.json"
-test_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_test_wo_riken_chimpact_V82.json"
+# train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_wo_riken_chimpact_V82.json"
+# test_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_test_wo_riken_chimpact_V82.json"
+
+# PFM V82 wo riken; only pose
+train_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_pose_wo_riken_V82.json"
+test_json="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_test_pose_wo_riken_V82.json"
 
 # snapshot_path="/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_train/train/snapshot-018.pt"
         # --snapshot_path $snapshot_path
