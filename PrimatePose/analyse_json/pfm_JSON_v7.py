@@ -276,4 +276,6 @@ if __name__ == "__main__":
     
     # select_sample_by_annotations_id(test_json_path, 37402)
     
-    save_image_by_id(160490, test_json_path, "/mediaPFM/data/datasets/final_datasets/v7/test", "/home/ti_wang/Ti_workspace/PrimatePose/data/image_sample_sub_datasets/mbw_zoo")
+    # save_image_by_id(160490, test_json_path, "/mediaPFM/data/datasets/final_datasets/v7/test", "/home/ti_wang/Ti_workspace/PrimatePose/data/image_sample_sub_datasets/mbw_zoo")
+    
+    
