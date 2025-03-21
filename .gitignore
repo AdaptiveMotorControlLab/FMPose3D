@@ -160,3 +160,22 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# pretrained models
+*.pt 
+*.pth
+*.pth
+# images and videos
+*.mp4
+# dataset
+*.json
+*.csv
+*.JPG
+
+wandb/
+rsync.sh
+# 
+.vscode/
+
+# masked folder
+vsix
