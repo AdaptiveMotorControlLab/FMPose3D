@@ -7,20 +7,20 @@ data_root=${data_path_prefix}"/v8_coco"
 project_root=$(dirname $(dirname $(realpath $0)))
 
 debug=0
-name=riken
-# file=${name}_detector_fasterrcnn
-file=${name}_hrnet_only_pose_no_single_20250227
-# file=${name}_pose_hrnet
+name=mbw
+# # file=${name}_detector_fasterrcnn
+# file=${name}_hrnet_only_pose_no_single_20250227
+file=${name}_pose_hrnet_V82_20250306
 
 dataset_name=${name}
 mode="train"
 
 # for splitted datasets V8.2
-# train_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
-# test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${dataset_name}_test.json"
+train_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
+test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${dataset_name}_test.json"
 
-train_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_${mode}_pose_no_single.json"
-test_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_test_pose_no_single.json"
+# train_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_${mode}_pose_no_single.json"
+# test_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_test_pose_no_single.json"
 
 # for splitted datasets V8.0
 # train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_name}_${mode}.json"

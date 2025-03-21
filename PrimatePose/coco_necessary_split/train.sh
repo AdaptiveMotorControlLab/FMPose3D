@@ -6,13 +6,15 @@ data_root=${data_path_prefix}"/v8_coco"
 # server amgm0
 # data_path_prefix="/media/data/ti/data"
 debug=0
-gpu_id="0"
-name=riken
+gpu_id="1"
+name=mbw
 # file=${name}_detector_fasterrcnn
 # train_detector=1
 # file=${name}_pose_reset
 # file=${name}_pose_hrnet_20250225
-file=${name}_hrnet_only_pose_no_single_20250227
+# file=${name}_hrnet_only_pose_no_single_20250227
+# file=${name}_pose_hrnet_20250308
+file=${name}_pose_hrnet_V82_20250306
 train_pose=1
 
 dataset_name=${name}
@@ -21,11 +23,11 @@ mode="train"
 run_name="${file}"
 
 # for splitted datasets V8.2
-train_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_${mode}_pose_no_single.json"
-test_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_test_pose_no_single.json"
+train_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
+test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${dataset_name}_test.json"
 
-# train_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
-# test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${dataset_name}_test.json"
+# train_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_${mode}_pose_no_single.json"
+# test_json="${data_path_prefix}/primate_data/PFM_V8.2/samples/${dataset_name}_test_pose_no_single.json"
 
 # for splitted datasets V8.0
 # train_json="${data_path_prefix}/primate_data/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
