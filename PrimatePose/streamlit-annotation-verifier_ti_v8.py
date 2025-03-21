@@ -859,7 +859,7 @@ def find_connections(pfm_idx, dataset_config):
         target_idx = None
         if idx1 == orig_idx:
             target_idx = idx2
-            
+        
         # Find corresponding PFM index
         for pfm_i, orig_i in enumerate(mapping):
             # Check if this keypoint exists in both formats
@@ -1087,11 +1087,11 @@ def main():
     #     st.success("Annotation file loaded successfully!")
             
     # todo: add a button to input dataset name, and model
-    dataset_name = "ak"
+    dataset_name = "oms"
     mode = "test"
     annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_{mode}_datasets/{dataset_name}_{mode}.json"
     # annotation_file_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/mit_train_test.json"
-    annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/ap10k_test.json"
+    # annotation_file_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/ap10k_test.json"
     with open(annotation_file_path, "r") as f:
         annotation_file = json.load(f)
     
