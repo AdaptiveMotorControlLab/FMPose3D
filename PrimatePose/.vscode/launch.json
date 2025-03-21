@@ -23,14 +23,14 @@
             // debug for evaluation
             "args": ["--project_root", 
             // "/mnt/data/tiwang/v8_coco",
-            "/home/tiwang/data/tiwang/v8_coco",
-            "--pytorch_config", "/home/ti_wang/Ti_workspace/PrimatePose/project/split/riken_pose_hrnet_train/train/pytorch_config.yaml",  //
+            "/home/ti_wang/data/tiwang/v8_coco",
+            "--train-pose",
+            "--pytorch_config", "/home/ti_wang/Ti_workspace/PrimatePose/project/split/mbw_pose_hrnet_V8.2_20250306_train/train/pytorch_config.yaml",  //
             // "--snapshot_path", "/home/ti_wang/Ti_workspace/PrimatePose/project/split/ak_hrnet_pose_train/train/snapshot-200.pt",
             // "--snapshot_path", "/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_hrnet_train/train/snapshot-180.pt",
-            "--train_file", "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/riken_train.json",  // The value of train_file
-            "--test_file",  "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/riken_test.json",   // The value of test_file
-            "--gpus", "0"
-            ],
+            "--train_file", "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/mbw_test.json",  // The value of train_file
+            "--test_file",  "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/mbw_test.json",   // The value of test_file
+            "--gpus", "0"],
             "env": {
                 "CUDA_VISIBLE_DEVICES": "0"},
             "justMyCode": false
