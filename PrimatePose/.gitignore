@@ -1,7 +1,35 @@
+# data
+demo/*.jpg
+demo/
+*.png
+*.jpg
+*.txt
+*.yaml
+*.sh
+wandb*
+# json
+*h5
+# font
+*ttf 
+
+# folder
+.vscode*
 project/
+test/
 wandb/
 data/
+data
+SuperAnimalEvaluation/
+scripts/
 rsync_from_amgm0.sh
 rsync_to_amgm0.sh
 env.sh
 test.py
+test.ipynb
+
+# AA*
+prompt*
+remark.md
+streamlit-annotation-verifier.py
+streamlit-annotation-verifier_ti_v8_riken_*
+# streamlit-annotation-verifier_ti.py
