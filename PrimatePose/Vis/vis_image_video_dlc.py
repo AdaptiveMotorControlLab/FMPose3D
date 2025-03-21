@@ -245,7 +245,7 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
             if detections_bboxes and len(detections_bboxes[0]['bboxes']) > 0:
                 bboxes = detections_bboxes[0]['bboxes']
                 
-                print(f"Detected {len(bboxes)} bounding boxes")
+                # print(f"Detected {len(bboxes)} bounding boxes")
                 
     # Result image starts as the original frame
     result_image = frame.copy()
@@ -264,7 +264,7 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
         pred_bboxs = predictions[0]["bboxes"]
         pred_scores = predictions[0]["bbox_scores"]
         pred_bboxes_scores = (pred_bboxs, pred_scores) # if we use GT bboxes for pose_runner.inference, here pred_bboxes will be the GT bboxes
-        print("pred_scores:", pred_scores)
+        # print("pred_scores:", pred_scores)
         
         plot_gt_and_predictions_PFM(
         image_path=image_path,
@@ -336,24 +336,25 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
     # Process each frame
     print("\nProcessing frames...")
     frame_files = sorted(os.listdir(ori_frames_dir))
-    for i, frame_file in enumerate(frame_files):
-        frame_path = os.path.join(ori_frames_dir, frame_file)
+    # for i, frame_file in enumerate(frame_files):
+    #     frame_path = os.path.join(ori_frames_dir, frame_file)
         
-        # Process frame using process_image
-        process_image(frame_path, pose_runner, detector_runner, results_dir)
+    #     # Process frame using process_image
+    #     process_image(frame_path, pose_runner, detector_runner, results_dir)
         
-        if i % 10 == 0:
-            print(f"\rProcessed {i+1}/{len(frame_files)} frames ({(i+1)/len(frame_files)*100:.1f}%)", end="")
+    #     if i % 10 == 0:
+    #         print(f"\rProcessed {i+1}/{len(frame_files)} frames ({(i+1)/len(frame_files)*100:.1f}%)", end="")
     
     print("\nFrame processing complete.")
     
     # Combine frames into video
     print("\nCreating output video...")
-    first_frame = cv2.imread(os.path.join(results_dir, frame_files[0]))
+    first_frame = cv2.imread(os.path.join(ori_frames_dir, frame_files[0]))
     height, width = first_frame.shape[:2]
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    video_path = os.path.join(video_folder, "1.mp4")
+    out = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
     
     result_files = sorted(os.listdir(results_dir))
     for i, result_file in enumerate(result_files):
@@ -365,7 +366,7 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
             print(f"\rWriting frame {i+1}/{len(result_files)} ({(i+1)/len(result_files)*100:.1f}%)", end="")
     
     out.release()
-    print(f"\nOutput video saved to: {output_path}")
+    print(f"\nOutput video saved to: {video_path}")
 
 def main():
     # Parse command line arguments
