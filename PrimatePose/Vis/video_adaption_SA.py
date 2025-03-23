@@ -21,6 +21,9 @@ from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import seaborn as sns
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+import cv2
+from tqdm import tqdm
+import glob
 
 def run_video_inference(video_path, pose_config_path, pose_model_path, detector_model_path):
     """Run video inference with adaptation using the specified models."""
@@ -40,8 +43,8 @@ def run_video_inference(video_path, pose_config_path, pose_model_path, detector_
         detector_name="fasterrcnn_mobilenet_v3_large_fpn",
         video_adapt=True,
         max_individuals=1,
-        pseudo_threshold=0.8,
-        pcutoff=0.8,
+        pseudo_threshold=0.65,
+        pcutoff=0.65,
         bbox_threshold=0.9,
         batch_size=4,
         detector_batch_size=4,
@@ -92,7 +95,7 @@ def calculate_jitter_score(json_path):
                 frame_keypoints.append([x, y])
 
         # If we have keypoints for this frame, add to the list
-        print("frame_keypoints:", frame_keypoints)
+        # print("frame_keypoints:", frame_keypoints)
         if frame_keypoints:
             # print("frame_keypoints:", len(frame_keypoints))
             all_kpts.append(np.array(frame_keypoints)[np.newaxis, :, :])
@@ -244,15 +247,85 @@ def plot_area_score(area_scores_before, area_scores_after, output_path):
     
     return output_path
 
+def generate_video_from_image_folder(image_folder_path, output_video_path):
+    """
+    Generate a video from a folder of images
+    
+    Parameters:
+    -----------
+    image_folder_path : str
+        Path to folder containing image files
+    output_video_path : str
+        Path to save the output video
+    """
+
+    # Get all image files in the folder
+    image_files = [f for f in os.listdir(image_folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    image_files.sort()
+    
+    if not image_files:
+        print(f"No image files found in {image_folder_path}")
+        return
+    
+    print(f"Found {len(image_files)} image files")
+    
+    # Read the first image to get dimensions
+    first_image_path = os.path.join(image_folder_path, image_files[0])
+    first_image = cv2.imread(first_image_path)
+    
+    if first_image is None:
+        print(f"Failed to read image: {first_image_path}")
+        return
+    
+    height, width, _ = first_image.shape
+    print(f"Image dimensions: {width}x{height}")
+    
+    # Create video writer
+    # Use H.264 codec (XVID for compatibility)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = 3  # Frames per second
+    
+    video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    
+    if not video_writer.isOpened():
+        print(f"Failed to open video writer for {output_video_path}")
+        return
+    
+    # Process each image and add to video
+    print(f"Creating video from {len(image_files)} images...")
+    for image_file in tqdm(image_files):
+        image_path = os.path.join(image_folder_path, image_file)
+        image = cv2.imread(image_path)
+        
+        if image is None:
+            print(f"Failed to read image: {image_path}, skipping")
+            continue
+            
+        # Ensure image has the same dimensions
+        if image.shape[0] != height or image.shape[1] != width:
+            image = cv2.resize(image, (width, height))
+            
+        # Add frame to video
+        video_writer.write(image)
+    
+    # Release video writer
+    video_writer.release()
+    
+    print(f"Video created successfully: {output_video_path}")
+    return output_video_path
+
 def main():
     """Main function to run video inference and optionally analyze results."""
     pose_config_path = "/home/ti_wang/Ti_workspace/PrimatePose/project/pfm_pose_V82_wo_riken_chimpact_20250304/train/pytorch_config.yaml"
     pose_model_path = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/pfm_pose.pt"
     # pose_model_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/pre_trained_models/aptv2/aptv2_200.pt"
     detector_model_path = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/pfm_det.pt"
+    
     video_path = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/8s_3840_2160_25fps.mp4"
     video_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/monkey_videos/videoID_1000013_original.mp4"
-    
+    video_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/APTv2/aptv2_v11C3.mp4"
+    video_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/APTv2/aptv2_v24C4.mp4"
+
     # Run inference
     output_folder = run_video_inference(video_path, pose_config_path, pose_model_path, detector_model_path)
     print(f"Results saved to: {output_folder}")
@@ -261,48 +334,73 @@ def main():
 
 if __name__ == "__main__":
     
-    # Choose what to run    
-    # main()
+    # Choose what to run 
+
+    flag_create_video_from_image_folder = False
+    flag_video_adaption = False
+    flag_calculate_area_score = False
+    flag_calculate_jitter_score = False
     
-    # Choose which JSON file to analyze (before adaptation)
-    before_json_path = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/video_adaption_SA_20250317_2004/videoID_1000013_original_superanimal_topviewmouse_pfm_det_pfm_pose_before_adapt.json"
+    # flag_create_video_from_image_folder = True
+    # flag_video_adaption = True
+    flag_calculate_area_score = True
+    flag_calculate_jitter_score = True
+
     
-    # JSON file after adaptation
-    after_json_path = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/video_adaption_SA_20250317_2004/videoID_1000013_original_superanimal_topviewmouse_snapshot-fasterrcnn_mobilenet_v3_large_fpn-001_snapshot-hrnet_w32-010_after_adapt.json"
+    if flag_create_video_from_image_folder:
+        image_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/APTv2/v11C3"
+        image_folder_path="/home/ti_wang/Ti_workspace/projects/sam2/primate_data/datasets/aptv2/processed_dataset/images/easy/7chimpanzee/v24C4"
+        output_video_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/APTv2/aptv2_v24C4.mp4"
+        generate_video_from_image_folder(image_folder_path, output_video_path)
+
+    if flag_video_adaption:
+        main()
+
+    # folder_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/video_adaption_SA_20250323_2015"
+    # before_adaption_json_path = os.path.join(folder_path, "aptv2_v24C4_superanimal_topviewmouse_pfm_det_pfm_pose_before_adapt.json")
+    # after_adaption_json_path = os.path.join(folder_path, "aptv2_v24C4_superanimal_topviewmouse_snapshot-fasterrcnn_mobilenet_v3_large_fpn-001_snapshot-hrnet_w32-001_after_adapt.json")    
     
-    # Extract keypoints and calculate area scores for before adaptation
-    print("\n=== Processing Before Adaptation Data ===")
-    keypoints_before = extract_keypoints_from_json(before_json_path)
-    print(f"Keypoints array shape (before): {keypoints_before.shape}")
-    area_scores_before = calculate_area_score(keypoints_before)
-    print(f"Mean area score (before): {np.mean(area_scores_before):.2f}")    
-    # Extract keypoints and calculate area scores for after adaptation
-    print("\n=== Processing After Adaptation Data ===")
-    keypoints_after = extract_keypoints_from_json(after_json_path)
-    print(f"Keypoints array shape (after): {keypoints_after.shape}")
-    area_scores_after = calculate_area_score(keypoints_after)
-    print(f"Mean area score (after): {np.mean(area_scores_after):.2f}")
+    folder_path="/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/video_adaption_SA_20250323_2015"
+    # Find files matching the pattern
+    before_adaption_json_path = glob.glob(os.path.join(folder_path, "*_before_adapt.json"))[0]
+    after_adaption_json_path = glob.glob(os.path.join(folder_path, "*_after_adapt.json"))[0]
     
-    # Plot comparison of area scores
-    print("\n=== Plotting Area Score Comparison ===")
-    area_score_output_folder = "/home/ti_wang/Ti_workspace/PrimatePose/Vis/samples/video_adaption_SA_20250317_2004/area_score_comparison"
-    plot_path = plot_area_score(area_scores_before, area_scores_after, area_score_output_folder)
-    print(f"Area score comparison plot saved to: {plot_path}")
+    if flag_calculate_area_score:
+        # Choose which JSON file to analyze (before adaptation)
+        # Extract keypoints and calculate area scores for before adaptation
+        print("\n=== Processing Before Adaptation Data ===")
+        keypoints_before = extract_keypoints_from_json(before_adaption_json_path)
+        print(f"Keypoints array shape (before): {keypoints_before.shape}")
+        area_scores_before = calculate_area_score(keypoints_before)
+        print(f"Mean area score (before): {np.mean(area_scores_before):.2f}")    
+        # Extract keypoints and calculate area scores for after adaptation
+        print("\n=== Processing After Adaptation Data ===")
+        keypoints_after = extract_keypoints_from_json(after_adaption_json_path)
+        print(f"Keypoints array shape (after): {keypoints_after.shape}")
+        area_scores_after = calculate_area_score(keypoints_after)
+        print(f"Mean area score (after): {np.mean(area_scores_after):.2f}")
+        
+        # Plot comparison of area scores
+        print("\n=== Plotting Area Score Comparison ===")
+        area_score_output_folder = os.path.join(folder_path, "area_score_comparison")
+        plot_path = plot_area_score(area_scores_before, area_scores_after, area_score_output_folder)
+        print(f"Area score comparison plot saved to: {plot_path}")
     
-    # # Calculate jitter scores for before adaptation
-    # print("\n=== Jitter Score Calculation (Before Adaptation) ===")
-    # jitter_before = calculate_jitter_score(before_json_path)
-    # if jitter_before is not None:
-    #     jitter_x_before = np.nanmean(jitter_before[0])
-    #     jitter_y_before = np.nanmean(jitter_before[1])
-    #     jitter_combined_before = np.nanmean([jitter_x_before, jitter_y_before])
-    #     print(f"Summary (before) - X: {jitter_x_before:.4f}, Y: {jitter_y_before:.4f}, Combined: {jitter_combined_before:.4f}")
-    
-    # # Calculate jitter scores for after adaptation
-    # print("\n=== Jitter Score Calculation (After Adaptation) ===")
-    # jitter_after = calculate_jitter_score(after_json_path)
-    # if jitter_after is not None:
-    #     jitter_x_after = np.nanmean(jitter_after[0])
-    #     jitter_y_after = np.nanmean(jitter_after[1])
-    #     jitter_combined_after = np.nanmean([jitter_x_after, jitter_y_after])
-    #     print(f"Summary (after) - X: {jitter_x_after:.4f}, Y: {jitter_y_after:.4f}, Combined: {jitter_combined_after:.4f}")
+    if flag_calculate_jitter_score:
+        # Calculate jitter scores for before adaptation
+        print("\n=== Jitter Score Calculation (Before Adaptation) ===")
+        jitter_before = calculate_jitter_score(before_adaption_json_path)
+        if jitter_before is not None:
+            jitter_x_before = np.nanmean(jitter_before[0])
+            jitter_y_before = np.nanmean(jitter_before[1])
+        jitter_combined_before = np.nanmean([jitter_x_before, jitter_y_before])
+        print(f"Summary (before) - X: {jitter_x_before:.4f}, Y: {jitter_y_before:.4f}, Combined: {jitter_combined_before:.4f}")
+        
+        # Calculate jitter scores for after adaptation
+        print("\n=== Jitter Score Calculation (After Adaptation) ===")
+        jitter_after = calculate_jitter_score(after_adaption_json_path)
+        if jitter_after is not None:
+            jitter_x_after = np.nanmean(jitter_after[0])
+            jitter_y_after = np.nanmean(jitter_after[1])
+            jitter_combined_after = np.nanmean([jitter_x_after, jitter_y_after])
+            print(f"Summary (after) - X: {jitter_x_after:.4f}, Y: {jitter_y_after:.4f}, Combined: {jitter_combined_after:.4f}")
