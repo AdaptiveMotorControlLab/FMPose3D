@@ -13,7 +13,6 @@ import pandas as pd
 from deeplabcut.generate_training_dataset import merge_annotateddatasets
 from deeplabcut.utils import auxiliaryfunctions
 
-
 def create_black_video(
     output_path: str,
     fps: int = 30,
