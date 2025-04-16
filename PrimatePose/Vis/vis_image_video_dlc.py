@@ -7,6 +7,8 @@ from pathlib import Path
 import torch
 import functools
 import types
+# import tqdm
+from tqdm import tqdm
 
 # Import DeepLabCut components
 from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
@@ -273,13 +275,81 @@ def process_image(image_path, pose_runner, detector_runner=None, output_path=Non
         bounding_boxes=pred_bboxes_scores,
         skeleton=PFM_SKELETON,
         # keypoint_names=keypoint_name_simplified_V2,
-        p_cutoff=0.65,
+        p_cutoff=0.43,
         keypoint_vis_mask=keypoint_vis_mask, # Pass the mask to plotting function
         )
-        
+           
     return result_image, pred_keypoints_list, pred_confidences_list, bboxes
 
-def process_video_pose(video_path, pose_runner, detector_runner=None, output_path=None):
+def generate_video_from_image_folder(image_folder_path, output_video_path):
+    """
+    Generate a video from a folder of images
+    
+    Parameters:
+    -----------
+    image_folder_path : str
+        Path to folder containing image files
+    output_video_path : str
+        Path to save the output video
+    """
+
+    # Get all image files in the folder
+    image_files = [f for f in os.listdir(image_folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    image_files.sort()
+    
+    if not image_files:
+        print(f"No image files found in {image_folder_path}")
+        return
+    
+    print(f"Found {len(image_files)} image files")
+    
+    # Read the first image to get dimensions
+    first_image_path = os.path.join(image_folder_path, image_files[0])
+    first_image = cv2.imread(first_image_path)
+    
+    if first_image is None:
+        print(f"Failed to read image: {first_image_path}")
+        return
+    
+    height, width, _ = first_image.shape
+    print(f"Image dimensions: {width}x{height}")
+    
+    # Create video writer
+    # Use H.264 codec (XVID for compatibility)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = 3  # Frames per second
+    
+    video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    
+    if not video_writer.isOpened():
+        print(f"Failed to open video writer for {output_video_path}")
+        return
+    
+    # Process each image and add to video
+    print(f"Creating video from {len(image_files)} images...")
+    for image_file in tqdm(image_files):
+        image_path = os.path.join(image_folder_path, image_file)
+        image = cv2.imread(image_path)
+        print("image_path:", image_path)
+        
+        if image is None:
+            print(f"Failed to read image: {image_path}, skipping")
+            continue
+            
+        # Ensure image has the same dimensions
+        if image.shape[0] != height or image.shape[1] != width:
+            image = cv2.resize(image, (width, height))
+        
+        # Add frame to video
+        video_writer.write(image)
+    
+    # Release video writer
+    video_writer.release()
+    
+    print(f"Video created successfully: {output_video_path}")
+    return output_video_path
+
+def process_video_pose(video_path, pose_runner, detector_runner=None, output_folder_path=None):
     """
     Process video for pose estimation by extracting frames, processing each frame,
     and reconstructing the video.
@@ -295,13 +365,10 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
     """
     # Create directory structure
     video_name = os.path.splitext(os.path.basename(video_path))[0]
-    target_folder = os.path.dirname(output_path)
-    
     # Create a dedicated folder for this video
-    video_folder = os.path.join(target_folder, video_name)
+    video_folder = os.path.join(output_folder_path, video_name)
     ori_frames_dir = os.path.join(video_folder, "ori_frames")
     results_dir = os.path.join(video_folder, "results")
-    
     os.makedirs(video_folder, exist_ok=True)
     os.makedirs(ori_frames_dir, exist_ok=True)
     os.makedirs(results_dir, exist_ok=True)
@@ -312,7 +379,7 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
         raise FileNotFoundError(f"Could not open video at: {video_path}")
     
     # Get video properties
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    # fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     print(f"Extracting frames from video...")
@@ -323,8 +390,8 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
             break
         
         # Save frame
-        frame_path = os.path.join(ori_frames_dir, f"frame_{frame_count:06d}.jpg")
-        cv2.imwrite(frame_path, frame)
+        tmp_frame_path = os.path.join(ori_frames_dir, f"frame_{frame_count:06d}.jpg")
+        cv2.imwrite(tmp_frame_path, frame)
         
         frame_count += 1
         if frame_count % 10 == 0:
@@ -336,37 +403,43 @@ def process_video_pose(video_path, pose_runner, detector_runner=None, output_pat
     # Process each frame
     print("\nProcessing frames...")
     frame_files = sorted(os.listdir(ori_frames_dir))
-    # for i, frame_file in enumerate(frame_files):
-    #     frame_path = os.path.join(ori_frames_dir, frame_file)
+    for i, frame_file in enumerate(frame_files):
+        tmp_frame_path = os.path.join(ori_frames_dir, frame_file)
         
-    #     # Process frame using process_image
-    #     process_image(frame_path, pose_runner, detector_runner, results_dir)
+        # Process frame using process_image
+        process_image(tmp_frame_path, pose_runner, detector_runner, results_dir)
         
-    #     if i % 10 == 0:
-    #         print(f"\rProcessed {i+1}/{len(frame_files)} frames ({(i+1)/len(frame_files)*100:.1f}%)", end="")
+        if i % 10 == 0:
+            print(f"\rProcessed {i+1}/{len(frame_files)} frames ({(i+1)/len(frame_files)*100:.1f}%)", end="")
     
     print("\nFrame processing complete.")
     
     # Combine frames into video
+    print("results_dir:", results_dir)
+    print("video_folder_dir:", video_folder)
+    # output_video_path = os.path.join(video_folder, "generated.mp4")
+    # generate_video_from_image_folder(results_dir, video_path)
     print("\nCreating output video...")
-    first_frame = cv2.imread(os.path.join(ori_frames_dir, frame_files[0]))
-    height, width = first_frame.shape[:2]
-    
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_path = os.path.join(video_folder, "1.mp4")
-    out = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
     
     result_files = sorted(os.listdir(results_dir))
+    first_frame = cv2.imread(os.path.join(results_dir, result_files[0]))
+    height, width, _ = first_frame.shape
+    print(f"Output video dimensions: {width}x{height}")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = 3
+    output_video_path = os.path.join(video_folder, "generated.mp4")
+    video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    
+    # print("results", result_files)
     for i, result_file in enumerate(result_files):
         frame_path = os.path.join(results_dir, result_file)
+        print("frame_path:", frame_path)
         frame = cv2.imread(frame_path)
-        out.write(frame)
-        
+        video_writer.write(frame)
         if i % 10 == 0:
             print(f"\rWriting frame {i+1}/{len(result_files)} ({(i+1)/len(result_files)*100:.1f}%)", end="")
-    
-    out.release()
-    print(f"\nOutput video saved to: {video_path}")
+    video_writer.release()
+    print(f"\nOutput video saved to: {output_video_path}")
 
 def main():
     # Parse command line arguments
