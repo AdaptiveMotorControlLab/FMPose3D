@@ -83,6 +83,29 @@ build:
 	docker build $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
+
+IMG_NAME := registry.rcp.epfl.ch/pfm_ti/test
+IMG_TAG := v0.2
+DOCKERFILE := Dockerfile
+BUILD_ARGS := \
+		--build-arg LDAP_GROUPNAME=rcp-runai-upmwmathis_AppGrpU\
+        --build-arg LDAP_GID=79685 \
+        --build-arg LDAP_USERNAME=wang3 \
+        --build-arg LDAP_UID=288935
+
+build_cluster:
+	docker build --platform linux/amd64 $(BUILD_ARGS) \
+		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
+
+CONTAINER_NAME := test0.1
+run_cluster:
+	docker run -it --name $(CONTAINER_NAME) \
+							$(IMG_NAME):$(IMG_TAG) tail -f /dev/null
+
+exec_cluster:
+	docker exec -it $(CONTAINER_NAME) /bin/zsh
+
+
 DOCKER_IMG_EXISTS := $(shell docker images -q $(IMG_NAME):$(IMG_TAG))
 
 build_check:
