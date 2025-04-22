@@ -32,7 +32,6 @@ The target for this function:
     - judge whether the annotation has pose: 
         - check all the vis_labels in the 'keypoints', if all these vis_labels are -1, then the annotation is considered without pose. Otherwise, we consider it has pose.
 
-
 # extract_annotations_with_tails_ap.py
 
 Target:
@@ -199,8 +198,7 @@ in V8.1, for some sub-datasets, the keypoint mapping is not correct, so we need 
 
 based on V8.1, we correct the keypoint mapping for some sub-datasets, and save the correct keypoint mapping to the json file;
 
-
-## process of V8.2
+### process of V8.2
 
 file: V8.2_correct_keypoint_mapping.py
 
@@ -298,7 +296,6 @@ categories
               we need to change the keypoint position to V8.2 format;
             - use the pre-defined V8.2 keypoint mapping to correct the keypoint mapping.
 
-
 def transform_keypoints(keypoints, v80_mapping, v82_mapping):
 ```bash
     # Plan A: use keypoint in V80 to replace keypoint in V82
@@ -315,3 +312,101 @@ def transform_keypoints(keypoints, v80_mapping, v82_mapping):
     #  use one for loop to fill the value of v82_keypoint using v80_keypoint.
     # plan B is faster and more efficient;
 ```
+
+## V8.21_Sapiens
+
+
+
+
+the structure of the V8.2 json file is like this:
+```bash
+    JSON structure:
+images
+    [List of 14374 items]
+        file_name
+            (str)
+        width
+            (int)
+        height
+            (int)
+        id
+            (int)
+        source_dataset
+            (str)
+annotations
+    [List of 14374 items]
+        id
+            (int)
+        image_id
+            (int)
+        category_id
+            (int)
+        bbox
+            [List of 4 items]
+                (int)
+        keypoints
+            [List of 111 items]
+                (int)
+        num_keypoints
+            (int)
+        area
+            (int)
+        iscrowd
+            (int)
+categories
+    [List of 1 items]
+        id
+            (int)
+        name
+            (str)
+        supercategory
+            (str)
+        keypoints
+            [List of 37 items]
+                (str)
+```
+
+Now, we need to modify the keypoints and num_keypoints in 'annotations' and categories['keypoints'] to change it to coco format.
+
+- select the target keypoints in PFM:
+[
+{"id": 0, "pfm_idx":  4,  keypoint_name: "nose"}
+{"id": 1, "pfm_idx":  2,  keypoint_name: "left_eye"}
+{"id": 2, "pfm_idx":  3,  keypoint_name: "right_eye"}
+{"id": 3, "pfm_idx":  5,  keypoint_name: "left_ear"}
+{"id": 4, "pfm_idx":  6,  keypoint_name: "right_ear"}
+{"id": 5, "pfm_idx":  12, keypoint_name: "left_shoulder"}
+{"id": 6, "pfm_idx":  13, keypoint_name: "right_shoulder"}
+{"id": 7, "pfm_idx":  18, keypoint_name: "left_elbow"}
+{"id": 8, "pfm_idx":  19, keypoint_name: "right_elbow"}
+{"id": 9, "pfm_idx":  20, keypoint_name: "left_wrist"}
+{"id": 10, "pfm_idx": 21, keypoint_name: "right_wrist"}
+{"id": 11, "pfm_idx": 24, keypoint_name: "left_hip"}
+{"id": 12, "pfm_idx": 25, keypoint_name: "right_hip"}
+{"id": 13, "pfm_idx": 27, keypoint_name: "left_knee"}
+{"id": 14, "pfm_idx": 28, keypoint_name: "right_knee"}
+{"id": 15, "pfm_idx": 29, keypoint_name: "left_ankle"}
+{"id": 16, "pfm_idx": 30, keypoint_name: "right_ankle"}
+]
+
+pfm_idx means the index of pfm keypoints. I need to select these keypoints from V8.2 version dataset, and then construct a 17 keypoints new version dataset. (json file)
+
+keep all the other items remain the same.
+
+the code is written in /home/ti_wang/Ti_workspace/PrimatePose/analyse_json/v8.21_sapiens_coco_17joints.py file.
+
+mode=test
+input file:
+/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{$mode}_pose_wo_riken_chimpact_V82.json
+
+output file:
+/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/pfm_{$mode}_pose_wo_riken_chimpact_v8_21.json
+
+
+
+
+extract the 17 keypoints and save it as a new version dataset
+
+why choose 17 keypoints?
+- align with coco format
+- compare performance
