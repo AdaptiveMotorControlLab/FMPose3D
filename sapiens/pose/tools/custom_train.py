@@ -1,6 +1,5 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
-#
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 import argparse
@@ -9,6 +8,10 @@ import os.path as osp
 from mmengine.config import Config, DictAction
 from mmengine.runner import Runner
 from mmengine.registry import RUNNERS
+import sys
+# Add the parent directory (pose) to sys.path; fix the env path error in debug mode
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+print("sys.path: ", sys.path)
 from mmpose.engine.hooks import CustomRuntimeInfoHook
 
 def parse_args():
@@ -164,10 +167,10 @@ def main():
 
     # load config
     cfg = Config.fromfile(args.config)
-    
+    # print("cfg: ", cfg)
     # merge CLI arguments to config
     cfg = merge_args(cfg, args)
-    
+    # print(cfg) 
     # set preprocess configs to model
     if 'preprocess_cfg' in cfg:
         cfg.model.setdefault('data_preprocessor',
