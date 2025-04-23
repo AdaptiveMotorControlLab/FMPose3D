@@ -179,7 +179,7 @@ dataset_coco = dict(
     type='CocoDataset',
     data_root=data_root,
     data_mode='topdown',
-    ann_file='annotations/pfm_train_pose_wo_riken_chimpact_V82.json',
+    ann_file='8.21_sapiens/pfm_train_pose_wo_riken_chimpact_v8_21.json',
     data_prefix=dict(img='images/'),
 )
 
@@ -207,7 +207,8 @@ val_dataloader = dict(
         type='CocoDataset',
         data_root=data_root,
         data_mode='topdown',
-        ann_file='annotations/pfm_test_pose_wo_riken_chimpact_V82.json',
+        # ann_file='annotations/pfm_test_pose_wo_riken_chimpact_V82.json',
+        ann_file='8.21_sapiens/pfm_test_pose_wo_riken_chimpact_v8_21.json',
         # bbox_file=bbox_file,
         data_prefix=dict(img='images/'),
         test_mode=True,
@@ -219,5 +220,5 @@ test_dataloader = val_dataloader
 # evaluators
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file=f'{data_root}/annotations/pfm_test_pose_wo_riken_chimpact_V82.json')
+    ann_file=f'{data_root}/8.21_sapiens/pfm_test_pose_wo_riken_chimpact_v8_21.json')
 test_evaluator = val_evaluator
