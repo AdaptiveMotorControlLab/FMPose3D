@@ -83,7 +83,6 @@ build:
 	docker build $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
-
 IMG_NAME := registry.rcp.epfl.ch/pfm_ti/test
 IMG_TAG := v0.2
 DOCKERFILE := Dockerfile
