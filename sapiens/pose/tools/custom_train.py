@@ -11,7 +11,7 @@ from mmengine.registry import RUNNERS
 import sys
 # Add the parent directory (pose) to sys.path; fix the env path error in debug mode
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-print("sys.path: ", sys.path)
+# print("sys.path: ", sys.path)
 from mmpose.engine.hooks import CustomRuntimeInfoHook
 
 def parse_args():
@@ -166,8 +166,10 @@ def main():
     args = parse_args()
 
     # load config
-    cfg = Config.fromfile(args.config)
+    cfg = Config.fromfile(args.config) 
     # print("cfg: ", cfg)
+    # print("type(cfg): ", type(cfg)) #  <class 'mmengine.config.config.Config'>
+    
     # merge CLI arguments to config
     cfg = merge_args(cfg, args)
     # print(cfg) 
@@ -177,7 +179,7 @@ def main():
                              cfg.get('preprocess_cfg', {}))
 
     # build the runner from config
-    # runner = Runner.from_cfg(cfg)
+    runner = Runner.from_cfg(cfg)
 
     # print("RUNNERS: ", len(RUNNERS))
     # print("RUNNERS module_dict: ", RUNNERS.module_dict)
@@ -198,7 +200,7 @@ def main():
         # print(runner.model)
 
     # start training
-    # runner.train()
+    runner.train()
 
 if __name__ == '__main__':
     main() 
