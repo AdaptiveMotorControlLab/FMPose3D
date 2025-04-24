@@ -1,6 +1,25 @@
 # FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
+FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+# FROM continuumio/anaconda3:latest
+
+ENV PATH="/opt/conda/bin:${PATH}"
+
+# Install essential packages
+RUN apt-get update --fix-missing && \
+    apt-get install -y wget bzip2 ca-certificates curl git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up conda in shell
+RUN ln -fs /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc
+
+# Initialize conda for both bash and zsh (do this as root before user creation)
+RUN conda init bash && conda init zsh
+
 # Use the official Anaconda3 image from Docker Hub
-FROM continuumio/anaconda3:latest
+# FROM continuumio/anaconda3:latest
 
 #####################################
 # RCP CaaS requirement (Storage)
@@ -17,11 +36,10 @@ ARG LDAP_GID
 RUN groupadd ${LDAP_GROUPNAME} --gid ${LDAP_GID}
 RUN useradd -m -s /bin/bash -g ${LDAP_GROUPNAME} -u ${LDAP_UID} ${LDAP_USERNAME}
 
-ARG user_name=ti_wang
-ARG uid=1002
-ARG gid=1002
-ENV HOME=/root 
-
+# ARG user_name=ti_wang
+# ARG uid=1002
+# ARG gid=1002
+# ENV HOME=/root 
 # WORKDIR /
 
 # Copy your code inside the container
@@ -29,51 +47,84 @@ RUN mkdir -p /home/${LDAP_USERNAME}
 
 ENV HOME=/home/${LDAP_USERNAME}
 WORKDIR ${HOME}
-RUN git clone https://github.com/facebookresearch/sapiens.git
-RUN cd sapiens/_install && ./conda.sh
-RUN conda activate sapiens
+# RUN git clone https://github.com/facebookresearch/sapiens.git
 
-# ENV DEBIAN_FRONTEND=noninteractive
+# Modify conda.sh to use the correct conda path and then execute it
+# RUN cd sapiens/_install && \
+    # sed -i "s|CONDA_BASE=\"/home/\${USER}/anaconda3\"|CONDA_BASE=\"/opt/conda\"|g" conda.sh && \
+    # ./conda.sh
+
+# Properly initialize and activate conda environment in a shell context
+# SHELL ["/bin/bash", "--login", "-c"]
+# Install additional packages in the sapiens environment
+# RUN source ~/.bashrc && \
+#     conda activate sapiens && \
+#     pip install mmcv==2.0.1 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.0/index.html && \
+#     pip install gpustat
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Install system packages
+SHELL ["/bin/bash", "-c"]
 RUN apt-get update -y && apt-get install -yy --no-install-recommends \
     vim zsh tmux wget \
-    curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo ssh git-lfs\
+    curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo ssh git-lfs \
+    libglib2.0-0 \
     && apt-get -y autoclean \
     && apt-get -y autoremove \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-
-# RUN apt-get update && apt-get install -y libglib2.0-0
-
 # Create a non-root user
-RUN mkdir /app /logs /data
-RUN groupadd -g ${gid} ${user_name} \
-    && useradd -m -u ${uid} -g ${gid} ${user_name} \
-    && chown -R ${uid}:${gid} /home
-
+# RUN mkdir /app /logs /data
+# RUN groupadd -g ${gid} ${user_name} \
+#     && useradd -m -u ${uid} -g ${gid} ${user_name} \
+#     && chown -R ${uid}:${gid} /home
+    
 # Switch to the new user and set home directory as working directory
-USER ${user_name}
-ENV HOME=/home/${user_name}
+# USER ${user_name}
+# ENV HOME=/home/${user_name}
+
 WORKDIR ${HOME}
 # Install Oh My Zsh and plugins
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended \
 && git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions \
 && git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \
 && sed -i 's/^plugins=(.*)$/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
-RUN echo "export PATH=$PATH:/home/${user_name}/.local/bin" >> /home/${user_name}/.zshrc
-
-# install pip packages
-# COPY ./requirements.txt /requirements.txt
-# RUN pip install --no-cache-dir --upgrade pip setuptools gpustat nvitop && \
-#     pip install --no-cache-dir pytest PySide6==6.3.1
+RUN echo "export PATH=$PATH:/home/${LDAP_USERNAME}/.local/bin" >> /home/${LDAP_USERNAME}/.zshrc
 
 # Set environment variables
-ENV SAPIENS_ROOT=/home/ti_wang/Ti_workspace/sapiens
+ENV SAPIENS_ROOT=/home/${LDAP_USERNAME}/Ti_workspace/sapiens
 ENV SAPIENS_LITE_ROOT=$SAPIENS_ROOT/lite
 
-WORKDIR /home/ti_wang/Ti_workspace/sapiens
-USER ${user_name}
-USER root
+WORKDIR /home/${LDAP_USERNAME}/Ti_workspace/sapiens
 
+# Setup the conda environment for the LDAP user
+RUN mkdir -p /home/${LDAP_USERNAME}/.conda && \
+    chown -R ${LDAP_USERNAME}:${LDAP_GROUPNAME} /home/${LDAP_USERNAME} && \
+    echo 'export PATH="/opt/conda/bin:$PATH"' >> /home/${LDAP_USERNAME}/.zshrc && \
+    echo '. /opt/conda/etc/profile.d/conda.sh' >> /home/${LDAP_USERNAME}/.zshrc
+# echo 'conda activate sapiens' >> /home/${LDAP_USERNAME}/.zshrc
+
+# Install OpenMMLab libraries with pre-built wheels
+RUN pip install -U openmim && \
+    mim install mmengine && \
+    mim install mmcv && \
+    pip install mmdet mmpretrain
+
+# Alternatively, if the above fails, use MMCV-lite (no CUDA support)
+# RUN pip install mmcv-lite mmengine mmpretrain mmdet
+
+# Now switch to the LDAP user
+USER ${LDAP_USERNAME}
+USER root
 CMD ["zsh"]
 SHELL ["/bin/zsh", "-c"]
+
+# Install Python and pip
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip \
+    git wget curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
