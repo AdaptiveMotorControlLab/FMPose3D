@@ -12,7 +12,7 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 # GPU := GPU_1_2_
 
 # [USER: ADJUST TAG]
-TAG := _sapien_1.3 #_train|_test|_daemon 
+TAG := _sapien_1.3 #_train|_test|_daemon
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
@@ -68,7 +68,7 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-IMG_TAG := 1.2
+IMG_TAG := 1.3
 # IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
 IMG_NAME := sapien
 
@@ -84,9 +84,10 @@ build:
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
 
-IMG_NAME := registry.rcp.epfl.ch/pfm_ti/test
-IMG_TAG := v0.2
-DOCKERFILE := Dockerfile
+# for cluster
+IMG_NAME := registry.rcp.epfl.ch/pfm_ti/sapiens
+IMG_TAG := v0.12
+DOCKERFILE := Dockerfile_cluster
 BUILD_ARGS := \
 		--build-arg LDAP_GROUPNAME=rcp-runai-upmwmathis_AppGrpU\
         --build-arg LDAP_GID=79685 \
@@ -97,14 +98,22 @@ build_cluster:
 	docker build --platform linux/amd64 $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
-CONTAINER_NAME := test0.1
+CONTAINER_NAME := test0.24
+HOST_SRC := /home/ti_wang/Ti_workspace/sapiens
+DOCKER_SRC := /home/wang3/Ti_workspace/sapiens
+PFM_DATA := /home/ti_wang/data/tiwang/v8_coco
+CLUSTER_DATA := /home/ti_wang/data/tiwang/v8_coco
+VOLUMES := \
+	--volume $(HOST_SRC):$(DOCKER_SRC) \
+	--volume $(PFM_DATA):$(CLUSTER_DATA)
+
 run_cluster:
-	docker run -it --name $(CONTAINER_NAME) \
-							$(IMG_NAME):$(IMG_TAG) tail -f /dev/null
+	docker run -it --gpus all --name $(CONTAINER_NAME) $(VOLUMES) \
+							$(IMG_NAME):$(IMG_TAG) 
+# tail -f /dev/null
 
 exec_cluster:
 	docker exec -it $(CONTAINER_NAME) /bin/zsh
-
 
 DOCKER_IMG_EXISTS := $(shell docker images -q $(IMG_NAME):$(IMG_TAG))
 
