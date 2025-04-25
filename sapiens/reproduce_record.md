@@ -44,9 +44,50 @@ You must first build you image with the registry tag:
 -t registry.rcp.epfl.ch/<project>/<container_name>:<version>
 ```
 
+
 ```bash
 docker push image_name
 docker push registry.rcp.epfl.ch/how-to-registry/demo:latest
 docker push registry.rcp.epfl.ch/how-to-registry/demo:0.1
 ```
 
+- harbor:
+    
+    https://registry.rcp.epfl.ch/harbor/projects/571/repositories
+
+
+## change default project
+
+```bash
+runai config project upmwmathis-wang3
+runai config project course-ee-559-wang3
+```
+
+## submit jobs
+
+```bash
+runai submit --gpu 1 --name sleep  --image  registry.rcp.epfl.ch/avion/llava_avion:latest  --backoff-limit 0 --large-shm --run-as-uid 288935 --run-as-gid 79685 --existing-pvc \
+claimname=upmwmathis-scratch,path=/data   --command -- /bin/bash -ic "sleep infinity"
+```
+
+```bash
+runai submit --gpu 1 --name sleeptest6 --image registry.rcp.epfl.ch/pfm_ti/sapiens:v0.12 --backoff-limit 0 --large-shm \
+--pvc upmwmathis-scratch --pvc home:${HOME} -e HOME=${HOME} \
+--command -- /bin/bash -ic "sleep infinity"
+```
+
+
+--pvc home:${HOME}
+
+- PVC stands for Persistent Volume Claim
+Format: --pvc <pvc-name>:<mount-path>
+
+e.g. "--pvc home:${HOME}"
+- In this case, it mounts a volume named "home" to the path specified by ${HOME}.
+Ensures your data persists even after the container stops running.
+
+"-e HOME=${HOME}"
+- -e is used to set Environment Variables inside the container
+- Format: -e VARIABLE=VALUE
+- This sets the HOME environment variable inside the container to match the current user's HOME directory path
+- Ensures the container knows where your home directory is located
