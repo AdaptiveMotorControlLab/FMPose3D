@@ -27,7 +27,6 @@ RUN chown -R ${LDAP_USERNAME}:${LDAP_GROUPNAME} /opt/conda
 RUN chown -R ${LDAP_USERNAME}:${LDAP_GROUPNAME} /etc/profile.d
 # Set your user as owner of the new copied files
 RUN chown -R ${LDAP_USERNAME}:${LDAP_GROUPNAME} /home/${LDAP_USERNAME}
-
 # Now switch to the LDAP user
 USER ${LDAP_USERNAME}
 
@@ -76,7 +75,7 @@ WORKDIR ${HOME}
 # ENV SAPIENS_ROOT=/home/${LDAP_USERNAME}/Ti_workspace/sapiens
 # ENV SAPIENS_LITE_ROOT=$SAPIENS_ROOT/lite
 
-WORKDIR /home/${LDAP_USERNAME}/Ti_workspace/sapiens
+# WORKDIR /home/${LDAP_USERNAME}/Ti_workspace/sapiens
 
 # Setup the conda environment for the LDAP user
 # RUN mkdir -p /home/${LDAP_USERNAME}/.conda && \
