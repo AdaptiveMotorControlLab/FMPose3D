@@ -57,7 +57,7 @@ RUN ln -fs /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
 # Install Python packages
 RUN pip install -U openmim && \
     mim install mmengine mmcv mmpretrain && \
-    pip install pandas future tensorboard
+    pip install pandas future tensorboard gpustat
 RUN pip install albumentations
 
 # Switch to the new user and set home directory as working directory
@@ -65,11 +65,11 @@ RUN pip install albumentations
 ENV HOME=/home/${LDAP_USERNAME}
 WORKDIR ${HOME}
 # Install Oh My Zsh and plugins
-# RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended \
-# && git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions \
-# && git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \
-# && sed -i 's/^plugins=(.*)$/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
-# RUN echo "export PATH=$PATH:/home/${LDAP_USERNAME}/.local/bin" >> /home/${LDAP_USERNAME}/.zshrc
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended \
+&& git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions \
+&& git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \
+&& sed -i 's/^plugins=(.*)$/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+RUN echo "export PATH=$PATH:/home/${LDAP_USERNAME}/.local/bin" >> /home/${LDAP_USERNAME}/.zshrc
 
 # Set environment variables
 # ENV SAPIENS_ROOT=/home/${LDAP_USERNAME}/Ti_workspace/sapiens
@@ -85,8 +85,8 @@ WORKDIR ${HOME}
 # echo 'conda activate sapiens' >> /home/${LDAP_USERNAME}/.zshrc
 
 # Setup zsh as the default shell
-# SHELL ["/bin/zsh", "-c"]
-# CMD ["zsh"]
+SHELL ["/bin/zsh", "-c"]
+CMD ["zsh"]
 # setup bash as the default shell
-SHELL ["/bin/bash", "-c"]
-CMD ["bash"]
+# SHELL ["/bin/bash", "-c"]
+# CMD ["bash"]
