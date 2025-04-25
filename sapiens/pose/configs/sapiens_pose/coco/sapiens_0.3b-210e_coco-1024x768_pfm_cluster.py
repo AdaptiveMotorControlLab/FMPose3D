@@ -7,7 +7,8 @@ model_name = 'sapiens_0.3b'; embed_dim=1024; num_layers=24
 # model_name = 'sapiens_2b'; embed_dim=1920; num_layers=48
 
 # pretrained_checkpoint='../pretrain/checkpoints/sapiens_0.3b/sapiens_0.3b_epoch_1600_clean.pth'
-pretrained_checkpoint='/home/wang3/Ti_workspace/sapiens/downloads/sapiens-pose-coco/sapiens_host/pose/checkpoints/sapiens_0.3b/sapiens_0.3b_coco_best_coco_AP_796.pth' 
+
+pretrained_checkpoint='/data/ti/sapiens/downloads/sapiens-pose-coco/sapiens_host/pose/checkpoints/sapiens_0.3b/sapiens_0.3b_coco_best_coco_AP_796.pth' 
 
 # Define architecture parameters directly
 num_heads=16
@@ -25,7 +26,7 @@ patch_size=16
 num_keypoints=17 # 17 for coco, 37 for pfm
 num_epochs=210
 
-data_root="/home/ti_wang/data/tiwang/v8_coco"
+data_root="/data/ti/v8_coco"
 # bbox_file=f'{data_root}/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
 # bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
 
@@ -185,8 +186,8 @@ dataset_coco = dict(
 
 # data loaders
 train_dataloader = dict(
-    batch_size=1,  # Reduced from 64
-    num_workers=1, # 4
+    batch_size=8,  # Reduced from 64
+    num_workers=4, # 4
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -198,8 +199,8 @@ train_dataloader = dict(
     )
 
 val_dataloader = dict(
-    batch_size=1,  # Reduced from 32
-    num_workers=1, # 4
+    batch_size=8,  # Reduced from 32
+    num_workers=4, # 4
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
