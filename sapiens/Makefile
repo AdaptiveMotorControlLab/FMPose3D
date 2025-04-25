@@ -93,7 +93,7 @@ BUILD_ARGS := \
         --build-arg LDAP_GID=79685 \
         --build-arg LDAP_USERNAME=wang3 \
         --build-arg LDAP_UID=288935
-
+		
 build_cluster:
 	docker build --platform linux/amd64 $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
