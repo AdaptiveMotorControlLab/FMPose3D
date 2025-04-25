@@ -1,0 +1,25 @@
+# FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+FROM ubuntu:22.04
+# FROM alpine:3.18
+
+# Install essential system packages
+RUN apt-get update && \
+    apt-get install -y git zsh libgl1-mesa-glx libglib2.0-0 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# User setup for container
+ARG LDAP_USERNAME
+ARG LDAP_UID
+ARG LDAP_GROUPNAME
+ARG LDAP_GID
+RUN groupadd ${LDAP_GROUPNAME} --gid ${LDAP_GID} && \
+    useradd -m -s /bin/zsh -g ${LDAP_GROUPNAME} -u ${LDAP_UID} ${LDAP_USERNAME}
+
+# Set environment variables
+# ENV HOME=/home/${LDAP_USERNAME}
+# ENV SAPIENS_ROOT=/home/${LDAP_USERNAME}/Ti_workspace/sapiens
+# WORKDIR ${SAPIENS_ROOT}
+
+USER ${LDAP_USERNAME}
+CMD ["zsh"]
