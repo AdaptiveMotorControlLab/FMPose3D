@@ -86,7 +86,7 @@ build:
 
 # for cluster
 IMG_NAME := registry.rcp.epfl.ch/pfm_ti/sapiens
-IMG_TAG := v0.12
+IMG_TAG := v0.19
 DOCKERFILE := Dockerfile_cluster
 BUILD_ARGS := \
 		--build-arg LDAP_GROUPNAME=rcp-runai-upmwmathis_AppGrpU\
@@ -98,11 +98,14 @@ build_cluster:
 	docker build --platform linux/amd64 $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
-CONTAINER_NAME := test0.24
+docker_push:
+	docker push $(IMG_NAME):$(IMG_TAG)
+
+CONTAINER_NAME := v0.37
 HOST_SRC := /home/ti_wang/Ti_workspace/sapiens
 DOCKER_SRC := /home/wang3/Ti_workspace/sapiens
-PFM_DATA := /home/ti_wang/data/tiwang/v8_coco
-CLUSTER_DATA := /home/ti_wang/data/tiwang/v8_coco
+PFM_DATA := /home/ti_wang/data/tiwang
+CLUSTER_DATA := /data/ti
 VOLUMES := \
 	--volume $(HOST_SRC):$(DOCKER_SRC) \
 	--volume $(PFM_DATA):$(CLUSTER_DATA)
