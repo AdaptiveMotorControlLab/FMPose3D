@@ -8,6 +8,11 @@ model_name = 'sapiens_0.3b'; embed_dim=1024; num_layers=24
 
 pretrained_checkpoint='../pretrain/checkpoints/sapiens_0.3b/sapiens_0.3b_epoch_1600_clean.pth'
 
+# Define architecture parameters directly
+num_heads=16
+feedforward_channels=embed_dim * 4
+
+
 ##-----------------------------------------------------------------
 # evaluate_every_n_epochs = 10 ## default
 evaluate_every_n_epochs = 1
@@ -20,7 +25,7 @@ patch_size=16
 num_keypoints=17
 num_epochs=210
 
-bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
+# bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
 # runtime
 train_cfg = dict(max_epochs=num_epochs, val_interval=evaluate_every_n_epochs)
 
@@ -87,7 +92,13 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='mmpretrain.VisionTransformer',
-        arch=model_name,
+        # arch=model_name,
+        arch=dict(
+        embed_dims=embed_dim,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        feedforward_channels=feedforward_channels
+        ),
         img_size=(image_size[1], image_size[0]),
         patch_size=patch_size,
         qkv_bias=True,
@@ -184,7 +195,7 @@ val_dataloader = dict(
         data_root='data/coco',
         data_mode='topdown',
         ann_file='annotations/person_keypoints_val2017.json',
-        bbox_file=bbox_file,
+        # bbox_file=bbox_file,
         data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=val_pipeline,
