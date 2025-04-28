@@ -6,7 +6,8 @@ model_name = 'sapiens_0.3b'; embed_dim=1024; num_layers=24
 # model_name = 'sapiens_1b'; embed_dim=1536; num_layers=40
 # model_name = 'sapiens_2b'; embed_dim=1920; num_layers=48
 
-pretrained_checkpoint='../pretrain/checkpoints/sapiens_0.3b/sapiens_0.3b_epoch_1600_clean.pth'
+# pretrained_checkpoint='../pretrain/checkpoints/sapiens_0.3b/sapiens_0.3b_epoch_1600_clean.pth'
+pretrained_checkpoint='/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-pose-coco/sapiens_host/pose/checkpoints/sapiens_0.3b/sapiens_0.3b_coco_best_coco_AP_796.pth' 
 
 # Define architecture parameters directly
 num_heads=16
@@ -25,6 +26,7 @@ patch_size=16
 num_keypoints=17
 num_epochs=210
 
+data_root="/home/ti_wang/Ti_workspace/sapiens/COCO_data"
 # bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
 # runtime
 train_cfg = dict(max_epochs=num_epochs, val_interval=evaluate_every_n_epochs)
@@ -164,7 +166,7 @@ val_pipeline = [
 # datasets
 dataset_coco = dict(
     type='CocoDataset',
-    data_root='data/coco',
+    data_root=data_root,
     data_mode='topdown',
     ann_file='annotations/person_keypoints_train2017.json',
     data_prefix=dict(img='train2017/'),
@@ -192,7 +194,7 @@ val_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
         type='CocoDataset',
-        data_root='data/coco',
+        data_root=data_root,
         data_mode='topdown',
         ann_file='annotations/person_keypoints_val2017.json',
         # bbox_file=bbox_file,
@@ -206,5 +208,5 @@ test_dataloader = val_dataloader
 # evaluators
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file='data/coco/annotations/person_keypoints_val2017.json')
+    ann_file='COCO_data/annotations/person_keypoints_val2017.json')
 test_evaluator = val_evaluator
