@@ -109,9 +109,9 @@ model = dict(
         with_cls_token=False,
         out_type='featmap',
         patch_cfg=dict(padding=2),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=pretrained_checkpoint),
+        # init_cfg=dict(
+        #     type='Pretrained',
+        #     checkpoint=pretrained_checkpoint),
     ),
     head=dict(
         type='HeatmapHead',
@@ -127,7 +127,11 @@ model = dict(
         flip_test=True,
         flip_mode='heatmap',
         shift_heatmap=False,
-    ))
+    ),
+    init_cfg=dict(
+        type='Pretrained',
+        checkpoint=pretrained_checkpoint)
+    )
 
 # pipelines
 train_pipeline = [
@@ -174,7 +178,7 @@ dataset_coco = dict(
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=2,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -187,7 +191,7 @@ train_dataloader = dict(
     )
 
 val_dataloader = dict(
-    batch_size=32,
+    batch_size=2,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
