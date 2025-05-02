@@ -4,12 +4,14 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 import os
+import argparse
 from deeplabcut.generate_training_dataset import merge_annotateddatasets
 import deeplabcut
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 import deeplabcut.utils.auxiliaryfunctions as auxiliaryfunctions
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 
 
 def create_training_dataset_pfm(config, BU_SHUFFLE=1):
@@ -39,18 +41,83 @@ def create_training_dataset_pfm(config, BU_SHUFFLE=1):
         engine=deeplabcut.Engine.PYTORCH,
         userfeedback=False,
     )
-    return config, train_indices, test_indices
+    return config
 
-config = "/home/ti_wang/Ti_workspace/PrimatePose/CTD_primate/pfm_deepwild-dlc-2025-05-02/config.yaml"
 
-create_training_dataset_pfm(config)
-
-BU_SHUFFLE = 0
-
-deeplabcut.train_network(
-    config,
-    shuffle=BU_SHUFFLE,
-    epochs=100,
-)
-
-# deeplabcut.evaluate_network(config, Shuffles=[BU_SHUFFLE])    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='DeepLabCut training script for primate pose estimation')
+    
+    # Configuration
+    parser.add_argument('--config', type=str, 
+                        default="/TD_primate/pfm_oms_small-dlc-2025-05-02/config.yaml",
+                        help='Path to the config.yaml file')
+    
+    # Shuffle indices
+    parser.add_argument('--bu_shuffle', type=int, default=1,
+                        help='Shuffle index for baseline model (default: 1)')
+    parser.add_argument('--ctd_shuffle', type=int, default=7,
+                        help='Shuffle index for CTD model (default: 7)')
+    
+    # Training parameters
+    parser.add_argument('--epochs', type=int, default=100,
+                        help='Number of training epochs (default: 100)')
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='Batch size for training (default: 32)')
+    parser.add_argument('--ctd_net_type', type=str, default="ctd_prenet_rtmpose_m",
+                        help='Network type for CTD (default: ctd_prenet_rtmpose_m)')
+    
+    # Actions
+    parser.add_argument('--create_BU_dataset', type=bool, default=False,
+                        help='Create training dataset using create_training_dataset_pfm')
+    parser.add_argument('--train_BU', type=bool, default=False,
+                        help='Train the baseline network')
+    parser.add_argument('--evaluate_BU', type=bool, default=False,
+                        help='Evaluate the baseline network')
+    parser.add_argument('--create_CTD_dataset', type=bool, default=False,
+                        help='Create CTD training dataset')
+    parser.add_argument('--train_CTD', type=bool, default=False,
+                        help='Train the CTD network')
+    
+    args = parser.parse_args()
+    print("training!")
+    
+    config = args.config
+    BU_SHUFFLE = args.bu_shuffle
+    CTD_SHUFFLE = args.ctd_shuffle
+    
+    # Execute actions based on arguments
+    if args.create_BU_dataset:
+        config = create_training_dataset_pfm(config, BU_SHUFFLE=BU_SHUFFLE)
+        print("config:", config)
+    
+    if args.train_BU:
+        print("Training BU network")
+        deeplabcut.train_network(
+            config,
+            shuffle=BU_SHUFFLE,
+            batch_size=args.batch_size,
+        )
+    
+    if args.evaluate_BU:
+        print("Evaluating BU network")
+        deeplabcut.evaluate_network(config, Shuffles=[BU_SHUFFLE])
+    
+    if args.create_CTD_dataset:
+        print("Creating CTD training dataset")
+        deeplabcut.create_training_dataset_from_existing_split(
+            config,
+            from_shuffle=BU_SHUFFLE,
+            shuffles=[CTD_SHUFFLE],
+            net_type=args.ctd_net_type,
+            engine=deeplabcut.Engine.PYTORCH,
+            ctd_conditions=(BU_SHUFFLE, -1),
+        )
+    
+    if args.train_CTD:
+        print("Training CTD network")
+        deeplabcut.train_network(
+            config,
+            shuffle=CTD_SHUFFLE,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+        )
