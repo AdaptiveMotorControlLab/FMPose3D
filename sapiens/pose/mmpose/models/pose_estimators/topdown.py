@@ -117,7 +117,7 @@ class TopdownPoseEstimator(BasePoseEstimator):
         """
         # Enable automatic mixed precision training context.
         with optim_wrapper.optim_context(self):
-            data = self.data_preprocessor(data, True)
+            data = self.data_preprocessor(data, True) # [1,3,1024,768]
             losses, preds = self._run_forward(data, mode='loss')  # type: ignore
         parsed_losses, log_vars = self.parse_losses(losses)  # type: ignore
 
