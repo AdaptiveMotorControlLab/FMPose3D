@@ -87,7 +87,7 @@ def convert_to_coco_format(input_file, output_file):
     # Save the new dataset
     print(f"Saving COCO format data to {output_file}")
     with open(output_file, 'w') as f:
-        json.dump(new_data, f)
+        json.dump(new_data, f, indent=4)
     
     print(f"Conversion complete. Original dataset had {len(data['annotations'])} annotations with {len(data['categories'][0]['keypoints'])} keypoints.")
     print(f"New dataset has {len(new_data['annotations'])} annotations with {len(new_data['categories'][0]['keypoints'])} keypoints.")
@@ -100,10 +100,11 @@ def main():
    
     args.mode = "train"
     # Define input and output paths
+    args.species = "oms"
     base_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2"
-    input_file = f"{base_dir}/pfm_{args.mode}_pose_wo_riken_chimpact_V82.json"
+    input_file = f"{base_dir}/splitted_{args.mode}_datasets/{args.species}_{args.mode}.json"
     output_dir = f"{base_dir}/8.21_sapiens"
-    output_file = f"{output_dir}/pfm_{args.mode}_pose_wo_riken_chimpact_v8_21.json"
+    output_file = f"{output_dir}/{args.species}_{args.mode}_pose_v8_21.json"
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)

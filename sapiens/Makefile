@@ -12,7 +12,7 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 # GPU := GPU_1_2_
 
 # [USER: ADJUST TAG]
-TAG := _sapien_1.3 #_train|_test|_daemon
+TAG := _sapien_1.5 #_train|_test|_daemon
 #if no tag, will be deleted on exit
 #_daemon can be restarted (long-lasting) env: to avoid
 #_test: testing env
@@ -31,7 +31,6 @@ DOCKER_SRC := /home/ti_wang/
 # HOST_DATA := /mnt/data/tiwang
 HOST_DATA := /usr
 DOCKER_DATA := /usr
-# tiwang/.
 
 # [USER: ADJUST VOLUMES]
 VOLUMES := \
@@ -48,7 +47,8 @@ run: build_check
 	@echo "Selected available port: $(PORT)"
 	docker run --shm-size=110G --gpus all -it -p $(PORT):8889 --name $(CONTAINER_NAME) \
 							$(VOLUMES) \
-							$(IMG_NAME):$(IMG_TAG) tail -f /dev/null
+							$(IMG_NAME):$(IMG_TAG)
+#  tail -f /dev/null
 
 # @echo "Container exited and removed by default. Delete --rm option in current Makefile and adjustthis message, if you need to keep the container alive (docker restart)."
 
@@ -68,11 +68,16 @@ run: build_check
 
 # [USER: ADJUST TAG]
 
-IMG_TAG := 1.3
-# IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
-IMG_NAME := sapien
+# IMG_TAG := 1.3
+# IMG_NAME := sapien
 
-DOCKERFILE := Dockerfile.ti
+IMG_TAG := 0.1
+IMG_NAME := sapien_lite
+
+# IMG_NAME := mmathislab/$(shell id -un)/$(project_name_lo)
+
+# DOCKERFILE := Dockerfile.ti
+DOCKERFILE := Dockerfile.sapiens_lite
 
 BUILD_ARGS := \
         --build-arg uid=$(shell id -u) \
@@ -83,37 +88,39 @@ build:
 	docker build $(BUILD_ARGS) \
 		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
 
-
 # for cluster
-IMG_NAME := registry.rcp.epfl.ch/pfm_ti/sapiens
-IMG_TAG := v0.12
-DOCKERFILE := Dockerfile_cluster
-BUILD_ARGS := \
+IMG_NAME_CLUSTER := registry.rcp.epfl.ch/pfm_ti/sapiens
+IMG_TAG_CLUSTER := v0.19
+DOCKERFILE_CLUSTER := Dockerfile_cluster
+BUILD_ARGS_CLUSTER := \
 		--build-arg LDAP_GROUPNAME=rcp-runai-upmwmathis_AppGrpU\
         --build-arg LDAP_GID=79685 \
         --build-arg LDAP_USERNAME=wang3 \
         --build-arg LDAP_UID=288935
 		
 build_cluster:
-	docker build --platform linux/amd64 $(BUILD_ARGS) \
-		 -t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
+	docker build --platform linux/amd64 $(BUILD_ARGS_CLUSTER) \
+		 -t $(IMG_NAME_CLUSTER):$(IMG_TAG_CLUSTER) -f $(DOCKERFILE_CLUSTER) .
 
-CONTAINER_NAME := test0.24
-HOST_SRC := /home/ti_wang/Ti_workspace/sapiens
-DOCKER_SRC := /home/wang3/Ti_workspace/sapiens
-PFM_DATA := /home/ti_wang/data/tiwang/v8_coco
-CLUSTER_DATA := /home/ti_wang/data/tiwang/v8_coco
-VOLUMES := \
-	--volume $(HOST_SRC):$(DOCKER_SRC) \
-	--volume $(PFM_DATA):$(CLUSTER_DATA)
+docker_push:
+	docker push $(IMG_NAME_CLUSTER):$(IMG_TAG_CLUSTER)
+
+CONTAINER_NAME_CLUSTER := v0.38
+HOST_SRC_CLUSTER := /home/ti_wang/Ti_workspace/sapiens
+DOCKER_SRC_CLUSTER := /home/wang3/Ti_workspace/sapiens
+PFM_DATA_CLUSTER := /home/ti_wang/data/tiwang
+CLUSTER_DATA_CLUSTER := /data/ti
+VOLUMES_CLUSTER := \
+	--volume $(HOST_SRC_CLUSTER):$(DOCKER_SRC_CLUSTER) \
+	--volume $(PFM_DATA_CLUSTER):$(CLUSTER_DATA_CLUSTER)
 
 run_cluster:
-	docker run -it --gpus all --name $(CONTAINER_NAME) $(VOLUMES) \
-							$(IMG_NAME):$(IMG_TAG) 
+	docker run -it --gpus all --name $(CONTAINER_NAME_CLUSTER) $(VOLUMES_CLUSTER) \
+						$(IMG_NAME_CLUSTER):$(IMG_TAG_CLUSTER) 
 # tail -f /dev/null
 
 exec_cluster:
-	docker exec -it $(CONTAINER_NAME) /bin/zsh
+	docker exec -it $(CONTAINER_NAME_CLUSTER) /bin/zsh
 
 DOCKER_IMG_EXISTS := $(shell docker images -q $(IMG_NAME):$(IMG_TAG))
 

@@ -381,6 +381,9 @@ class Runner:
                 self._experiment_name,
                 scope_name=default_scope)
         self.default_scope = default_scope
+        # for i in range(5):
+        #     print("__________________________")
+        # print("self.default_scope: ", self.default_scope)
 
         # Build log processor to format message.
         log_processor = dict() if log_processor is None else log_processor
@@ -789,6 +792,9 @@ class Runner:
         if isinstance(visualizer, dict):
             # ensure visualizer containing name key
             visualizer.setdefault('name', self._experiment_name)
+            print("__________________________")
+            print("self._log_dir: ", self._log_dir)
+            print("__________________________")
             visualizer.setdefault('save_dir', self._log_dir)
             return VISUALIZERS.build(visualizer)
         else:
