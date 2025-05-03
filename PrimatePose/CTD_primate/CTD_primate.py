@@ -59,7 +59,7 @@ if __name__ == "__main__":
                         help='Shuffle index for CTD model (default: 7)')
     
     # Training parameters
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=400,
                         help='Number of training epochs (default: 100)')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training (default: 32)')
@@ -79,6 +79,8 @@ if __name__ == "__main__":
                         help='Train the CTD network')
     
     args = parser.parse_args()
+    
+    
     print("training!")
     
     config = args.config
@@ -112,9 +114,30 @@ if __name__ == "__main__":
             engine=deeplabcut.Engine.PYTORCH,
             ctd_conditions=(BU_SHUFFLE, -1),
         )
-    
+            
     if args.train_CTD:
         print("Training CTD network")
+        
+        # back up files
+        train_scripts = "train_CTD.sh" 
+        # Dynamically determine the model directory
+        cfg = auxiliaryfunctions.read_config(config)
+        task = cfg['Task']
+        date= cfg['date']
+        prefix = task + date
+        TrainingFraction = cfg['TrainingFraction'][0] * 100
+        model_folder = f"{prefix}-trainset{int(TrainingFraction)}shuffle{CTD_SHUFFLE}"
+        # Build complete backup directory path
+        backup_dir = os.path.join(Path(config).parent, "dlc-models-pytorch", f"iteration-0", model_folder)
+        # Create backup directory if it doesn't exist
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Copy files to backup directory
+        shutil.copy2(train_scripts, os.path.join(backup_dir, train_scripts))
+        current_script = os.path.basename(__file__)
+        shutil.copy2(current_script, os.path.join(backup_dir, current_script))
+        print(f"Backed up {train_scripts} and {current_script} to {backup_dir}")
+
         deeplabcut.train_network(
             config,
             shuffle=CTD_SHUFFLE,
