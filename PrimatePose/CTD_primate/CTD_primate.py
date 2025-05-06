@@ -14,7 +14,7 @@ import numpy as np
 import yaml
 
 
-def create_training_dataset_pfm(config, BU_SHUFFLE=1):
+def create_training_dataset_pfm(config, net_type="resnet_50", BU_SHUFFLE=1):
     cfg = auxiliaryfunctions.read_config(config)
     
     # Create the training dataset folder
@@ -37,12 +37,32 @@ def create_training_dataset_pfm(config, BU_SHUFFLE=1):
         Shuffles=[BU_SHUFFLE],
         trainIndices=[train_indices],
         testIndices=[test_indices],
-        net_type="resnet_50",
+        net_type=net_type,
         engine=deeplabcut.Engine.PYTORCH,
         userfeedback=False,
     )
     return config
 
+def backup_files(config):
+        # back up files
+        train_scripts = "train_CTD.sh" 
+        # Dynamically determine the model directory
+        cfg = auxiliaryfunctions.read_config(config)
+        task = cfg['Task']
+        date= cfg['date']
+        prefix = task + date
+        TrainingFraction = cfg['TrainingFraction'][0] * 100
+        model_folder = f"{prefix}-trainset{int(TrainingFraction)}shuffle{CTD_SHUFFLE}"
+        # Build complete backup directory path
+        backup_dir = os.path.join(Path(config).parent, "dlc-models-pytorch", f"iteration-0", model_folder)
+        # Create backup directory if it doesn't exist
+        os.makedirs(backup_dir, exist_ok=True)
+        # Copy files to backup directory
+        shutil.copy2(train_scripts, os.path.join(backup_dir, train_scripts))
+        current_script = os.path.basename(__file__)
+        shutil.copy2(current_script, os.path.join(backup_dir, current_script))
+        print(f"Backed up {train_scripts} and {current_script} to {backup_dir}")
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DeepLabCut training script for primate pose estimation')
@@ -59,10 +79,12 @@ if __name__ == "__main__":
                         help='Shuffle index for CTD model (default: 7)')
     
     # Training parameters
-    parser.add_argument('--epochs', type=int, default=400,
+    parser.add_argument('--CTD_epochs', type=int, default=400,
                         help='Number of training epochs (default: 100)')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training (default: 32)')
+    parser.add_argument('--bu_net_type', type=str, default="resnet_50",
+                        help='Network type for baseline')
     parser.add_argument('--ctd_net_type', type=str, default="ctd_prenet_rtmpose_m",
                         help='Network type for CTD (default: ctd_prenet_rtmpose_m)')
     
@@ -77,9 +99,10 @@ if __name__ == "__main__":
                         help='Create CTD training dataset')
     parser.add_argument('--train_CTD', type=bool, default=False,
                         help='Train the CTD network')
+    parser.add_argument('--evaluate_CTD', type=bool, default=False,
+                        help='Evaluate the CTD network')
     
     args = parser.parse_args()
-    
     
     print("training!")
     
@@ -89,11 +112,12 @@ if __name__ == "__main__":
     
     # Execute actions based on arguments
     if args.create_BU_dataset:
-        config = create_training_dataset_pfm(config, BU_SHUFFLE=BU_SHUFFLE)
+        config = create_training_dataset_pfm(config,net_type=args.bu_net_type, BU_SHUFFLE=BU_SHUFFLE)
         print("config:", config)
     
     if args.train_BU:
         print("Training BU network")
+        backup_files(config)
         deeplabcut.train_network(
             config,
             shuffle=BU_SHUFFLE,
@@ -117,30 +141,15 @@ if __name__ == "__main__":
             
     if args.train_CTD:
         print("Training CTD network")
-        
-        # back up files
-        train_scripts = "train_CTD.sh" 
-        # Dynamically determine the model directory
-        cfg = auxiliaryfunctions.read_config(config)
-        task = cfg['Task']
-        date= cfg['date']
-        prefix = task + date
-        TrainingFraction = cfg['TrainingFraction'][0] * 100
-        model_folder = f"{prefix}-trainset{int(TrainingFraction)}shuffle{CTD_SHUFFLE}"
-        # Build complete backup directory path
-        backup_dir = os.path.join(Path(config).parent, "dlc-models-pytorch", f"iteration-0", model_folder)
-        # Create backup directory if it doesn't exist
-        os.makedirs(backup_dir, exist_ok=True)
-        
-        # Copy files to backup directory
-        shutil.copy2(train_scripts, os.path.join(backup_dir, train_scripts))
-        current_script = os.path.basename(__file__)
-        shutil.copy2(current_script, os.path.join(backup_dir, current_script))
-        print(f"Backed up {train_scripts} and {current_script} to {backup_dir}")
-
+        backup_files(config)
         deeplabcut.train_network(
             config,
             shuffle=CTD_SHUFFLE,
-            epochs=args.epochs,
+            epochs=args.CTD_epochs,
             batch_size=args.batch_size,
         )
+        
+    if args.evaluate_CTD:
+        print("Evaluating CTD network")
+        print(CTD_SHUFFLE)
+        deeplabcut.evaluate_network(config, Shuffles=[CTD_SHUFFLE])
