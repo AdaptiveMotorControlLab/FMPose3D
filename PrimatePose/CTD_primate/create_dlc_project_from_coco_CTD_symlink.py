@@ -3,6 +3,7 @@
 import json
 import shutil
 import os
+import argparse
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -213,19 +214,47 @@ def main(
 
 if __name__ == "__main__":
     
-    output_dir = Path("/home/ti_wang/Ti_workspace/PrimatePose/CTD_primate").resolve()
-    species = "oms"
+    parser = argparse.ArgumentParser(description="Create a DeepLabCut project from a COCO dataset")
+    
+    parser.add_argument("--output_dir", type=str, 
+                        default="/home/ti_wang/Ti_workspace/PrimatePose/CTD_primate",
+                        help="Output directory for the project")
+    
+    parser.add_argument("--task", type=str, 
+                        default="pfm_riken",
+                        help="Task name for the project")
+    
+    parser.add_argument("--experimenter", type=str, 
+                        default="ti",
+                        help="Experimenter name")
+    
+    parser.add_argument("--coco_project", type=str, 
+                        default="/home/ti_wang/data/tiwang/v8_coco",
+                        help="Path to COCO project")
+    
+    parser.add_argument("--train_file", type=str, 
+                        default=None,
+                        help="Path to training file. If not provided, it will be constructed using species name")
+    
+    parser.add_argument("--test_file", type=str, 
+                        default=None,
+                        help="Path to test file. If not provided, it will be constructed using species name")
+    
+    args = parser.parse_args()
+    
+    # Convert string paths to Path objects
+    output_dir = Path(args.output_dir).resolve()
+    coco_project = Path(args.coco_project)
+    
+    # Construct train/test file paths if not provided
+    train_file = Path(args.train_file)
+    test_file = Path(args.test_file)
+    
     main(
         output_dir=output_dir,
-        task="pfm",
-        experimenter="ti",
-        coco_project=Path("/home/ti_wang/data/tiwang/v8_coco"),
-        train_file=Path(f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_train_pose_wo_riken_chimpact_V82.json"),
-        test_file=Path(f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_test_pose_wo_riken_chimpact_V82.json")
-        # train_file=Path(f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_train_datasets/{species}_train.json"),
-        # test_file=Path(f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/{species}_test.json")
-        # train_file=Path("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_train_datasets/deepwild_train_train.json"),
-        # test_file=Path("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/deepwild_train_test.json"),
-        # train_file=Path("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/oms_train_small_1_500.json"),
-        # test_file=Path("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/oms_test_small_1_500.json"),
+        task=args.task,
+        experimenter=args.experimenter,
+        coco_project=coco_project,
+        train_file=train_file,
+        test_file=test_file,
     )
