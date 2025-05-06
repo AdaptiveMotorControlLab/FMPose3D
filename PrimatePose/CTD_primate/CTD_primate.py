@@ -43,7 +43,7 @@ def create_training_dataset_pfm(config, net_type="resnet_50", BU_SHUFFLE=1):
     )
     return config
 
-def backup_files(config):
+def backup_files(config, shuffle=1):
         # back up files
         train_scripts = "train_CTD.sh" 
         # Dynamically determine the model directory
@@ -52,7 +52,7 @@ def backup_files(config):
         date= cfg['date']
         prefix = task + date
         TrainingFraction = cfg['TrainingFraction'][0] * 100
-        model_folder = f"{prefix}-trainset{int(TrainingFraction)}shuffle{CTD_SHUFFLE}"
+        model_folder = f"{prefix}-trainset{int(TrainingFraction)}shuffle{shuffle}"
         # Build complete backup directory path
         backup_dir = os.path.join(Path(config).parent, "dlc-models-pytorch", f"iteration-0", model_folder)
         # Create backup directory if it doesn't exist
@@ -117,7 +117,8 @@ if __name__ == "__main__":
     
     if args.train_BU:
         print("Training BU network")
-        backup_files(config)
+        backup_files(config, shuffle=BU_SHUFFLE)
+        print("BU_shuffle:", BU_SHUFFLE)
         deeplabcut.train_network(
             config,
             shuffle=BU_SHUFFLE,
@@ -141,7 +142,7 @@ if __name__ == "__main__":
             
     if args.train_CTD:
         print("Training CTD network")
-        backup_files(config)
+        backup_files(config, shuffle=CTD_SHUFFLE)
         deeplabcut.train_network(
             config,
             shuffle=CTD_SHUFFLE,
