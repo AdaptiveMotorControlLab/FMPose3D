@@ -1,3 +1,8 @@
+"""
+this file is used to covert pfm v8.2 format to coco format with 17 keypoints, 
+then I can use the coco format to train the sapiens model
+"""
+
 import json
 import os
 from pathlib import Path
