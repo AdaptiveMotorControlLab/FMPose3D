@@ -423,6 +423,12 @@ class JSONProcessor:
             data = json.load(f)
         return len(data['annotations'])
 
+    @staticmethod
+    def cal_number_of_images(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return len(data['images'])
+    
     def small_dataset_filter(self, json_path, output_path, sample_rate=1/20):
         with open(json_path, 'r') as f:
             data = json.load(f)
