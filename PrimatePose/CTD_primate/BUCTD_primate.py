@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
-
 def create_training_dataset_pfm(config, net_type="resnet_50", BU_SHUFFLE=1):
     cfg = auxiliaryfunctions.read_config(config)
     
