@@ -5,13 +5,13 @@ project_root=$(dirname $(realpath $0))
 debug=0
 OOD_dataset_name=AP-10K
 
-file_name=SA_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250514
+file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250514
 
 mode="train"
 
 # train and test json files
 train_json="${data_root}/annotations/${mode}_IID_wo_${OOD_dataset_name}.json"
-test_json="${data_root}/annotations/${mode}_IID_wo_${OOD_dataset_name}.json"
+test_json="${data_root}/annotations/test_IID_wo_${OOD_dataset_name}.json"
 
 # model_arch="top_down_resnet_50"
 # model_arch="top_down_hrnet_w32"
