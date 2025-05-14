@@ -148,6 +148,10 @@ if __name__ == "__main__":
     parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
     parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for pose model training")
+    parser.add_argument("--dataloader-workers", type=int, default=16, help="Number of dataloader workers")
+    parser.add_argument("--detector-batch-size", type=int, default=32, help="Batch size for detector model training")
+    parser.add_argument("--detector-dataloader-workers", type=int, default=16, help="Number of dataloader workers for detector")
     args = parser.parse_args()
     
     # backup the train.sh file and the current file in the same folder    
@@ -158,8 +162,8 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(current_file_path)
     train_sh_path = os.path.join(current_dir, "train.sh")
     
-    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
-    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    # shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    # shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
     
     main(
         args.project_root,
@@ -174,5 +178,9 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
+        batch_size=args.batch_size,
+        dataloader_workers=args.dataloader_workers,
+        detector_batch_size=args.detector_batch_size,
+        detector_dataloader_workers=args.detector_dataloader_workers,
         debug=args.debug
     )
