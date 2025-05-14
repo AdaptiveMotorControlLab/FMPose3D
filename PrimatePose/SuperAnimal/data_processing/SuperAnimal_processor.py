@@ -48,12 +48,21 @@ class SuperAnimalProcessor:
         # Split annotations
         OOD_annotations = []
         IID_annotations = []
+        uncategorized_annotations = []
         
         for annotation in annotations:
             if annotation["image_id"] in OOD_image_ids:
                 OOD_annotations.append(annotation)
             elif annotation["image_id"] in IID_image_ids:
                 IID_annotations.append(annotation)
+            else:
+                uncategorized_annotations.append(annotation)
+        
+        # Report any uncategorized annotations
+        if uncategorized_annotations:
+            print(f"WARNING: Found {len(uncategorized_annotations)} annotations that don't belong to either OOD or IID images")
+            # print(f"First few uncategorized annotation IDs: {[a['id'] for a in uncategorized_annotations[:5]]}")
+            # print(f"Their image IDs: {[a['image_id'] for a in uncategorized_annotations[:5]]}")
         
         # Create output JSONs
         OOD_data = {
@@ -75,10 +84,10 @@ class SuperAnimalProcessor:
         iid_filename = f"{mode}_IID_wo_{OOD_dataset_name}.json"
         
         with open(os.path.join(output_folder, ood_filename), 'w') as f:
-            json.dump(OOD_data, f)
+            json.dump(OOD_data, f, indent=4)
         
         with open(os.path.join(output_folder, iid_filename), 'w') as f:
-            json.dump(IID_data, f)
+            json.dump(IID_data, f, indent=4)
             
 
 if __name__ == "__main__":
