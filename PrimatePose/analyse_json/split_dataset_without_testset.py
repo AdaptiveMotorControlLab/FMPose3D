@@ -93,9 +93,9 @@ def test_split():
     """Test the dataset splitting function"""
     # Input JSON file
     # json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/deepwild_train.json"
-    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_train_datasets/mit_train.json"
+    json_path = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_train_datasets/mit_train.json"
     # Output directory
-    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/split_for_original_dataset_without_testset"
+    output_dir = "/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/split_for_original_dataset_without_testset"
     
     # Split the dataset
     train_path, test_path = split_json_dataset(

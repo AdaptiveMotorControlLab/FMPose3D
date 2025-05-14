@@ -1,7 +1,7 @@
 #!/bin/bash
-
 # Define the base conda path and environment name
-CONDA_BASE="/home/${USER}/anaconda3"
+CONDA_BASE="/opt/conda"
+# CONDA_BASE="/home/${USER}/anaconda3"
 ENV_NAME="sapiens"
 PYTHON_VERSION="3.10"
 PYTORCH_VERSION="pytorch-cuda=12.1"
@@ -45,8 +45,7 @@ conda install pytorch torchvision torchaudio "${PYTORCH_VERSION}" -c pytorch -c 
 # Install additional Python packages
 print_green "Installing additional Python packages..."
 pip install chumpy scipy munkres tqdm cython fsspec yapf==0.40.1 matplotlib packaging omegaconf ipdb ftfy regex
-pip install json_tricks terminaltables modelindex prettytable albumentations
-#  libcom
+pip install json_tricks terminaltables modelindex prettytable albumentations libcom
 
 # Change directory to the root of the repository
 cd "$(dirname "$0")/.."

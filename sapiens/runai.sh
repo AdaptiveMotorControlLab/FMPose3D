@@ -4,7 +4,7 @@
 
 # --pvc upmwmathis-scratch:/data 
 # -p "upmwmathis-wang3"
-# test 
+# test
 # runai submit --gpu 1 --name sleeptest17 --image registry.rcp.epfl.ch/pfm_ti/sapiens:smallImage_test --backoff-limit 0 --large-shm \
 # --pvc home:${HOME} --pvc upmwmathis-scratch:/data -e HOME=${HOME} -p upmwmathis-wang3 \
 # --command -- /bin/bash -ic "sleep infinity"
@@ -12,3 +12,16 @@
 runai submit --gpu 1 --name sleeptest30 --image registry.rcp.epfl.ch/pfm_ti/sapiens:v0.19 --backoff-limit 0 --large-shm \
 --pvc home:${HOME} --pvc upmwmathis-scratch:/data -e HOME=${HOME} -p upmwmathis-wang3 \
 --command -- /bin/bash -ic "sleep infinity"
+
+
+detector -> bbox -> sam -> mask;
+train:
+for n:
+    (image, mask) -> pose
+    pose -> sam -> mask
+    (image, mask) -> pose
+
+腐蚀
+erode;
+mask and erode mask;
+change: mask 

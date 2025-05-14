@@ -20,7 +20,7 @@ patch_size=16
 num_keypoints=17
 num_epochs=210
 
-bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
+# bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
 # runtime
 train_cfg = dict(max_epochs=num_epochs, val_interval=evaluate_every_n_epochs)
 

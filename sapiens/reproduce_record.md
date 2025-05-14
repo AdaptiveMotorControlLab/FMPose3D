@@ -15,6 +15,27 @@ file: pose/tools/custom_train.py, runner.train()
 ---> /site-packages/mmengine/runner/loops.py; def run(self, xxx); line:93;
 
 
+# Inference
+
+## inference env
+
+```bash
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+pip install opencv-python tqdm json-tricks
+pip install mmdet
+
+```
+
+pip install mmdet
+
+
+export SAPIENS_LITE_ROOT=$SAPIENS_ROOT/lite
+
+```bash
+cd lite/scripts/demo/torchscript
+./pose_keypoints17_ti.sh
+```
+
 # PFM data
 
 
@@ -91,3 +112,17 @@ Ensures your data persists even after the container stops running.
 - Format: -e VARIABLE=VALUE
 - This sets the HOME environment variable inside the container to match the current user's HOME directory path
 - Ensures the container knows where your home directory is located
+
+
+# Function
+
+
+for each run, we will generate a folder under work_dir. I hope all the vis_data can be saved in each run_folder.
+e.g. 
+for the run_folder: ./work_dirs/sapiens_0.3b-210e_coco-1024x768_pfm_cluster/20250425_161102
+I hope all the images will be saved in the vis_data folder under this run_folder: 
+work_dirs/sapiens_0.3b-210e_coco-1024x768_pfm_cluster/20250425_161102/vis_data
+
+save the config.py and the tf file under the run_folder
+
+which python

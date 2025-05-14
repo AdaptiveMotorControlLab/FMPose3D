@@ -384,7 +384,7 @@ class JSONProcessor:
         with open(output_path, 'w') as f:
             json.dump(output_data, f, indent=4)
             print(f"Output saved to {output_json_path}")
-    
+
     def remove_annotaions_w_wrong_bbox(self, input_json_path: str, output_json_path: str) -> None:
         """
         Remove annotations with wrong bbox.
@@ -417,6 +417,67 @@ class JSONProcessor:
             json.dump(data, f, indent=4)
         print(f"Output saved to {output_json_path}")
 
+    @staticmethod
+    def cal_number_of_annotations(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return len(data['annotations'])
+
+    @staticmethod
+    def cal_number_of_images(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return len(data['images'])
+    
+    def small_dataset_filter(self, json_path, output_path, sample_rate=1/20):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        all_images = data['images']
+        sample_size = int(len(all_images) * sample_rate)
+        filtered_images = random.sample(all_images, sample_size)
+        data['images'] = filtered_images
+        
+        # get filtered image ids
+        filtered_image_ids = set(img['id'] for img in filtered_images)
+        
+        # filter annotations to keep only those that correspond to filtered images
+        data['annotations'] = [ann for ann in data['annotations'] if ann['image_id'] in filtered_image_ids]
+        
+        # save to output_path
+        with open(output_path, 'w') as f:
+            json.dump(data, f, indent=4)
+    
+    def remove_redudant_images(self, input_json_path, output_json_path):
+        """
+        Remove redundant images from JSON data.
+        make sure every image in this json file is mentioned in the annotations.
+        """
+        # Load JSON data
+        with open(input_json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Get all image IDs referenced in annotations
+        referenced_image_ids = set()
+        for annotation in data['annotations']:
+            referenced_image_ids.add(annotation['image_id'])
+        
+        # Filter images list to keep only referenced images
+        filtered_images = [img for img in data['images'] if img['id'] in referenced_image_ids]
+        
+        # Update the images list in the data
+        data['images'] = filtered_images
+        
+        # Save the updated JSON data
+        with open(output_json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+            
+        print(f"Original images count: {len(data['images'])}")
+        print(f"Images referenced in annotations: {len(referenced_image_ids)}")
+        print(f"Removed {len(data['images']) - len(filtered_images)} redundant images")
+        print(f"Saved filtered JSON to {output_json_path}")
+
+
 # Example usage:
 
 if __name__ == "__main__":
@@ -428,16 +489,37 @@ if __name__ == "__main__":
 
     processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/lote_test.json")
 
+    species = "riken"
+    train_file= f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_train_datasets/{species}_train.json"
+    test_file= f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/{species}_test.json"
+    print(JSONProcessor.cal_number_of_annotations(train_file))
+    print(JSONProcessor.cal_number_of_annotations(test_file))
     # Print JSON structure
     # processor.print_structure()
     
-    mode_list = ["train", "test"] #  "val"]
-    for mode in mode_list:
-        processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
-                               output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json",
-                               exclude_datasets=["riken"])
-        processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json", \
-                                        output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_wo_riken_V82.json")
+    # mode_list = ["train", "test"] #  "val"]
+    # species = "oms"
+    # for mode in mode_list:
+        
+    #     input_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets/{species}_{mode}.json"
+    #     output_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/{species}_{mode}_small_1_500.json"
+    #     processor.small_dataset_filter(json_path=input_json_path, \
+    #                                    output_path=output_json_path,
+    #                                    sample_rate=1/500)
+    #     num_annotations = processor.cal_number_of_annotations(json_path=output_json_path)
+    #     print(f"Number of annotations in {mode} dataset: {num_annotations}")
+        
+        
+        # input_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/{species}_{mode}_pose_v8_21.json"
+        # output_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/{species}_{mode}_pose_v8_21_rm_useless_images.json"
+        # processor.remove_redudant_images(input_json_path, output_json_path)
+    
+    # for mode in mode_list:
+    #     processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
+    #                            output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json",
+    #                            exclude_datasets=["riken"])
+    #     processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json", \
+    #                                     output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_wo_riken_V82.json")
     
         # processor.remove_annotaions_w_wrong_bbox(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json", \
                                                 # output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82_no_wrong_bbox.json")

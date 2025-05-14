@@ -13,6 +13,7 @@ pretrained_checkpoint='/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-pose
 num_heads=16
 feedforward_channels=embed_dim * 4
 
+
 ##-----------------------------------------------------------------
 # evaluate_every_n_epochs = 10 ## default
 evaluate_every_n_epochs = 1
@@ -22,13 +23,11 @@ image_size = [768, 1024] ## width x height
 sigma = 6 ## sigma is 2 for 256
 scale = 4
 patch_size=16
-num_keypoints=17 # 17 for coco, 37 for pfm
+num_keypoints=17
 num_epochs=210
 
-data_root="/home/ti_wang/data/tiwang/v8_coco"
-# bbox_file=f'{data_root}/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
+data_root="/home/ti_wang/Ti_workspace/sapiens/COCO_data"
 # bbox_file='data/coco/person_detection_results/COCO_val2017_detections_AP_H_70_person.json'
-
 # runtime
 train_cfg = dict(max_epochs=num_epochs, val_interval=evaluate_every_n_epochs)
 
@@ -76,15 +75,10 @@ auto_scale_lr = dict(base_batch_size=512) ## default not enabled
 # hooks
 default_hooks = dict(
     checkpoint=dict(save_best='coco/AP', rule='greater', max_keep_ckpts=-1),
-    # visualization=dict(type='CustomPoseVisualizationHook', enable=True, interval=vis_every_iters, scale=scale),
-    visualization=dict(
-        type='CustomPoseVisualizationHook', 
-        enable=True, 
-        interval=vis_every_iters, 
-        scale=scale,
-        out_dir='vis_data_images'),  # Use a more descriptive folder name
+    visualization=dict(type='CustomPoseVisualizationHook', enable=True, interval=vis_every_iters, scale=scale),
     logger=dict(type='LoggerHook', interval=10),
     )
+
 # codec settings
 codec = dict(
     type='UDPHeatmap', input_size=(image_size[0], image_size[1]), heatmap_size=(int(image_size[0]/scale), int(image_size[1]/scale)), sigma=sigma) ## sigma is 2 for 256
@@ -102,10 +96,10 @@ model = dict(
         type='mmpretrain.VisionTransformer',
         # arch=model_name,
         arch=dict(
-            embed_dims=embed_dim,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            feedforward_channels=feedforward_channels
+        embed_dims=embed_dim,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        feedforward_channels=feedforward_channels
         ),
         img_size=(image_size[1], image_size[0]),
         patch_size=patch_size,
@@ -133,12 +127,11 @@ model = dict(
         flip_test=True,
         flip_mode='heatmap',
         shift_heatmap=False,
-    )
-    ,
+    ),
     init_cfg=dict(
         type='Pretrained',
         checkpoint=pretrained_checkpoint)
-)
+    )
 
 # pipelines
 train_pipeline = [
@@ -179,15 +172,14 @@ dataset_coco = dict(
     type='CocoDataset',
     data_root=data_root,
     data_mode='topdown',
-    # ann_file='8.21_sapiens/pfm_train_pose_wo_riken_chimpact_v8_21.json',
-    ann_file="8.21_sapiens/oms_test_pose_v8_21.json",
-    data_prefix=dict(img='images/'),
+    ann_file='annotations/person_keypoints_train2017.json',
+    data_prefix=dict(img='train2017/'),
 )
 
 # data loaders
 train_dataloader = dict(
-    batch_size=1,  # Reduced from 64
-    num_workers=1, # 4
+    batch_size=2,
+    num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -199,8 +191,8 @@ train_dataloader = dict(
     )
 
 val_dataloader = dict(
-    batch_size=1,  # Reduced from 32
-    num_workers=1, # 4
+    batch_size=2,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
@@ -208,10 +200,9 @@ val_dataloader = dict(
         type='CocoDataset',
         data_root=data_root,
         data_mode='topdown',
-        # ann_file='annotations/pfm_test_pose_wo_riken_chimpact_V82.json',
-        ann_file='8.21_sapiens/pfm_test_pose_wo_riken_chimpact_v8_21.json',
+        ann_file='annotations/person_keypoints_val2017.json',
         # bbox_file=bbox_file,
-        data_prefix=dict(img='images/'),
+        data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=val_pipeline,
     ))
@@ -221,5 +212,5 @@ test_dataloader = val_dataloader
 # evaluators
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file=f'{data_root}/8.21_sapiens/pfm_test_pose_wo_riken_chimpact_v8_21.json')
+    ann_file='COCO_data/annotations/person_keypoints_val2017.json')
 test_evaluator = val_evaluator

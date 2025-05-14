@@ -2,19 +2,16 @@
 
 cd ../../.. || exit  # go to the lite folder
 # SAPIENS_CHECKPOINT_ROOT=/home/${USER}/sapiens_lite_host
-USER="wang3"
-SAPIENS_CHECKPOINT_ROOT=/home/${USER}/Ti_workspace/sapiens/sapiens_lite_host
+SAPIENS_CHECKPOINT_ROOT=/home/ti_wang/Ti_workspace/sapiens/sapiens_lite_host
 
 MODE='torchscript' ## original. no optimizations (slow). full precision inference.
 # MODE='bfloat16' ## A100 gpus. faster inference at bfloat16
 
 SAPIENS_CHECKPOINT_ROOT=$SAPIENS_CHECKPOINT_ROOT/$MODE
 
-#----------------------------set your input and output directories----------------------------------------------
-# INPUT='../pose/demo/data/itw_videos/reel1'
-# OUTPUT="/home/${USER}/Desktop/sapiens/pose/Outputs/vis/itw_videos/reel1_pose17"
-INPUT="/home/${USER}/Ti_workspace/sapiens/primate_data/st_original_images"
-OUTPUT="/home/${USER}/Ti_workspace/sapiens/primate_data/processed_images"
+#----------------------------set your input and output directories------------------------------------------
+INPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/st_original_images"
+OUTPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/processed_images"
 
 #--------------------------MODEL CARD---------------
 MODEL_NAME='sapiens_0.3b'; 
@@ -37,7 +34,8 @@ RADIUS=15 ## keypoint radius
 KPT_THRES=0.3 ## confidence threshold
 
 ##-------------------------------------inference-------------------------------------
-RUN_FILE='demo/vis_pose_single_process.py'
+# Using our modified script that doesn't require mmdet
+RUN_FILE='demo/vis_pose_single_process_modified.py'
 
 ## number of inference jobs per gpu, total number of gpus and gpu ids
 # JOBS_PER_GPU=1; TOTAL_GPUS=8; VALID_GPU_IDS=(0 1 2 3 4 5 6 7)
@@ -70,9 +68,6 @@ fi
 export TF_CPP_MIN_LOG_LEVEL=2
 echo "Distributing ${NUM_IMAGES} image paths into ${TOTAL_JOBS} jobs."
 
-# Ensure PYTHONPATH includes necessary directories
-# export PYTHONPATH=$PYTHONPATH:/opt/conda/lib/python3.10/site-packages
-
 # Divide image paths into text files for each job
 for ((i=0; i<TOTAL_JOBS; i++)); do
   TEXT_FILE="${INPUT}/image_paths_$((i+1)).txt"
@@ -98,26 +93,6 @@ python3 ${RUN_FILE} \
   --radius ${RADIUS} \
   --kpt-thr ${KPT_THRES}
 
-# # Run the process on the GPUs, allowing multiple jobs per GPU
-# for ((i=0; i<TOTAL_JOBS; i++)); do
-#   GPU_ID=$((i % TOTAL_GPUS))
-#   CUDA_VISIBLE_DEVICES=${VALID_GPU_IDS[GPU_ID]} python3 ${RUN_FILE} \
-#     ${CHECKPOINT} \
-#     --num_keypoints 17 \
-#     --det-config ${DETECTION_CONFIG_FILE} \
-#     --det-checkpoint ${DETECTION_CHECKPOINT} \
-#     --batch-size ${BATCH_SIZE} \
-#     --input "${INPUT}/image_paths_$((i+1)).txt" \
-#     --output-root="${OUTPUT}" \
-#     --radius ${RADIUS} \
-#     --kpt-thr ${KPT_THRES} ## add & to process in background
-#   # Allow a short delay between starting each job to reduce system load spikes
-#   # sleep 1
-# done
-
-# Wait for all background processes to finish
-wait
-
 # Remove the image list and temporary text files
 rm "${IMAGE_LIST}"
 for ((i=0; i<TOTAL_JOBS; i++)); do
@@ -128,4 +103,4 @@ done
 cd -
 
 echo "Processing complete."
-echo "Results saved to $OUTPUT"
+echo "Results saved to $OUTPUT" 
