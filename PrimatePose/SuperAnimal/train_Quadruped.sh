@@ -6,7 +6,7 @@ debug=0
 gpu_id="0"
 OOD_dataset_name=AP-10K
 
-file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250514
+file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250515
 
 train_pose=1
 train_detector=0
@@ -37,6 +37,18 @@ if [ "$debug" -eq 1 ]; then
 else
     pytorch_config=${project_root}/experiments/${file_name}/train/pytorch_config.yaml
     echo "Debug mode is OFF, using default pytorch_config: $pytorch_config"
+    
+    # Copy this script to the experiment folder
+    experiment_dir=${project_root}/experiments/${file_name}
+    echo "Copying train_Quadruped.sh and train.py to ${experiment_dir}"
+    cp "$0" "$experiment_dir/"
+    cp "${project_root}/train.py" "$experiment_dir/"
+
+    # Copy train.py to the experiment folder
+    echo "Copying create_coco_project_Quadruped.sh and make_config.py to ${experiment_dir}"
+    cp "${project_root}/create_coco_project_Quadruped.sh" "$experiment_dir/"
+    cp "${project_root}/make_config.py" "$experiment_dir/"
+
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py \
         $([ "$train_detector" -eq 1 ] && echo "--train-detector") \
         $([ "$train_pose" -eq 1 ] && echo "--train-pose") \
