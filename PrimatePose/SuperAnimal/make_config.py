@@ -12,7 +12,7 @@ from deeplabcut.generate_training_dataset import MakeInference_yaml
 from deeplabcut.pose_estimation_pytorch.config import make_pytorch_pose_config
 from deeplabcut.pose_estimation_pytorch.data import COCOLoader
 import logging
-from cal_the_bad_samples import cal_different_kinds_of_samples
+from data_processing.cal_the_bad_samples import cal_different_kinds_of_samples
 
 def get_base_config(
     project_path: str,
