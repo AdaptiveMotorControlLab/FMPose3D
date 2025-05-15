@@ -13,8 +13,6 @@ mode="train"
 train_json="${data_root}/annotations/${mode}_IID_wo_${OOD_dataset_name}.json"
 test_json="${data_root}/annotations/test_IID_wo_${OOD_dataset_name}.json"
 
-# model_arch="top_down_resnet_50"
-# model_arch="top_down_hrnet_w32"
 model_arch="rtmpose_s"
 
 if [ "$debug" -eq 1 ]; then
