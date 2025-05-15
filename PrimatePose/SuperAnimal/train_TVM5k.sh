@@ -46,7 +46,7 @@ else
     cp "${project_root}/train.py" "$experiment_dir/"
 
     # Copy train.py to the experiment folder
-    echo "Copying create_coco_project_Quadruped.sh and make_config.py to ${experiment_dir}"
+    echo "Copying create_coco_project_TVM5k.sh and make_config.py to ${experiment_dir}"
     cp "${project_root}/create_coco_project_TVM5k.sh" "$experiment_dir/"
     cp "${project_root}/make_config.py" "$experiment_dir/"
 
