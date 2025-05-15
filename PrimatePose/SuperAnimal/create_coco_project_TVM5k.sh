@@ -1,11 +1,11 @@
 data_path_prefix="/home/ti_wang/data"
-data_root=${data_path_prefix}"/SuperAnimal/Quadruped80K"
+data_root=${data_path_prefix}"/SuperAnimal/TopViewMouse5K_20240913"
 project_root=$(dirname $(realpath $0))
 
 debug=0
-OOD_dataset_name=AP-10K
+OOD_dataset_name=openfield-Pranav-2018-08-20
 
-file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250515
+file_name=SA-TVM_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250515
 
 mode="train"
 

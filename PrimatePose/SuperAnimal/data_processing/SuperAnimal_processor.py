@@ -95,4 +95,12 @@ class SuperAnimalProcessor:
 if __name__ == "__main__":
     
     data_path = "/home/ti_wang/Ti_workspace/PrimatePose/SuperAnimal/data/SuperAnimal/Quadruped80K/annotations/test.json"
-    SuperAnimalProcessor.print_all_dataset_names(data_path)
+    # SuperAnimalProcessor.print_all_dataset_names(data_path)
+
+    # TVM_data_path = "/home/ti_wang/Ti_workspace/PrimatePose/SuperAnimal/data/SuperAnimal/TopViewMouse5K_20240913/annotations/train.json"
+    # SuperAnimalProcessor.print_all_dataset_names(TVM_data_path)
+    mode = ['train', 'test']
+    for m in mode:
+        TVM5k_data_path ="/home/ti_wang/Ti_workspace/PrimatePose/SuperAnimal/data/SuperAnimal/TopViewMouse5K_20240913/annotations/" + m + ".json"
+        SuperAnimalProcessor.leave_one_dataset_out(TVM5k_data_path, OOD_dataset_name="openfield-Pranav-2018-08-20", \
+                                                output_folder= "/home/ti_wang/Ti_workspace/PrimatePose/SuperAnimal/data/SuperAnimal/TopViewMouse5K_20240913/annotations")
