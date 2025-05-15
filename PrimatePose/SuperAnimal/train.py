@@ -11,8 +11,6 @@ from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
 from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
 import wandb
-# wandb.init(project="primatepose", tags=["debug_SSDLite"])
-# wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
 
 def main(
     project_root: str,
