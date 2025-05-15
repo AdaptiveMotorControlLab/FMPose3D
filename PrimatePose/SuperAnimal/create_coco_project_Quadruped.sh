@@ -5,7 +5,7 @@ project_root=$(dirname $(realpath $0))
 debug=0
 OOD_dataset_name=AP-10K
 
-file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250514
+file_name=SAQ_pose_rtmpose_s_OOD_${OOD_dataset_name}_20250515
 
 mode="train"
 
