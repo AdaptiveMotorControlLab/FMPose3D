@@ -2,7 +2,9 @@ import json
 import os
 
 class SuperAnimalProcessor:
-    
+    """
+    Helper class providing helper functions for Super-Animal datasets
+    """
     def __init__(self, data_path):
         pass
 
