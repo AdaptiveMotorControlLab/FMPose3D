@@ -91,10 +91,9 @@ def main(
 
         if args.debug:
             logger_config = dict(type = "WandbLogger",
-                                project_name = "primatepose",
-                                tags = ["server8"],
-                                group = "Dubug",
-                                run_name = args.run_name,
+                                project_name = "Debug",
+                                group = "debug",
+                                run_name = args.wandb_run_name,
                                 )
         else:
             # Convert comma-separated tag string to list if needed
@@ -151,9 +150,9 @@ if __name__ == "__main__":
     parser.add_argument("--detector-dataloader-workers", type=int, default=8, help="Number of dataloader workers for detector")
     parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
-    parser.add_argument("--wandb-project-name", type=str, default="primatepose", help="WandB project name")
+    parser.add_argument("--wandb-project-name", type=str, default="Debug", help="WandB project name")
     parser.add_argument("--wandb-run-name", type=str, default="default_run", help="Run name for wandb logging")
-    parser.add_argument("--wandb-group", type=str, default="default_group", help="WandB group name for logging")
+    parser.add_argument("--wandb-group", type=str, default="Debug", help="WandB group name for logging")
     parser.add_argument("--wandb-tag", type=str, default=None, help="Tags")
     args = parser.parse_args()
     
