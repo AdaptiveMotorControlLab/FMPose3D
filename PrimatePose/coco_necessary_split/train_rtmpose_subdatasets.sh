@@ -5,7 +5,7 @@ data_root=${data_path_prefix}"/v8_coco"
 debug=0
 gpu_id="1"
 
-dataset_name=lote
+dataset_name=mp
 file_name=${dataset_name}_pose_rtmpose_s_V82_20250516
 
 train_pose=1
@@ -16,7 +16,7 @@ train_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_${mode}_datasets/
 test_json="${data_path_prefix}/primate_data/PFM_V8.2/splitted_test_datasets/${dataset_name}_test.json"
 
 # Pose model training configuration
-batch_size=32
+batch_size=64
 dataloader_workers=4
 
 # wandb configuration
@@ -41,7 +41,7 @@ else
     echo "Copying training scripts to ${experiment_dir}"
     cp "$0" "$experiment_dir/"
     cp "${project_root}/coco_necessary_split/train.py" "$experiment_dir/"
-    cp "${project_root}/coco_necessary_split/create_coco_project_rtmpose_subdatasets.sh" "$experiment_dir/"
+    cp "${project_root}/coco_necessary_split/build_coco_project_rtmpose_subdatasets.sh" "$experiment_dir/"
     cp "${project_root}/coco_necessary_split/make_config.py" "$experiment_dir/"
 
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py \
