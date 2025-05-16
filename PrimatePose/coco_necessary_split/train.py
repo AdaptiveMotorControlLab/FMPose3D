@@ -158,15 +158,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # backup the train.sh file and the current file in the same folder    
-    train_dir = os.path.dirname(args.pytorch_config)
-    debug_dir = os.path.dirname(train_dir)
-    print("debug_dir:", debug_dir)
-    current_file_path = os.path.abspath(__file__)
-    current_dir = os.path.dirname(current_file_path)
-    train_sh_path = os.path.join(current_dir, "train.sh")
-    
-    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
-    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    # train_dir = os.path.dirname(args.pytorch_config)
+    # debug_dir = os.path.dirname(train_dir)
+    # print("debug_dir:", debug_dir)
+    # current_file_path = os.path.abspath(__file__)
+    # current_dir = os.path.dirname(current_file_path)
+    # train_sh_path = os.path.join(current_dir, "train.sh")
+    # shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    # shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
     
     main(
         args.project_root,
