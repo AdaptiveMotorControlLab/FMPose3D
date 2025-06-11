@@ -1,7 +1,8 @@
 """File to train a model on a COCO dataset"""
 
 from __future__ import annotations
-
+import os
+import shutil
 import argparse
 import copy
 from pathlib import Path
@@ -28,9 +29,9 @@ def main(
     snapshot_path: str | None,
     detector_path: str | None,
     batch_size: int = 32,
-    dataloader_workers: int = 16,
+    dataloader_workers: int = 8,
     detector_batch_size: int = 32,
-    detector_dataloader_workers: int= 16,
+    detector_dataloader_workers: int= 8,
     debug: bool = False,
 ):
     log_path = Path(model_config_path).parent / "log.txt"
@@ -90,17 +91,18 @@ def main(
 
         if args.debug:
             logger_config = dict(type = "WandbLogger",
-                                project_name = "primatepose",
-                                tags = ["server8"],
-                                group = "Dubug_v8_server8",
-                                run_name = args.run_name,
+                                project_name = "Debug",
+                                group = "debug",
+                                run_name = args.wandb_run_name,
                                 )
         else:
+            # Convert comma-separated tag string to list if needed
+            tags = args.wandb_tag.split(',') if args.wandb_tag and ',' in args.wandb_tag else [args.wandb_tag] if args.wandb_tag else []
             logger_config = dict(type = "WandbLogger",
-                                project_name = "primatepose",
-                                tags = ["eval"],
-                                group = "split_datasets_v8_server8",
-                                run_name = args.run_name,
+                                project_name = args.wandb_project_name,
+                                tags = tags,
+                                group = args.wandb_group,
+                                run_name = args.wandb_run_name,
                                 )
         
         # skipping detector training if a detector_path is given
@@ -127,9 +129,6 @@ def main(
             snapshot_path=snapshot_path,
         )
         
-import os
-import shutil
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--project_root")
@@ -145,21 +144,27 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot_path", default=None)
     parser.add_argument("--detector_path", default=None)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for pose model training")
+    parser.add_argument("--dataloader-workers", type=int, default=8, help="Number of dataloader workers")
+    parser.add_argument("--detector-batch-size", type=int, default=32, help="Batch size for detector model training")
+    parser.add_argument("--detector-dataloader-workers", type=int, default=8, help="Number of dataloader workers for detector")
     parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
-    parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
+    parser.add_argument("--wandb-project-name", type=str, default="Debug", help="WandB project name")
+    parser.add_argument("--wandb-run-name", type=str, default="default_run", help="Run name for wandb logging")
+    parser.add_argument("--wandb-group", type=str, default="Debug", help="WandB group name for logging")
+    parser.add_argument("--wandb-tag", type=str, default=None, help="Tags")
     args = parser.parse_args()
     
     # backup the train.sh file and the current file in the same folder    
-    train_dir = os.path.dirname(args.pytorch_config)
-    debug_dir = os.path.dirname(train_dir)
-    print("debug_dir:", debug_dir)
-    current_file_path = os.path.abspath(__file__)
-    current_dir = os.path.dirname(current_file_path)
-    train_sh_path = os.path.join(current_dir, "train.sh")
-    
-    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
-    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    # train_dir = os.path.dirname(args.pytorch_config)
+    # debug_dir = os.path.dirname(train_dir)
+    # print("debug_dir:", debug_dir)
+    # current_file_path = os.path.abspath(__file__)
+    # current_dir = os.path.dirname(current_file_path)
+    # train_sh_path = os.path.join(current_dir, "train.sh")
+    # shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    # shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
     
     main(
         args.project_root,
@@ -174,5 +179,9 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
+        batch_size=args.batch_size,
+        dataloader_workers=args.dataloader_workers,
+        detector_batch_size=args.detector_batch_size,
+        detector_dataloader_workers=args.detector_dataloader_workers,
         debug=args.debug
     )

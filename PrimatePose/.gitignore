@@ -1,11 +1,11 @@
 # data
 demo/*.jpg
-demo/
+# demo/
 *.png
 *.jpg
-*.txt
+# *.txt
 *.yaml
-*.sh
+# *.sh
 wandb*
 # json
 *h5
@@ -15,11 +15,10 @@ wandb*
 # folder
 .vscode*
 project/
-test/
+# test/
 wandb/
 data/
-data
-SuperAnimalEvaluation/
+# SuperAnimalEvaluation/
 scripts/
 rsync_from_amgm0.sh
 rsync_to_amgm0.sh
