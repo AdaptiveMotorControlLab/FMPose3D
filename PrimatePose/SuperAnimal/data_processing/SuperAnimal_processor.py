@@ -120,7 +120,19 @@ if __name__ == "__main__":
     #     SuperAnimalProcessor.leave_one_dataset_out(TVM5k_data_path, OOD_dataset_name="openfield-Pranav-2018-08-20", \
     #                                             output_folder= "/home/ti_wang/Ti_workspace/PrimatePose/SuperAnimal/data/SuperAnimal/TopViewMouse5K_20240913/annotations")
     # merge SAQ's train and test datasets
-    train_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/train_IID_wo_AP-10K.json"
-    test_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/test_IID_wo_AP-10K.json"
-    output_json_file_path = "../data/SuperAnimal/Quadruped80K/annotations/merged_train_and_test_wo_AP-10K.json"
+    # train_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/train_IID_wo_AP-10K.json"
+    # test_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/test_IID_wo_AP-10K.json"
+    # output_json_file_path = "../data/SuperAnimal/Quadruped80K/annotations/merged_train_and_test_wo_AP-10K.json"
+    # SuperAnimalProcessor.merge_train_and_test_datasets(train_SAQ_json_path, test_SAQ_json_path, output_json_file_path)
+    
+    # merge SA-TVM's train and test datasets
+    # train_TVM_json_path ="../data/SuperAnimal/TopViewMouse5K_20240913/annotations/train_IID_wo_openfield-Pranav-2018-08-20.json"
+    # test_TVM_json_path ="../data/SuperAnimal/TopViewMouse5K_20240913/annotations/test_IID_wo_openfield-Pranav-2018-08-20.json"
+    # output_json_file_path = "../data/SuperAnimal/TopViewMouse5K_20240913/annotations/merged_train_and_test_wo_openfield-Pranav-2018-08-20.json"
+    # SuperAnimalProcessor.merge_train_and_test_datasets(train_TVM_json_path, test_TVM_json_path, output_json_file_path)
+
+    # Merge SAQ's train and test datasets
+    train_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/train.json"
+    test_SAQ_json_path ="../data/SuperAnimal/Quadruped80K/annotations/test.json"
+    output_json_file_path = "../data/SuperAnimal/Quadruped80K/annotations/merged_train_and_test.json"
     SuperAnimalProcessor.merge_train_and_test_datasets(train_SAQ_json_path, test_SAQ_json_path, output_json_file_path)
