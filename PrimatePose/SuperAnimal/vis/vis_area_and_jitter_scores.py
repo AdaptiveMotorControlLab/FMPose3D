@@ -56,7 +56,7 @@ def calculate_area_score(keypoints_array):
             
     return np.array(areas)
 
-def plot_area_score(area_scores_before, area_scores_after, output_path):
+def plot_area_score(area_scores_before, area_scores_after, output_folder_path):
     """
     Plot area scores for a video before and after adaptation
     
@@ -103,12 +103,10 @@ def plot_area_score(area_scores_before, area_scores_after, output_path):
     
     # Save figure with white background
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    os.makedirs(output_path, exist_ok=True)
-    output_path = os.path.join(output_path, f"area_score_comparison_{timestamp}.png")
+    os.makedirs(output_folder_path, exist_ok=True)
+    output_path = os.path.join(output_folder_path, f"area_score_comparison_{timestamp}.png")
     fig.savefig(output_path, dpi=300, bbox_inches='tight', pad_inches=0.05, transparent=False)
     print(f"Plot saved to {output_path}") 
-    # Show figure
-    plt.show()
     
     return output_path
 
@@ -304,7 +302,7 @@ if __name__ == "__main__":
         area_before_scores = calculate_area_score(keypoints_before)
         area_after_scores = calculate_area_score(keypoints_after)
         
-        area_score_image_path = os.path.join("./figures/area_score_comparison.png")
-        plot_area_score(area_before_scores, area_after_scores, output_path=area_score_image_path)
+        area_score_image_folder_path = os.path.join("./figures")
+        plot_area_score(area_before_scores, area_after_scores, output_folder_path=area_score_image_folder_path)
         
         
