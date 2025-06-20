@@ -33,6 +33,8 @@ def calculate_area_score(keypoints_array):
     """
     Calculate area score from keypoints array with shape [Frame, num_joints, 3]
     where the last dimension is [x, y, likelihood]
+    Reference:
+        https://github.com/AdaptiveMotorControlLab/DLC-ModelZoo/blob/7e346b59a4d2947e365c3e1e550c0a5d5965c0fe/modelzoo/metric/unsupervised_metrics.py#L173
     """
     # Extract just the x,y coordinates (first two channels)
     coordinates = keypoints_array[:, :, :2]  # Shape: [Frame, num_joints, 2]
@@ -40,10 +42,6 @@ def calculate_area_score(keypoints_array):
     # Calculate area for each frame
     areas = []
     for frame_keypoints in coordinates:
-        # Filter out keypoints with low likelihood if needed
-        # This is optional - you can set a threshold based on your needs
-        # valid_keypoints = frame_keypoints[keypoints_array[i,:,2] > likelihood_threshold]
-        
         # Remove any keypoints with NaN values
         valid_keypoints = frame_keypoints[~np.any(np.isnan(frame_keypoints), axis=1)]
         
@@ -66,6 +64,9 @@ def plot_area_score(area_scores_before, area_scores_after, output_folder_path):
         Array of area scores for each frame before adaptation
     area_scores_after : numpy.ndarray
         Array of area scores for each frame after adaptation
+    Reference:
+        https://github.com/AdaptiveMotorControlLab/modelzoo-figures/blob/main/figures/Figure3.ipynb
+    
     """
     # Create figure
     fig, ax = plt.subplots(1, figsize=(9, 3), dpi=300)
