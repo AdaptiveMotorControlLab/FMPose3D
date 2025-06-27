@@ -134,7 +134,7 @@ def main(
     )
     print(f"Saved your model configuration in {output_path}")
 
-    txt_path = str(train_dir / "sapmle.txt")
+    txt_path = str(train_dir / "sample.txt")
     cal_different_kinds_of_samples(train_file, txt_path)
     cal_different_kinds_of_samples(test_file, txt_path)
 
