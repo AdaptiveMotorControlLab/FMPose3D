@@ -31,7 +31,7 @@ if [ "$debug" -eq 1 ]; then
         $([ "$train_detector" -eq 1 ] && echo "--train-detector") \
         $([ "$train_pose" -eq 1 ] && echo "--train-pose") \
         --project_root $data_root --pytorch_config $pytorch_config \
-        --train_file $train_file --test_file $test_file \
+        --train_file $train_json --test_file $test_json \
         --device cuda --gpus 0 --run-name $run_name \
         --batch-size $batch_size --dataloader-workers $dataloader_workers
 else
