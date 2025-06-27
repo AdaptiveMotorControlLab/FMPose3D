@@ -40,13 +40,13 @@ else
     
     # Copy this script to the experiment folder
     experiment_dir=${project_root}/experiments/${file_name}
-    echo "Copying train_pfm_rtmpose_OOD_ap10k.sh and train.py to ${experiment_dir}"
+    echo "Copying train_pfm_hrnetw32_OOD_ap10k.sh and train.py to ${experiment_dir}"
     cp "$0" "$experiment_dir/"
     cp "${project_root}/coco_necessary/train.py" "$experiment_dir/"
 
     # Copy train.py to the experiment folder
-    echo "Copying create_coco_project_pfm_rtmpose_OOD_ap10k.sh and make_config.py to ${experiment_dir}"
-    cp "${project_root}/coco_necessary/create_coco_project_pfm_rtmpose_OOD_ap10k.sh" "$experiment_dir/"
+    echo "Copying create_coco_project_pfm_hrnetw32_OOD_ap10k.sh and make_config.py to ${experiment_dir}"
+    cp "${project_root}/coco_necessary/create_coco_project_pfm_hrnetw32_OOD_ap10k.sh" "$experiment_dir/"
     cp "${project_root}/coco_necessary/make_config.py" "$experiment_dir/"
 
     CUDA_VISIBLE_DEVICES=$gpu_id python train.py \
