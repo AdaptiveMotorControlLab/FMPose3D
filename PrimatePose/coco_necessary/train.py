@@ -90,7 +90,7 @@ def main(
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["server8"],
-                                group = "Dubug_v83_server8",
+                                group = "Debug_v83_server8",
                                 run_name = args.run_name,
                                 )
         else:
