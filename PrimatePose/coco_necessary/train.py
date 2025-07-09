@@ -90,14 +90,14 @@ def main(
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["server8"],
-                                group = "Dubug_v8_server8",
+                                group = "Debug_v83_server8",
                                 run_name = args.run_name,
                                 )
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
-                                group = "split_datasets_v8_server8",
+                                group = "pfm_v83_server8",
                                 run_name = args.run_name,
                                 )
         
