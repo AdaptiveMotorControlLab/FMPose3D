@@ -315,9 +315,6 @@ def transform_keypoints(keypoints, v80_mapping, v82_mapping):
 
 ## V8.21_Sapiens
 
-
-
-
 the structure of the V8.2 json file is like this:
 ```bash
     JSON structure:
@@ -403,10 +400,9 @@ output file:
 /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/pfm_{$mode}_pose_wo_riken_chimpact_v8_21.json
 
 
-
-
 extract the 17 keypoints and save it as a new version dataset
 
 why choose 17 keypoints?
 - align with coco format
 - compare performance
+
