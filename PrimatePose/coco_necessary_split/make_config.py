@@ -18,6 +18,7 @@ def get_base_config(
     project_path: str,
     pose_config_path: str,
     model_architecture: str,
+    detector_architecture: str,
     bodyparts: list[str],
     unique_bodyparts: list[str],
     individuals: list[str],
@@ -42,9 +43,8 @@ def get_base_config(
         pose_config_path=pose_config_path,
         net_type=model_architecture,
         top_down=top_down,
-        detector_type="fasterrcnn_mobilenet_v3_large_fpn"
+        detector_type=detector_architecture
     )
-
 
 def make_inference_config(
     dlc_path: str,
@@ -67,6 +67,7 @@ def main(
     test_file: str,
     output: str,
     model_arch: str,
+    detector_arch: str,
     multi_animal: bool,
     debug: bool,
 ):
@@ -101,6 +102,7 @@ def main(
         project_path=project_root,
         pose_config_path=pose_config_path,
         model_architecture=model_arch,
+        detector_architecture=detector_arch,
         bodyparts=bodyparts,
         unique_bodyparts=[],
         individuals= [f"individual{i}" for i in range(num_individuals)],
@@ -119,7 +121,7 @@ def main(
     pytorch_cfg["detector"]["runner"]["eval_interval"] = 1
     pytorch_cfg["detector"]["train_settings"]["dataloader_pin_memory"] = False
     pytorch_cfg["runner"]["snapshots"]["save_epochs"] = 1
-    pytorch_cfg["runner"]["snapshots"]["max_snapshots"] = 10
+    pytorch_cfg["runner"]["snapshots"]["max_snapshots"] = 5
     
     pytorch_cfg["runner"]["eval_interval"] = 1
 
@@ -140,7 +142,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("project_root")
     parser.add_argument("output")
-    parser.add_argument("model_arch")
+    parser.add_argument("--model_arch", default="top_down_hrnet_w32")
+    parser.add_argument("--detector_arch", default="fasterrcnn_mobilenet_v3_large_fpn")
     parser.add_argument("--train_file", default="train.json")
     parser.add_argument("--test_file", default="test.json")
     parser.add_argument("--multi_animal", action="store_true")
@@ -154,6 +157,7 @@ if __name__ == "__main__":
         args.test_file,
         args.output,
         args.model_arch,
+        args.detector_arch,
         args.multi_animal,
         args.debug,
     )
