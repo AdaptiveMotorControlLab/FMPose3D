@@ -111,30 +111,47 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
         # Add labels for valid keypoints
         for i, (x, y, z) in enumerate(pose_3d):
             if valid_mask[i]:
-                ax.text(x, y, z, f'{i}', fontsize=8)
+                # Use keypoint name if available, otherwise use index
+                if keypoint_names is not None and i < len(keypoint_names):
+                    label = keypoint_names[i]
+                else:
+                    label = f'{i}'
+                ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
     else:
         ax.scatter(pose_3d[:, 0], pose_3d[:, 1], pose_3d[:, 2], 
                   c='red', s=50, alpha=0.8)
         
         # Add labels
         for i, (x, y, z) in enumerate(pose_3d):
-            ax.text(x, y, z, f'{i}', fontsize=8)
+            # Use keypoint name if available, otherwise use index
+            if keypoint_names is not None and i < len(keypoint_names):
+                label = keypoint_names[i]
+            else:
+                label = f'{i}'
+            ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
     
     # Draw skeleton connections (simplified)
+    # connections = [
+    #     # Head connections
+    #     (1, 2), (1, 3), (1, 4), (2, 5), (3, 6),
+    #     # Torso connections
+    #     (11, 12), (11, 13), (12, 14), (13, 14), (14, 15), (15, 16), (16, 17),
+    #     # Arm connections
+    #     (12, 18), (18, 20), (20, 22), (13, 19), (19, 21), (21, 23),
+    #     # Hip connections
+    #     (16, 24), (16, 25), (24, 26), (25, 26),
+    #     # Leg connections
+    #     (24, 27), (27, 29), (29, 31), (25, 28), (28, 30), (30, 32),
+    #     # Tail connections
+    #     (17, 33), (33, 34), (34, 35), (35, 36)
+    # ]
+   
     connections = [
-        # Head connections
-        (1, 2), (1, 3), (1, 4), (2, 5), (3, 6),
-        # Torso connections
-        (11, 12), (11, 13), (12, 14), (13, 14), (14, 15), (15, 16), (16, 17),
-        # Arm connections
-        (12, 18), (18, 20), (20, 22), (13, 19), (19, 21), (21, 23),
-        # Hip connections
-        (16, 24), (16, 25), (24, 26), (25, 26),
-        # Leg connections
-        (24, 27), (27, 29), (29, 31), (25, 28), (28, 30), (30, 32),
-        # Tail connections
-        (17, 33), (33, 34), (34, 35), (35, 36)
+        (1, 11), (11, 12), (11, 13), (12, 22), (13, 23), 
+        (11, 26), (26, 27), (26, 28), (27, 31), (28, 32), 
+        (26, 36)
     ]
+    
     
     for joint1, joint2 in connections:
         if joint1 < len(pose_3d) and joint2 < len(pose_3d):
