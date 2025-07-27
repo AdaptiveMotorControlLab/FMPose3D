@@ -116,9 +116,7 @@ def plot_keypoint_distribution(joint_data, output_dir='./plots', dataset_name='P
             return f'{x:.0f}'
     
     ax.yaxis.set_major_formatter(plt.FuncFormatter(format_y_axis))
-    
 
-    
     # Set axis limits with some padding
     ax.set_ylim(0, max_count * 1.15)
     
@@ -138,7 +136,7 @@ def plot_keypoint_distribution(joint_data, output_dir='./plots', dataset_name='P
     # Save the plot with high quality
     plot_path = os.path.join(output_dir, f"{dataset_name}_keypoint_distribution.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-    print(f"Publication-quality plot saved to: {plot_path}")
+    print(f"plot saved to: {plot_path}")
     plt.close()
 
 def plot_keypoint_performance(joint_data, output_dir='./plots', dataset_name='PrimatePose'):
@@ -231,7 +229,7 @@ def plot_keypoint_count_vs_performance(joint_data, output_dir='./plots', dataset
         counts.append(joint_info['count'])
         rmse_values.append(joint_info['rmse'])
     
-    plt.figure(figsize=(16, 10))
+    plt.figure(figsize=(12, 10))
     
     # Create scatter plot with different colors based on performance
     colors = ['green' if rmse < 20 else 'orange' if rmse < 50 else 'red' for rmse in rmse_values]
@@ -323,8 +321,8 @@ def plot_keypoint_count_vs_performance(joint_data, output_dir='./plots', dataset
     # Customize the plot
     plt.xlabel('Count (log scale)', fontsize=12, fontweight='bold')
     plt.ylabel('RMSE', fontsize=12, fontweight='bold')
-    plt.title(f'Keypoint Count vs Performance for {dataset_name}', 
-              fontsize=14, fontweight='bold', pad=20)
+    # plt.title(f'Keypoint Count vs Performance for {dataset_name}', 
+    #           fontsize=14, fontweight='bold', pad=20)
     
     # Add grid
     plt.grid(True, alpha=0.3)
