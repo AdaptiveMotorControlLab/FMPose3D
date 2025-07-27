@@ -14,7 +14,7 @@ from deeplabcut.pose_estimation_pytorch.apis.utils import get_inference_runners
 from deeplabcut.pose_estimation_pytorch.task import Task
 
 def pycocotools_evaluation(
-    kpt_oks_sigmas: list[int],
+    kpt_oks_sigmas: list[float],
     ground_truth: dict,
     predictions: list[dict],
     annotation_type: str,
@@ -67,7 +67,7 @@ def main(
     snapshot_path: str,
     detector_path: str | None,
     pcutoff: float,
-    oks_sigma: float,
+    oks_sigma: list[float],
     gpus: list[int] | None,
 ):
     loader = COCOLoader(
@@ -120,8 +120,10 @@ def main(
         for annotation_type in annotation_types:
             # kpt_oks_sigmas = oks_sigma * np.ones(parameters.num_joints)
             # kpt_oks_sigmas = 0.1 * np.ones(parameters.num_joints)
-            kpt_oks_sigmas = args.oks_sigma
-            
+            kpt_oks_sigmas = oks_sigma
+
+            print("kpt_oks_sigmas:", kpt_oks_sigmas)
+
             pycocotools_evaluation(
                 ground_truth=ground_truth,
                 predictions=coco_predictions,
