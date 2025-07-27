@@ -410,6 +410,9 @@ def main():
     logger.info(f"Starting training with arguments: {vars(args)}")
     
     # Set random seed for reproducibility
+    if args.seed == -1:
+        args.seed = random.randint(0, 2**32 - 1)  # Generate a random seed
+        logger.info(f"No seed provided (-1). Generated random seed: {args.seed}")
     set_random_seed(args.seed)
     logger.info(f"Random seed set to: {args.seed}")
     
