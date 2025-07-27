@@ -129,7 +129,7 @@ class CameraPredictor(nn.Module):
         focal_length = torch.sigmoid(camera_params[:, 0:1]) * FOCAL_LENGTH_SCALE + FOCAL_LENGTH_OFFSET  # Range [500, 1500]
         rotation = camera_params[:, 1:4]  # Rotation angles
         translation = camera_params[:, 4:7]  # Translation
-        scale = torch.sigmoid(camera_params[:, 7:8]) * 2 + 0.5  # Scale factor [0.5, 2.5]
+        scale = torch.sigmoid(camera_params[:, 7:8]) * self.SCALE_FACTOR_RANGE + self.SCALE_FACTOR_OFFSET  # Scale factor [0.5, 2.5]
         center = torch.tanh(camera_params[:, 8:9])  # Center offset [-1, 1]
         
         return {
