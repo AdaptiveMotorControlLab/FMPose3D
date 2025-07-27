@@ -182,8 +182,8 @@ def plot_keypoint_performance(joint_data, output_dir='./plots', dataset_name='Pr
     plt.xticks(x, keypoint_names, rotation=45, ha='right', fontsize=10)
     plt.xlabel('Keypoint Name', fontsize=12, fontweight='bold')
     plt.ylabel('RMSE', fontsize=12, fontweight='bold')
-    plt.title(f'Keypoint Performance (RMSE) for {dataset_name}', 
-              fontsize=14, fontweight='bold', pad=20)
+    # plt.title(f'Keypoint Performance (RMSE) for {dataset_name}', 
+            #   fontsize=14, fontweight='bold', pad=20)
     
     # Add grid for better readability
     plt.grid(axis='y', alpha=0.3)
@@ -195,7 +195,7 @@ def plot_keypoint_performance(joint_data, output_dir='./plots', dataset_name='Pr
         Patch(facecolor='orange', alpha=0.7, label='Medium (RMSE 20-50)'),
         Patch(facecolor='red', alpha=0.7, label='Poor (RMSE > 50)')
     ]
-    plt.legend(handles=legend_elements, loc='upper right')
+    plt.legend(handles=legend_elements, loc='upper left')
     
     # Adjust layout to prevent label cutoff
     plt.tight_layout()
