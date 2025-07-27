@@ -148,7 +148,7 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
         ax.scatter(valid_pose[:, 0], valid_pose[:, 1], valid_pose[:, 2], 
                   c='red', s=50, alpha=0.8)
         
-        # Add labels for valid keypoints with offset to avoid clustering
+        # Add labels for valid keypoints
         for i, (x, y, z) in enumerate(pose_3d_corrected):
             if valid_mask[i]:
                 # Use keypoint name if available, otherwise use index
@@ -156,33 +156,19 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
                     label = keypoint_names[i]
                 else:
                     label = f'{i}'
-                
-                # Add offset to spread out text labels
-                offset_scale = max_range * 0.05  # 5% of the max range as offset
-                text_x = x + (i % 3 - 1) * offset_scale  # Spread in X direction
-                text_y = y + ((i // 3) % 3 - 1) * offset_scale  # Spread in Y direction  
-                text_z = z + ((i // 9) % 3 - 1) * offset_scale  # Spread in Z direction
-                
-                ax.text(text_x, text_y, text_z, label, fontsize=6, ha='center', va='bottom')
+                # ax.text(x, y, z, label, fontsize=6, ha='center', va='bottom')
     else:
         ax.scatter(pose_3d_corrected[:, 0], pose_3d_corrected[:, 1], pose_3d_corrected[:, 2], 
                   c='red', s=50, alpha=0.8)
         
-        # Add labels with offset to avoid clustering
+        # Add labels
         for i, (x, y, z) in enumerate(pose_3d_corrected):
             # Use keypoint name if available, otherwise use index
             if keypoint_names is not None and i < len(keypoint_names):
                 label = keypoint_names[i]
             else:
                 label = f'{i}'
-            
-            # Add offset to spread out text labels
-            offset_scale = max_range * 0.05  # 5% of the max range as offset
-            text_x = x + (i % 3 - 1) * offset_scale  # Spread in X direction
-            text_y = y + ((i // 3) % 3 - 1) * offset_scale  # Spread in Y direction  
-            text_z = z + ((i // 9) % 3 - 1) * offset_scale  # Spread in Z direction
-            
-            ax.text(text_x, text_y, text_z, label, fontsize=6, ha='center', va='bottom')
+            ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
     
     # Draw skeleton connections (simplified)
     # connections = [
@@ -204,8 +190,7 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
         (1, 11), (11, 12), (11, 13), (12, 22), (13, 23), 
         (11, 26), (26, 27), (26, 28), (27, 31), (28, 32), 
         (26, 36)
-    ]
-    
+    ] 
     
     for joint1, joint2 in connections:
         if joint1 < len(pose_3d_corrected) and joint2 < len(pose_3d_corrected):
@@ -219,21 +204,59 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     ax.set_zlabel('Z')
     ax.set_title(title)
     
-    # Set equal aspect ratio
-    max_range = np.array([pose_3d_corrected[:, 0].max() - pose_3d_corrected[:, 0].min(),
-                         pose_3d_corrected[:, 1].max() - pose_3d_corrected[:, 1].min(),
-                         pose_3d_corrected[:, 2].max() - pose_3d_corrected[:, 2].min()]).max() / 2.0
-    mid_x = (pose_3d_corrected[:, 0].max() + pose_3d_corrected[:, 0].min()) * 0.5
-    mid_y = (pose_3d_corrected[:, 1].max() + pose_3d_corrected[:, 1].min()) * 0.5
-    mid_z = (pose_3d_corrected[:, 2].max() + pose_3d_corrected[:, 2].min()) * 0.5
+    # 确保3D pose居中显示
+    # 计算pose的中心点
+    if valid_mask is not None:
+        valid_points = pose_3d_corrected[valid_mask]
+        if len(valid_points) > 0:
+            center_x = valid_points[:, 0].mean()
+            center_y = valid_points[:, 1].mean()
+            center_z = valid_points[:, 2].mean()
+        else:
+            center_x = center_y = center_z = 0
+    else:
+        center_x = pose_3d_corrected[:, 0].mean()
+        center_y = pose_3d_corrected[:, 1].mean()
+        center_z = pose_3d_corrected[:, 2].mean()
     
-    ax.set_xlim(mid_x - max_range, mid_x + max_range)
-    ax.set_ylim(mid_y - max_range, mid_y + max_range)
-    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+    # 计算pose的范围
+    if valid_mask is not None:
+        valid_points = pose_3d_corrected[valid_mask]
+        if len(valid_points) > 0:
+            range_x = valid_points[:, 0].max() - valid_points[:, 0].min()
+            range_y = valid_points[:, 1].max() - valid_points[:, 1].min()
+            range_z = valid_points[:, 2].max() - valid_points[:, 2].min()
+        else:
+            range_x = range_y = range_z = 1.0
+    else:
+        range_x = pose_3d_corrected[:, 0].max() - pose_3d_corrected[:, 0].min()
+        range_y = pose_3d_corrected[:, 1].max() - pose_3d_corrected[:, 1].min()
+        range_z = pose_3d_corrected[:, 2].max() - pose_3d_corrected[:, 2].min()
     
-    # Set better viewing angle
-    ax.view_init(elev=15, azim=45)
+    # 使用最大范围确保等比例显示，并添加一些边距
+    max_range = max(range_x, range_y, range_z) / 2.0
+    margin = max_range * 0.2  # 添加20%的边距
     
+    # 设置坐标轴范围，确保pose居中
+    ax.set_xlim(center_x - max_range - margin, center_x + max_range + margin)
+    ax.set_ylim(center_y - max_range - margin, center_y + max_range + margin)
+    ax.set_zlim(center_z - max_range - margin, center_z + max_range + margin)
+    
+    # 设置等比例显示
+    ax.set_box_aspect([1, 1, 1])
+    
+    # 设置网格和背景
+    ax.grid(True, alpha=0.3)
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    
+    # Set better viewing angle - rotated 45 degrees clockwise around z-axis
+    # elev 仰角: 上下 （x-axis）； azim 方位角: 左右（z-axis）
+    # 10, 260
+    # ax.view_init(elev=10, azim=260) # default value: elev= 30, azim=-60
+    ax.view_init(elev=45, azim=60) # default value: elev= 30, azim=-60
+    # ax.view_init(elev=10, azim=-70) # default value: elev= x, azim=60 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
     
