@@ -148,7 +148,7 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
         ax.scatter(valid_pose[:, 0], valid_pose[:, 1], valid_pose[:, 2], 
                   c='red', s=50, alpha=0.8)
         
-        # Add labels for valid keypoints
+        # Add labels for valid keypoints with offset to avoid clustering
         for i, (x, y, z) in enumerate(pose_3d_corrected):
             if valid_mask[i]:
                 # Use keypoint name if available, otherwise use index
@@ -156,19 +156,33 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
                     label = keypoint_names[i]
                 else:
                     label = f'{i}'
-                ax.text(x, y, z, label, fontsize=6, ha='center', va='bottom')
+                
+                # Add offset to spread out text labels
+                offset_scale = max_range * 0.05  # 5% of the max range as offset
+                text_x = x + (i % 3 - 1) * offset_scale  # Spread in X direction
+                text_y = y + ((i // 3) % 3 - 1) * offset_scale  # Spread in Y direction  
+                text_z = z + ((i // 9) % 3 - 1) * offset_scale  # Spread in Z direction
+                
+                ax.text(text_x, text_y, text_z, label, fontsize=6, ha='center', va='bottom')
     else:
         ax.scatter(pose_3d_corrected[:, 0], pose_3d_corrected[:, 1], pose_3d_corrected[:, 2], 
                   c='red', s=50, alpha=0.8)
         
-        # Add labels
+        # Add labels with offset to avoid clustering
         for i, (x, y, z) in enumerate(pose_3d_corrected):
             # Use keypoint name if available, otherwise use index
             if keypoint_names is not None and i < len(keypoint_names):
                 label = keypoint_names[i]
             else:
                 label = f'{i}'
-            ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
+            
+            # Add offset to spread out text labels
+            offset_scale = max_range * 0.05  # 5% of the max range as offset
+            text_x = x + (i % 3 - 1) * offset_scale  # Spread in X direction
+            text_y = y + ((i // 3) % 3 - 1) * offset_scale  # Spread in Y direction  
+            text_z = z + ((i // 9) % 3 - 1) * offset_scale  # Spread in Z direction
+            
+            ax.text(text_x, text_y, text_z, label, fontsize=6, ha='center', va='bottom')
     
     # Draw skeleton connections (simplified)
     # connections = [
