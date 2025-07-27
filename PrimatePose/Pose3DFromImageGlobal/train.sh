@@ -3,7 +3,7 @@
 # Training script for 3D Pose Estimation (Global coordinate system)
 # This script automatically copies source files and saves parameters for reproducibility
 
-NVIDIA_VISIBLE_DEVICES=1 python train.py \
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --dataset_name "oms" \
     --train_json /home/ti_wang/Ti_workspace/PrimatePose/Pose3D/data/oms_train.json \
     --val_json /home/ti_wang/Ti_workspace/PrimatePose/Pose3D/data/oms_test.json \
