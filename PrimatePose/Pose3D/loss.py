@@ -187,7 +187,7 @@ class BoneLengthLoss(nn.Module):
             else:
                 valid_bone = torch.ones(batch_size, dtype=torch.bool, device=device)
             
-            if valid_bone.sum() == 0:
+            if not valid_bone.any():
                 continue
                 
             # Compute bone vectors
