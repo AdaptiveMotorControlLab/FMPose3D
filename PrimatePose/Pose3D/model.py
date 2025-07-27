@@ -110,7 +110,7 @@ class Pose3DEstimator(nn.Module):
         camera_params_raw = self.camera_predictor(global_feature)
         
         # Split into components
-        focal_length = torch.sigmoid(camera_params_raw[:, 0:1]) * 1000 + 500  # Range [500, 1500]
+        focal_length = torch.sigmoid(camera_params_raw[:, 0:1]) * FOCAL_LENGTH_SCALE + FOCAL_LENGTH_OFFSET  # Range [500, 1500]
         rotation = camera_params_raw[:, 1:4]  # Rotation angles [rx, ry, rz]
         translation = camera_params_raw[:, 4:7]  # Translation vector [tx, ty, tz]
         scale = torch.sigmoid(camera_params_raw[:, 7:8]) * 2 + 0.5  # Scale factor [0.5, 2.5]
