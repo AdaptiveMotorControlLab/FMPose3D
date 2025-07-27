@@ -55,12 +55,13 @@ def set_random_seed(seed):
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)  # For multi-GPU
         
-    # Set PyTorch deterministic behavior
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    
-    # For DataLoader worker processes
-    torch.use_deterministic_algorithms(True, warn_only=True)
+    if debug_mode:
+        # Set PyTorch deterministic behavior
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
+        # For DataLoader worker processes
+        torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def save_checkpoint(model, optimizer, scheduler, epoch, best_loss, save_path, best_epoch=None):
