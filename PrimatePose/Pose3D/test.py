@@ -16,6 +16,8 @@ from datetime import datetime
 from dataset import PrimateDataset, create_data_loaders
 from model import Pose3DEstimator, project_3d_to_2d
 from loss import CombinedLoss
+from interactive_3d_viewer import create_interactive_3d_pose
+import plotly.offline as pyo
 
 
 def setup_logging():
@@ -28,12 +30,13 @@ def setup_logging():
     return logging.getLogger(__name__)
 
 
-def load_model(checkpoint_path, num_keypoints=37, backbone='resnet50', device='cpu'):
+def load_model(checkpoint_path, num_keypoints=37, embed_dim=256, num_heads=8, root_joint_idx=11, device='cpu'):
     """Load trained model from checkpoint"""
     model = Pose3DEstimator(
         num_keypoints=num_keypoints,
-        backbone=backbone,
-        pretrained=False  # Not needed for inference
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        root_joint_idx=root_joint_idx
     )
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -102,14 +105,19 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
     
+    # Fix coordinate system - flip Y and Z axes to correct orientation
+    pose_3d_corrected = pose_3d.copy()
+    # pose_3d_corrected[:, 1] = -pose_3d[:, 1]  # Flip Y axis
+    # pose_3d_corrected[:, 2] = -pose_3d[:, 2]  # Flip Z axis
+    
     # Plot keypoints
     if valid_mask is not None:
-        valid_pose = pose_3d[valid_mask]
+        valid_pose = pose_3d_corrected[valid_mask]
         ax.scatter(valid_pose[:, 0], valid_pose[:, 1], valid_pose[:, 2], 
                   c='red', s=50, alpha=0.8)
         
         # Add labels for valid keypoints
-        for i, (x, y, z) in enumerate(pose_3d):
+        for i, (x, y, z) in enumerate(pose_3d_corrected):
             if valid_mask[i]:
                 # Use keypoint name if available, otherwise use index
                 if keypoint_names is not None and i < len(keypoint_names):
@@ -118,11 +126,11 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
                     label = f'{i}'
                 ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
     else:
-        ax.scatter(pose_3d[:, 0], pose_3d[:, 1], pose_3d[:, 2], 
+        ax.scatter(pose_3d_corrected[:, 0], pose_3d_corrected[:, 1], pose_3d_corrected[:, 2], 
                   c='red', s=50, alpha=0.8)
         
         # Add labels
-        for i, (x, y, z) in enumerate(pose_3d):
+        for i, (x, y, z) in enumerate(pose_3d_corrected):
             # Use keypoint name if available, otherwise use index
             if keypoint_names is not None and i < len(keypoint_names):
                 label = keypoint_names[i]
@@ -154,11 +162,11 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     
     
     for joint1, joint2 in connections:
-        if joint1 < len(pose_3d) and joint2 < len(pose_3d):
+        if joint1 < len(pose_3d_corrected) and joint2 < len(pose_3d_corrected):
             if valid_mask is None or (valid_mask[joint1] and valid_mask[joint2]):
-                ax.plot([pose_3d[joint1, 0], pose_3d[joint2, 0]],
-                       [pose_3d[joint1, 1], pose_3d[joint2, 1]],
-                       [pose_3d[joint1, 2], pose_3d[joint2, 2]], 'b-', alpha=0.6)
+                ax.plot([pose_3d_corrected[joint1, 0], pose_3d_corrected[joint2, 0]],
+                       [pose_3d_corrected[joint1, 1], pose_3d_corrected[joint2, 1]],
+                       [pose_3d_corrected[joint1, 2], pose_3d_corrected[joint2, 2]], 'b-', alpha=0.6)
     
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -166,16 +174,19 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     ax.set_title(title)
     
     # Set equal aspect ratio
-    max_range = np.array([pose_3d[:, 0].max() - pose_3d[:, 0].min(),
-                         pose_3d[:, 1].max() - pose_3d[:, 1].min(),
-                         pose_3d[:, 2].max() - pose_3d[:, 2].min()]).max() / 2.0
-    mid_x = (pose_3d[:, 0].max() + pose_3d[:, 0].min()) * 0.5
-    mid_y = (pose_3d[:, 1].max() + pose_3d[:, 1].min()) * 0.5
-    mid_z = (pose_3d[:, 2].max() + pose_3d[:, 2].min()) * 0.5
+    max_range = np.array([pose_3d_corrected[:, 0].max() - pose_3d_corrected[:, 0].min(),
+                         pose_3d_corrected[:, 1].max() - pose_3d_corrected[:, 1].min(),
+                         pose_3d_corrected[:, 2].max() - pose_3d_corrected[:, 2].min()]).max() / 2.0
+    mid_x = (pose_3d_corrected[:, 0].max() + pose_3d_corrected[:, 0].min()) * 0.5
+    mid_y = (pose_3d_corrected[:, 1].max() + pose_3d_corrected[:, 1].min()) * 0.5
+    mid_z = (pose_3d_corrected[:, 2].max() + pose_3d_corrected[:, 2].min()) * 0.5
     
     ax.set_xlim(mid_x - max_range, mid_x + max_range)
     ax.set_ylim(mid_y - max_range, mid_y + max_range)
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
+    
+    # Set better viewing angle
+    ax.view_init(elev=15, azim=45)
     
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
@@ -233,8 +244,8 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
             # Create valid mask from visibility
             valid_mask = pose_2d[:, :, 2] > 0
             
-            # Forward pass
-            predictions = model(images, pose_2d, valid_mask)
+            # Forward pass (only 2D pose input)
+            predictions = model(pose_2d, valid_mask)
             pose_3d_pred = predictions['pose_3d']
             camera_params_pred = predictions['camera_params']
             
@@ -263,13 +274,27 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
                         valid_mask[i], image_2d_path
                     )
                     
-                    # Visualize predicted 3D pose
+                    # Visualize predicted 3D pose (static matplotlib)
                     pose_3d_path = os.path.join(vis_dir, f'sample_{sample_id:04d}_3d.png')
                     fig = visualize_3d_pose(
                         pose_3d_pred[i], keypoint_names, valid_mask[i],
                         pose_3d_path, f"Sample {sample_id} - Predicted 3D Pose"
                     )
                     plt.close(fig)
+                    
+                    # Generate interactive 3D pose (HTML)
+                    pose_3d_html_path = os.path.join(vis_dir, f'sample_{sample_id:04d}_3d_interactive.html')
+                    try:
+                        interactive_fig = create_interactive_3d_pose(
+                            pose_3d_pred[i], keypoint_names, valid_mask[i],
+                            title=f"Sample {sample_id} - Interactive 3D Pose",
+                            show_skeleton=True, point_size=8
+                        )
+                        pyo.plot(interactive_fig, filename=pose_3d_html_path, auto_open=False)
+                        logger.info(f"Saved interactive 3D visualization: {pose_3d_html_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate interactive 3D visualization for sample {sample_id}: {e}")
+                        continue
                     
                     # Visualize reprojected 2D pose
                     pose_2d_proj = project_3d_to_2d(
@@ -312,7 +337,7 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
                     plt.savefig(comparison_path, dpi=150, bbox_inches='tight')
                     plt.close(fig)
                     
-                    logger.info(f"Saved visualizations for sample {sample_id}")
+                    logger.info(f"Saved all visualizations for sample {sample_id} (2D, 3D PNG, 3D HTML, comparison)")
     
     # Compute final statistics
     all_errors = np.array(all_errors)
@@ -338,6 +363,15 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
         json.dump(results, f, indent=2)
     
     logger.info(f"Results saved to: {results_path}")
+    
+    # Information about interactive visualizations
+    logger.info("📁 Visualization files generated:")
+    logger.info(f"  📊 Static visualizations: {vis_dir}/*_2d.jpg, *_3d.png, *_comparison.png")
+    logger.info(f"  🌐 Interactive 3D poses: {vis_dir}/*_3d_interactive.html")
+    logger.info("💡 To view interactive 3D poses:")
+    logger.info("  1. Start HTTP server: python -m http.server 8080")
+    logger.info(f"  2. Open browser: http://localhost:8080/{vis_dir.replace(output_dir + '/', '')}/*_3d_interactive.html")
+    logger.info("  3. Or download HTML files to your local machine")
     
     return results
 
@@ -387,11 +421,14 @@ def main():
                        help='Output directory for results and visualizations. If not provided, will create timestamped directory')
     
     # Model configuration
-    parser.add_argument('--backbone', type=str, default='resnet50',
-                       choices=['resnet18', 'resnet34', 'resnet50'],
-                       help='Backbone architecture')
     parser.add_argument('--num_keypoints', type=int, default=37,
                        help='Number of keypoints')
+    parser.add_argument('--embed_dim', type=int, default=256,
+                       help='Embedding dimension for attention layers')
+    parser.add_argument('--num_heads', type=int, default=8,
+                       help='Number of attention heads')
+    parser.add_argument('--root_joint_idx', type=int, default=11,
+                       help='Index of root joint (neck)')
     parser.add_argument('--image_size', type=int, nargs=2, default=[256, 256],
                        help='Image size [width, height]')
     
@@ -426,7 +463,9 @@ def main():
     model = load_model(
         args.checkpoint,
         num_keypoints=args.num_keypoints,
-        backbone=args.backbone,
+        embed_dim=args.embed_dim,
+        num_heads=args.num_heads,
+        root_joint_idx=args.root_joint_idx,
         device=device
     )
     
