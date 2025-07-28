@@ -1,5 +1,5 @@
 """
-3D-to-2D Reprojection Visualization Script
+3D Pose Estimation and Visualization API
 
 This script reprojects 3D pose coordinates onto 2D camera images for validation
 in a multi-camera setup. It's designed for primate pose estimation systems.
@@ -55,7 +55,7 @@ print('Choosing frame {} of batch {} for visualization'.format(frm, btch))
 # Intrinsic parameters define the camera's internal characteristics:
 # - K matrix: 3x3 camera calibration matrix (focal lengths, principal point)
 # - d1, d2: Radial distortion coefficients for lens correction
-with open('Batch{}/intrinsic.txt'.format(btch)) as f:
+with open('../dataset/Batch{}/intrinsic.txt'.format(btch)) as f:
     lines = f.readlines()
     cameras = {}  # Dictionary to store all camera parameters
     
@@ -84,7 +84,7 @@ with open('Batch{}/intrinsic.txt'.format(btch)) as f:
 # - R: 3x3 rotation matrix (camera orientation)
 # - C: 3D camera center position in world coordinates
 # - P: 3x4 projection matrix combining intrinsic and extrinsic parameters
-with open('Batch{}/camera.txt'.format(btch)) as f:
+with open('../dataset/Batch{}/camera.txt'.format(btch)) as f:
     lines = f.readlines()
     
     # Parse extrinsic file format: starting from line 3, every 5 lines define one camera
@@ -185,10 +185,11 @@ def get_projection(cam, coords_3d):
 
 def display_plot(I, image_name):
     """
-    Display reprojection results from 4 cameras in a 2x2 grid.
+    Save reprojection results from 4 cameras in a 2x2 grid to file.
     
     Args:
         I: Dictionary containing processed images from 4 cameras
+        image_name: Output filename to save the visualization
     """
     fig = plt.figure()
     
@@ -215,18 +216,20 @@ def display_plot(I, image_name):
 
     fig.tight_layout()
     # plt.show()
-    fig.savefig(image_name)  # Optional: save figure to file
+    fig.savefig(image_name)  # Save figure to file
 
-# === MAIN PROCESSING PIPELINE ===
+
+# === COMMAND LINE INTERFACE ===
+
 if __name__ == '__main__':
     # Initialize data structures
     Data = defaultdict(dict)  # Store reprojected coordinates for each camera
     
     # Load 3D pose annotations from MATLAB file
-    annotations = loadmat('Batch{}/coords_3D.mat'.format(btch))
+    annotations = loadmat('../dataset/Batch{}/coords_3D.mat'.format(btch))
     
     # Load image cropping parameters from MATLAB file
-    parameters = loadmat('Batch{}/crop_para.mat'.format(btch))
+    parameters = loadmat('../dataset/Batch{}/crop_para.mat'.format(btch))
     
     # Extract and process crop parameters for the selected frame
     pt = parameters['crop'].transpose()[0]
@@ -246,7 +249,7 @@ if __name__ == '__main__':
         cmr = parameters['crop'][q[0][2*i]][1]    # Camera number
         
         # Construct image filename
-        img_name = 'Images/batch' + str(btch) + '_' + str(frame).zfill(9) + '_' + str(cmr) + '.jpg'
+        img_name = '../dataset/Images/batch' + str(btch) + '_' + str(frame).zfill(9) + '_' + str(cmr) + '.jpg'
         
         # Load image from file
         image = cv2.imread(img_name)
@@ -288,7 +291,7 @@ if __name__ == '__main__':
             x = x - params[i][1]  # Subtract left offset
             y = y - params[i][0]  # Subtract top offset
             pt1 = (y, x)  # OpenCV uses (x, y) format
-            
+
             coords1 = Data[str(cmr)][jt2]['reprojected']
             x, y = coords1
             x = x - params[i][1]
@@ -306,8 +309,10 @@ if __name__ == '__main__':
         # Store processed image
         I[i] = image
         
-        # Construct output filename (currently unused)
+        # Construct output filename for visualization
         a = 'Rep/batch' + str(btch) + '_' + str(frame).zfill(9) + '_' + str(cmr) + '.jpg'
+        print(a)
 
-    # Display final results from all 4 cameras
+        os.makedirs('Rep', exist_ok=True)
+    # Save final results from all 4 cameras to file
     display_plot(I, image_name=a)
