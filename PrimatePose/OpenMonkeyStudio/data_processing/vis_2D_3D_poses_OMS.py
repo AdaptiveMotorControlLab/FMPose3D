@@ -320,7 +320,7 @@ def extract_pose_data(batch_num, frame_num):
 
 
 def Pose3D(batch_num, frame_num, output_dir='results', visualize_3d=True, visualize_2d=True, 
-           export_2d_poses=False, pose_format='json', rotation_angle=-90, rotation_axis='x'):
+           rotation_angle=-90, rotation_axis='x'):
     """
     Main pipeline for processing 3D pose data with comprehensive visualization.
     
@@ -328,8 +328,7 @@ def Pose3D(batch_num, frame_num, output_dir='results', visualize_3d=True, visual
     1. Extracts 3D pose data from annotations
     2. Creates 3D visualization in 3D space
     3. Creates 2D reprojection visualization on camera images
-    4. Optionally saves 2D pose coordinates without plotting on images
-    5. Saves all results to organized output directory
+    4. Saves all results to organized output directory
     
     Args:
         batch_num (str/int): Batch number to process
@@ -337,8 +336,6 @@ def Pose3D(batch_num, frame_num, output_dir='results', visualize_3d=True, visual
         output_dir (str): Base directory to save results
         visualize_3d (bool): Whether to create 3D visualization
         visualize_2d (bool): Whether to create 2D visualization
-        export_2d_poses (bool): Whether to save 2D pose coordinates without plotting on images
-        pose_format (str): Format to save 2D poses ('json', 'csv', or 'pkl')
         rotation_angle (float): Rotation angle for 3D visualization (degrees, default: -90)
         rotation_axis (str): Rotation axis for 3D visualization ('x', 'y', or 'z', default: 'x')
     
@@ -364,11 +361,6 @@ def Pose3D(batch_num, frame_num, output_dir='results', visualize_3d=True, visual
     if visualize_2d:
         save_path_2d = os.path.join(specific_output_dir, f"pose_2d_batch{batch_num}_frame{frame_num}.png")
         Pose2D_vis(pose_data, batch_num, frame_num, save_path=save_path_2d, show_plot=False)
-    
-    # Save 2D poses without plotting on images if requested
-    if export_2d_poses:
-        save_path_poses = os.path.join(specific_output_dir, f"pose_2d_coords_batch{batch_num}_frame{frame_num}")
-        pose_2d_data = save_2d_poses_only(pose_data, batch_num, frame_num, save_path=save_path_poses, save_format=pose_format)
     
     print(f"=== Processing Complete ===")
     print(f"Results saved to: {specific_output_dir}")
@@ -421,169 +413,6 @@ def rotate_3d_points(points, angle_degrees, axis='z'):
     return rotated_points
 
 
-def save_2d_poses_only(pose_data, batch_num, frame_num, save_path=None, save_format='json'):
-    """
-    Extract and save 2D pose coordinates without plotting on images.
-    
-    Args:
-        pose_data (dict): 3D pose data from Pose3D() function
-        batch_num (str/int): Batch number
-        frame_num (int): Frame number
-        save_path (str, optional): Path to save the 2D pose data
-        save_format (str): Format to save poses ('json', 'csv', or 'npy')
-    
-    Returns:
-        dict: Dictionary containing 2D pose coordinates for each camera
-    """
-    cropping_parameters = pose_data['cropping_parameters']
-    cameras = pose_data['cameras']
-    
-    # Extract frame information from crop parameters
-    pt = cropping_parameters['crop'].transpose()[0]
-    unique_frames = np.unique(pt, axis=0)
-    q = np.where(pt == unique_frames[frame_num])
-    
-    print(f"Extracting 2D poses for frame {frame_num} (frame_id: {unique_frames[frame_num]})")
-    
-    # Store 2D poses for all cameras
-    camera_poses_2d = {}
-    
-    for i in range(4):  # Process 4 cameras
-        if i * 2 >= len(q[0]):
-            break
-        
-        # Extract camera ID from crop parameters
-        index = 2*i
-        frame = cropping_parameters['crop'][q[0][index]][0]  # Frame number
-        cmr = cropping_parameters['crop'][q[0][index]][1]    # Camera number
-        cam_id = str(cmr)  # Convert to string
-        
-        # Get crop parameters
-        crop_top = cropping_parameters['crop'][q[0][index]][2]
-        crop_left = cropping_parameters['crop'][q[0][index]][3]
-        crop_width = cropping_parameters['crop'][q[0][index]][4]
-        crop_height = cropping_parameters['crop'][q[0][index]][5]
-        
-        print(f"Processing camera {i} (cam_id: {cam_id})")
-        
-        # Reproject 3D joints to 2D
-        reprojected_joints = {}
-        joints_2d_list = []
-        
-        for jt_idx, joint_3d in enumerate(pose_data['joints_3d']):
-            if joint_3d is not None:
-                # Project 3D joint to 2D image coordinates
-                x, y = get_projection(cam_id, joint_3d, cameras)
-                
-                # Apply lens distortion
-                proj = distort_point(x, y, cameras[cam_id])
-                
-                # Store reprojected coordinates
-                reprojected_coords = (int(proj[1]), int(proj[0]))  # (y, x) format
-                reprojected_joints[jt_idx] = reprojected_coords
-                
-                # Adjust coordinates relative to crop region
-                adjusted_x = reprojected_coords[1] - crop_left
-                adjusted_y = reprojected_coords[0] - crop_top
-                
-                # Check if within crop boundaries
-                within_bounds = not (adjusted_x < 1 or adjusted_y < 1 or 
-                                   adjusted_x > crop_width or adjusted_y > crop_height)
-                
-                joints_2d_list.append({
-                    'joint_id': jt_idx,
-                    'joint_name': pose_data['joint_names'][jt_idx],
-                    'original_coords': reprojected_coords,
-                    'crop_adjusted_coords': (adjusted_y, adjusted_x),
-                    'within_crop_bounds': within_bounds
-                })
-            else:
-                reprojected_joints[jt_idx] = None
-                joints_2d_list.append({
-                    'joint_id': jt_idx,
-                    'joint_name': pose_data['joint_names'][jt_idx],
-                    'original_coords': None,
-                    'crop_adjusted_coords': None,
-                    'within_crop_bounds': False
-                })
-        
-        # Store camera pose data
-        camera_poses_2d[f'camera_{i}'] = {
-            'camera_id': cam_id,
-            'frame_id': frame,
-            'crop_parameters': {
-                'top': crop_top,
-                'left': crop_left, 
-                'width': crop_width,
-                'height': crop_height
-            },
-            'joints_2d': joints_2d_list,
-            'joint_pairs': pose_data['joint_pairs']
-        }
-    
-    # Add metadata
-    pose_2d_data = {
-        'batch_num': batch_num,
-        'frame_num': frame_num,
-        'frame_id': unique_frames[frame_num],
-        'total_cameras': len(camera_poses_2d),
-        'total_joints': len(pose_data['joint_names']),
-        'joint_names': pose_data['joint_names'],
-        'joint_pairs': pose_data['joint_pairs'],
-        'cameras': camera_poses_2d
-    }
-    
-    # Save the data if save_path is provided
-    if save_path:
-        save_dir = os.path.dirname(save_path) if os.path.dirname(save_path) else '.'
-        os.makedirs(save_dir, exist_ok=True)
-        
-        if save_format.lower() == 'json':
-            if not save_path.endswith('.json'):
-                save_path = save_path + '.json'
-            with open(save_path, 'w') as f:
-                json.dump(pose_2d_data, f, indent=2)
-            print(f"2D poses saved to JSON: {save_path}")
-            
-        elif save_format.lower() == 'npy':
-            if not save_path.endswith('.pkl'):
-                save_path = save_path.replace('.npy', '.pkl') + '.pkl'
-            import pickle
-            with open(save_path, 'wb') as f:
-                pickle.dump(pose_2d_data, f)
-            print(f"2D poses saved to pickle: {save_path}")
-            
-        elif save_format.lower() == 'csv':
-            if not save_path.endswith('.csv'):
-                save_path = save_path + '.csv'
-            # Create CSV format - flatten the data
-            import pandas as pd
-            csv_data = []
-            for cam_key, cam_data in camera_poses_2d.items():
-                for joint in cam_data['joints_2d']:
-                    if joint['original_coords'] is not None:
-                        csv_data.append({
-                            'batch_num': batch_num,
-                            'frame_num': frame_num,
-                            'frame_id': unique_frames[frame_num],
-                            'camera': cam_key,
-                            'camera_id': cam_data['camera_id'],
-                            'joint_id': joint['joint_id'],
-                            'joint_name': joint['joint_name'],
-                            'original_x': joint['original_coords'][1],
-                            'original_y': joint['original_coords'][0],
-                            'crop_adjusted_x': joint['crop_adjusted_coords'][1],
-                            'crop_adjusted_y': joint['crop_adjusted_coords'][0],
-                            'within_bounds': joint['within_crop_bounds']
-                        })
-            
-            df = pd.DataFrame(csv_data)
-            df.to_csv(save_path, index=False)
-            print(f"2D poses saved to CSV: {save_path}")
-    
-    return pose_2d_data
-
-
 def Pose3D_Vis(pose_data, save_path=None, show_plot=True, rotation_angle=-90, rotation_axis='x'):
     """
     Visualize 3D poses in 3D space.
@@ -615,6 +444,8 @@ def Pose3D_Vis(pose_data, save_path=None, show_plot=True, rotation_angle=-90, ro
         joint_coords = rotate_3d_points(joint_coords, rotation_angle, rotation_axis)
         
         # Plot joint points
+        # ax.scatter(joint_coords[:, 0], joint_coords[:, 1], joint_coords[:, 2], 
+        #           c='red', alpha=0.8, label='Joints')
         ax.scatter(joint_coords[:, 0], joint_coords[:, 1], joint_coords[:, 2], 
                   c='red', alpha=0.8, label='Joints')
         
@@ -634,10 +465,10 @@ def Pose3D_Vis(pose_data, save_path=None, show_plot=True, rotation_angle=-90, ro
                        [joint1[2], joint2[2]], 
                        'b-', linewidth=2, alpha=0.7)
     
-    # Set labels and title (fixed the set_zlabel issue)
+    # Set labels and title
     ax.set_xlabel('X (mm)')
     ax.set_ylabel('Y (mm)')
-    ax.set_zlabel('Z (mm)')  # This should work with projection='3d'
+    ax.set_zlabel('Z (mm)')
     ax.set_title(f'3D Pose Visualization (Rotated {rotation_angle}° around {rotation_axis.upper()}-axis)\nBatch {frame_info["batch_num"]}, Frame {frame_info["frame_num"]}')
     
     ax.legend()
@@ -817,7 +648,7 @@ def Pose2D_vis(pose_data, batch_num, frame_num, save_path=None, show_plot=False)
 
 
 def data_processing(batch_num, frame_num, output_dir='results', visualize_3d=True, visualize_2d=True,
-                   export_2d_poses=False, pose_format='json', rotation_angle=-90, rotation_axis='x'):
+                   rotation_angle=-90, rotation_axis='x'):
     """
     Wrapper function for the main Pose3D() pipeline.
     
@@ -829,8 +660,6 @@ def data_processing(batch_num, frame_num, output_dir='results', visualize_3d=Tru
         output_dir (str): Base directory to save results
         visualize_3d (bool): Whether to create 3D visualization
         visualize_2d (bool): Whether to create 2D visualization
-        export_2d_poses (bool): Whether to save 2D pose coordinates without plotting on images
-        pose_format (str): Format to save 2D poses ('json', 'csv', or 'pkl')
         rotation_angle (float): Rotation angle for 3D visualization (degrees, default: -90)
         rotation_axis (str): Rotation axis for 3D visualization ('x', 'y', or 'z', default: 'x')
     
@@ -839,7 +668,7 @@ def data_processing(batch_num, frame_num, output_dir='results', visualize_3d=Tru
     """
     # Call the main Pose3D() function which now contains the full pipeline
     return Pose3D(batch_num, frame_num, output_dir, visualize_3d, visualize_2d, 
-                  export_2d_poses, pose_format, rotation_angle, rotation_axis)
+                  rotation_angle, rotation_axis)
 
 
 # === LEGACY FUNCTION (for backward compatibility) ===
@@ -929,8 +758,7 @@ def main():
     
     # Run the main Pose3D pipeline
     print(f"Running Pose3D(batch_num={btch}, frame_num={frm})")
-    Pose3D(btch, frm, output_dir='results', visualize_3d=True, visualize_2d=True, 
-           export_2d_poses=False, pose_format='json')
+    Pose3D(btch, frm, output_dir='results', visualize_3d=True, visualize_2d=True)
 
 
 if __name__ == '__main__':
