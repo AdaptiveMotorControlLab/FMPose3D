@@ -186,17 +186,95 @@ for the categories, please use the "categories" in /home/ti_wang/Ti_workspace/Pr
 save the converted json file to this folder: /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples
 
 
+# Knowledge about primate dataset
+
+## check_vis_labels_per_dataset
+
+only oap omc and lote contain keypoints with vis_label=1;
+```bash
+Checking oap_train.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 991,760 keypoints (62.16%)
+Visibility 1: 94,611 keypoints (5.93%)
+Visibility 2: 509,069 keypoints (31.91%)
+------------------------------
+Total annotations: 43120
+
+
+Checking omc_train.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 1,338,340 keypoints (54.05%)
+Visibility 1: 82,644 keypoints (3.34%)
+Visibility 2: 1,054,945 keypoints (42.61%)
+------------------------------
+Total annotations: 66917
+
+Checking lote_train.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 153,300 keypoints (54.05%)
+Visibility 0: 37,664 keypoints (13.28%)
+Visibility 1: 29,452 keypoints (10.38%)
+Visibility 2: 63,189 keypoints (22.28%)
+------------------------------
+Total annotations: 7665
+```
+
+test sets:
+
+```bash
+Checking oap_test.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 330,602 keypoints (62.16%)
+Visibility 1: 31,307 keypoints (5.89%)
+Visibility 2: 169,929 keypoints (31.95%)
+------------------------------
+Total annotations: 14374
+
+Checking mit_test.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 34,408 keypoints (62.16%)
+Visibility 0: 5,103 keypoints (9.22%)
+Visibility 1: 3 keypoints (0.01%)
+Visibility 2: 15,838 keypoints (28.61%)
+
+Checking lote_test.json
+Visibility Label Counts:
+------------------------------
+Visibility -1: 45,620 keypoints (54.05%)
+Visibility 0: 11,254 keypoints (13.33%)
+Visibility 1: 8,853 keypoints (10.49%)
+Visibility 2: 18,670 keypoints (22.12%)
+------------------------------
+Total annotations: 2281
+```
+
+
 # Dataset Version
 
-## V8.1
+## V8.0
 
 transform the v7 version data to coco format that needed by dlc;
 
+
+## V8.1
+
+/home/ti_wang/Ti_workspace/PrimatePose/coco_necessary_split/evaluation_ori_kepts.sh
+
+the keypoints in the original format:
+path: /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/data_v8.1
+
+
+
 ## V8.2
 
-in V8.1, for some sub-datasets, the keypoint mapping is not correct, so we need to correct the keypoint mapping;
+in V8.0, for some sub-datasets, the keypoint mapping is not correct, so we need to correct the keypoint mapping;
 
-based on V8.1, we correct the keypoint mapping for some sub-datasets, and save the correct keypoint mapping to the json file;
+based on V8.0, we correct the keypoint mapping for some sub-datasets, and save the correct keypoint mapping to the json file;
 
 ### process of V8.2
 
