@@ -550,8 +550,8 @@ class JSONProcessor:
                     keypoint_names = category['keypoints']
                     break
         
-        print(f"Found {len(keypoint_names)} keypoints: {keypoint_names}")
-        print("-" * 60)
+        # print(f"Found {len(keypoint_names)} keypoints: {keypoint_names}")
+        # print("-" * 60)
         
         # Process all annotations
         for ann in data['annotations']:
@@ -583,6 +583,15 @@ class JSONProcessor:
         
         return vis_counts
 
+    def check_vis_labels_per_dataset(self, folder_path):
+        """
+        Check the visibility labels of keypoints per dataset.
+        """
+        for file in os.listdir(folder_path):
+            if file.endswith(".json"):
+                print(f"Checking {file}")
+                self.check_vis_label_of_keypoints(os.path.join(folder_path, file))
+                print("-" * 30)
 
 # Example usage:
 
@@ -664,7 +673,9 @@ if __name__ == "__main__":
     
     # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
     
-    processor.check_vis_label_of_keypoints(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json")
+    # processor.check_vis_label_of_keypoints(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json")
+    processor.check_vis_labels_per_dataset(folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_test_datasets")
+    
     
     # processor.merge_json_files(
     #                            json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_train_datasets",
