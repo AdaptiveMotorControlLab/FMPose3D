@@ -180,7 +180,16 @@ def main(
         # Update net_type to reflect the actual ViT variant used
         pytorch_cfg["net_type"] = model_name
         
+        # Update training schedule for ViT (longer training with later LR decay)
+        pytorch_cfg["train_settings"]["epochs"] = 210
+        pytorch_cfg["runner"]["scheduler"]["params"]["milestones"] = [170, 200]
+        
+        # Update learning rate for ViT training
+        pytorch_cfg["runner"]["optimizer"]["params"]["lr"] = 5e-4
+        
         print(f"✅ ViT + DINO configuration applied successfully (net_type: {model_name})")
+        print(f"🕐 Training schedule: 210 epochs with LR decay at epochs 170 and 200")
+        print(f"📈 Learning rate: {pytorch_cfg['runner']['optimizer']['params']['lr']} (start)")
     else:
         print(f"Using default configuration for model: {pytorch_cfg['model']['backbone']['type']}")
     
