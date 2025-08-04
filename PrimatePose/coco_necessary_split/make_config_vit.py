@@ -61,6 +61,17 @@ def make_inference_config(
     MakeInference_yaml(items2change, output_path, default_config_path)
 
 
+def str_to_bool(v):
+    """Convert string to boolean for argparse"""
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def main(
     project_root: str,
     train_file: str,
@@ -134,14 +145,14 @@ def main(
             vit_model_name = "vit_base_patch16_224"
             print(f" Patch size not specified in {model_arch}, defaulting to patch16")
         
-        print(f"🔧 Using ViT model: {vit_model_name} (patch_size={patch_size})")
+        print(f"🔧 Using ViT model: {vit_model_name} (patch_size={patch_size}, DINO={dino_pretrained})")
         
         # Override backbone configuration for ViT + DINO
         pytorch_cfg["model"]["backbone"] = {
             "type": "ViT",
             "model_name": vit_model_name,
             "img_size": 224,
-            "pretrained": False,
+            "pretrained": not dino_pretrained,  # Use ImageNet weights if DINO is disabled
             "dino_pretrained": dino_pretrained,
             "dino_arch": "vit_base",
             "patch_size": patch_size,
@@ -203,7 +214,8 @@ if __name__ == "__main__":
     parser.add_argument("output")
     parser.add_argument("--model_arch", default="top_down_vit_base_patch16_224")
     parser.add_argument("--detector_arch", default="fasterrcnn_mobilenet_v3_large_fpn")
-    parser.add_argument("--dino_pretrained", default=True)
+    parser.add_argument("--dino_pretrained", type=str_to_bool, default=True, 
+                        help="Use DINO pretraining (True/False)")
     parser.add_argument("--train_file", default="train.json")
     parser.add_argument("--test_file", default="test.json")
     parser.add_argument("--multi_animal", action="store_true")
