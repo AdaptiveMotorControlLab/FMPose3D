@@ -4,16 +4,18 @@ project_root=$(dirname $(dirname $(realpath $0)))
 
 debug=0
 
-dataset_name=ak
-file_name=${dataset_name}_pose_vit_dino_V83_20250804_4
+dataset_name=aptv2
+# file_name=${dataset_name}_pose_vit_ImageNet_V83_20250804_4
+file_name=${dataset_name}_pose_vit_ImageNet_small_p16_lr1e-4_V83_20250806
 
 mode="train"
 # for splitted datasets V8.3
 train_json="${data_path_prefix}/primate_data/PFM_V8.3/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
 test_json="${data_path_prefix}/primate_data/PFM_V8.3/splitted_test_datasets/${dataset_name}_test.json"
 
-model_arch="top_down_vit_base_patch8_224"
+model_arch="top_down_vit_small_patch16_224"
 dino_pretrained=True
+# dino_pretrained=False
 
 detector_arch="fasterrcnn_mobilenet_v3_large_fpn"
 
