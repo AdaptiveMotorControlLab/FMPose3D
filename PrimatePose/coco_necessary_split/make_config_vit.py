@@ -126,26 +126,46 @@ def main(
     elif "vit" in model_arch.lower() or "dino" in model_arch.lower():
         print("Configuring ViT backbone with DINO pretraining...")
         
-        # Parse model architecture to extract patch size and model variant
-        # Examples: "top_down_vit_base_patch16_224", "vit_base_patch8_224"
+        # Parse model architecture to extract ViT size, patch size and model variant
+        # Examples: "top_down_vit_base_patch16_224", "vit_small_patch8_224"
         model_name = model_arch
         if model_arch.startswith("top_down_"):
             model_name = model_arch[len("top_down_"):]
         
+        # Extract ViT size (small, base, large)
+        if "small" in model_name:
+            vit_size = "small"
+            dino_arch = "vit_small"
+            backbone_channels = 384
+        elif "base" in model_name:
+            vit_size = "base"
+            dino_arch = "vit_base"
+            backbone_channels = 768
+        elif "large" in model_name:
+            vit_size = "large"
+            dino_arch = "vit_large"
+            backbone_channels = 1024
+        else:
+            # Default to base if not specified
+            vit_size = "base"
+            dino_arch = "vit_base"
+            backbone_channels = 768
+            print(f" ViT size not specified in {model_arch}, defaulting to base")
+        
         # Extract patch size from model name
         if "patch8" in model_name:
             patch_size = 8
-            vit_model_name = "vit_base_patch8_224"
         elif "patch16" in model_name:
             patch_size = 16
-            vit_model_name = "vit_base_patch16_224"
         else:
             # Default to patch16 if not specified
             patch_size = 16
-            vit_model_name = "vit_base_patch16_224"
             print(f" Patch size not specified in {model_arch}, defaulting to patch16")
         
-        print(f"🔧 Using ViT model: {vit_model_name} (patch_size={patch_size}, DINO={dino_pretrained})")
+        # Construct the full model name
+        vit_model_name = f"vit_{vit_size}_patch{patch_size}_224"
+        
+        print(f"🔧 Using ViT model: {vit_model_name} (size={vit_size}, patch_size={patch_size}, channels={backbone_channels}, DINO={dino_pretrained})")
         
         # Override backbone configuration for ViT + DINO
         pytorch_cfg["model"]["backbone"] = {
@@ -154,22 +174,22 @@ def main(
             "img_size": 224,
             "pretrained": not dino_pretrained,  # Use ImageNet weights if DINO is disabled
             "dino_pretrained": dino_pretrained,
-            "dino_arch": "vit_base",
+            "dino_arch": dino_arch,
             "patch_size": patch_size,
             "drop_rate": 0.0,
             "drop_path_rate": 0.1,
             "freeze_bn_stats": False,
             "freeze_bn_weights": False,
         }
-        # Update backbone output channels
-        pytorch_cfg["model"]["backbone_output_channels"] = 768
+        # Update backbone output channels based on ViT size
+        pytorch_cfg["model"]["backbone_output_channels"] = backbone_channels
         
-        # Update head configuration to match ViT output channels (768)
+        # Update head configuration to match ViT output channels
         for head_name, head_config in pytorch_cfg["model"]["heads"].items():
             if "heatmap_config" in head_config:
-                head_config["heatmap_config"]["channels"] = [768]
+                head_config["heatmap_config"]["channels"] = [backbone_channels]
             if "locref_config" in head_config:
-                head_config["locref_config"]["channels"] = [768]
+                head_config["locref_config"]["channels"] = [backbone_channels]
         
         # Update data configuration for 224x224 images (DINO standard)
         pytorch_cfg["data"]["train"]["top_down_crop"]["width"] = 224
@@ -179,17 +199,8 @@ def main(
         
         # Update net_type to reflect the actual ViT variant used
         pytorch_cfg["net_type"] = model_name
-        
-        # Update training schedule for ViT (longer training with later LR decay)
-        pytorch_cfg["train_settings"]["epochs"] = 210
-        pytorch_cfg["runner"]["scheduler"]["params"]["milestones"] = [170, 200]
-        
-        # Update learning rate for ViT training
-        pytorch_cfg["runner"]["optimizer"]["params"]["lr"] = 5e-4
-        
+                
         print(f"✅ ViT + DINO configuration applied successfully (net_type: {model_name})")
-        print(f"🕐 Training schedule: 210 epochs with LR decay at epochs 170 and 200")
-        print(f"📈 Learning rate: {pytorch_cfg['runner']['optimizer']['params']['lr']} (start)")
     else:
         print(f"Using default configuration for model: {pytorch_cfg['model']['backbone']['type']}")
     
@@ -203,6 +214,13 @@ def main(
     pytorch_cfg["runner"]["snapshots"]["max_snapshots"] = 5
     
     pytorch_cfg["runner"]["eval_interval"] = 1
+
+    # Update training schedule
+    pytorch_cfg["train_settings"]["epochs"] = 210
+    pytorch_cfg["runner"]["scheduler"]["params"]["milestones"] = [170, 200]
+    
+    # Update learning rate
+    pytorch_cfg["runner"]["optimizer"]["params"]["lr"] = 1e-4    
 
     af.write_plainconfig(str(train_dir / "pytorch_config.yaml"), pytorch_cfg)
     make_inference_config(
