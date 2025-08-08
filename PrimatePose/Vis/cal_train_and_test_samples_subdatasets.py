@@ -462,7 +462,31 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
         else:
             pct_str = f"{real_pct:.1f}%"
         
-        legend_labels.append(f'{label.upper()}: {size:,} ({pct_str})')
+        if label == 'ak':
+            label = 'AnimalKingdom'
+        elif label == 'oap':
+            label = 'OpenApePose'
+        elif label == 'mbw':
+            label = 'MBW'
+        elif label == 'oms':
+            label = 'OpenMonkeyStudio'
+        elif label == 'deepwild':
+            label = 'DeepWild'
+        elif label == 'mit':
+            label = 'MIT'
+        elif label == 'mp':
+            label = 'MacaquePose'
+        elif label == 'ap10k':
+            label = 'AP-10K'
+        elif label == 'omc':
+            label = 'OpenMonkeyChallenge'
+        elif label == 'aptv2':
+            label = 'APTv2'
+        elif label == 'anipose':
+            label = 'Animal-Pose'
+        elif label == 'lote':
+            label = 'LoTE-Animal'
+        legend_labels.append(f'{label}: {size:,} ({pct_str})')
     
     # Add legend outside the pie chart (closer to the pie)
     ax.legend(wedges, legend_labels, 
@@ -546,12 +570,14 @@ def vis_ratio_subdataset():
     sorted_datasets, labels, sizes, percentages, total_images = calculate_dataset_stats()
     print("labels:", labels)
     custom_order = ['ak', 'oap', 'mbw', 'oms', 'deepwild', 'mit', 'mp', 'ap10k', 'omc', 'aptv2', 'anipose', 'lote']
+    # print("labels:", labels)
     # Step 2: Create visualization with small dataset highlighting (rotated 25° anticlockwise)
     output_files = create_pie_chart(labels, sizes, percentages, total_images, 
                                    custom_order=custom_order, 
                                    start_angle=130)  # 90 + 25 = 115 degrees
     
     return sorted_datasets
+
 
 
 if __name__ == "__main__":
