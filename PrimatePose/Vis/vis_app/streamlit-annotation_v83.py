@@ -582,16 +582,16 @@ def main():
                 image_name = image_info['file_name'].split('.')[-2]
                 image_type = image_info['file_name'].split('.')[-1]
 
-                tab_image, tab_interactive = st.tabs(["Image", "Interactive"])
+                tab_interactive, tab_image = st.tabs(["Interactive", "Image"])
+                with tab_interactive:
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.caption(f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}")
                 with tab_image:
                     st.image(
                         img,
                         caption=f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}",
                         use_container_width=True,
                     )
-                with tab_interactive:
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                    st.caption(f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}")
                 
                 # Add download button for the current image                
                 # Create four columns for the buttons
