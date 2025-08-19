@@ -176,12 +176,14 @@ def evaluate_single_dataset(
         detector_path=detector_path,
         detector_transform=None,
     )
+    # Force-disable detector when no detector snapshot is provided to avoid use the default detector from torchvision.
+    if detector_path is None:
+        detector_runner = None
+    print("detector_runner:", detector_runner)
     
     output_path = output_folder
-    # print(output_path)
     output_path.mkdir(exist_ok=True)
-    #for mode in ["train", "test"]:    
-    # print("detector_runner:", detector_runner)
+    
     
     for mode in ["test"]:    
         scores, predictions = evaluate(
@@ -227,7 +229,6 @@ def evaluate_single_dataset(
             separator = "\n" + "="*50 + "\n"
             f.write(separator)
             f.write(f"Dataset: {dataset_name}\n")
-            # f.write(f"Model: {snapshot_path}\n")
             
             # Write the scores
             for k, v in scores.items():
@@ -239,13 +240,14 @@ def evaluate_single_dataset(
             predictions=predictions,
             ground_truth=gt_keypoints,
             output_dir=output_path,
-            num_samples=10,  # Added to limit visualization to 10 samples
+            num_samples=20,  # Added to limit visualization to 10 samples
             random_select=True,
-            keypoint_vis_mask=keypoint_vis_mask,
-            plot_bboxes=True,
+            # keypoint_vis_mask=keypoint_vis_mask,
+            # plot_bboxes=True,
             skeleton=True
             # keypoint_names=keypoint_name_simplified
         )
+        
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
