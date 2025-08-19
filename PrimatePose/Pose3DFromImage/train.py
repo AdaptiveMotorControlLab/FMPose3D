@@ -13,10 +13,11 @@ import logging
 from datetime import datetime
 import random
 import shutil
+import importlib.util
 
 # Import our modules
 from dataset import PrimateDataset, create_data_loaders
-from models.model import Pose3DEstimator
+from models.model_graph import Pose3D
 from loss import CombinedLoss
 
 
@@ -301,13 +302,22 @@ def main():
                        help='Path to checkpoint to resume from')
     parser.add_argument('--save_freq', type=int, default=1,
                        help='Save checkpoint every N epochs')
-    parser.add_argument('--val_freq', type=int, default=5,
+    parser.add_argument('--val_freq', type=int, default=1,
                        help='Validate every N epochs')
     parser.add_argument('--gpu', type=int, default=None,
                        help='GPU device ID to use (e.g., 0, 1, 2). If not specified, uses automatic detection')
     # Reproducibility
     parser.add_argument('--seed', type=int, default=1,
                         help='Random seed for reproducibility (default: 1)')
+    # Weights & Biases
+    parser.add_argument('--wandb', action='store_true',
+                        help='Enable Weights & Biases logging')
+    parser.add_argument('--wandb_project_name', type=str, default='Pose3D',
+                        help='W&B project name')
+    parser.add_argument('--wandb_run_name', type=str, default=None,
+                        help='W&B run name (defaults to experiment folder name)')
+    parser.add_argument('--wandb_group', type=str, default=None,
+                        help='W&B group name')
     
     args = parser.parse_args()
     
@@ -389,7 +399,7 @@ def main():
     
     # Create model
     logger.info("Creating model...")
-    model = Pose3DEstimator(
+    model = Pose3D(
         num_keypoints=args.num_keypoints,
         backbone=args.backbone,
         pretrained=True
@@ -425,6 +435,25 @@ def main():
     # Setup tensorboard
     writer = SummaryWriter(os.path.join(args.output_dir, 'tensorboard'))
     
+    # Optional: initialize Weights & Biases
+    wandb = None
+    if args.wandb:
+        if importlib.util.find_spec("wandb") is not None:
+            import wandb as _wandb
+            wandb = _wandb
+            run_name = args.wandb_run_name or os.path.basename(args.output_dir)
+            wandb.init(
+                project=args.wandb_project_name,
+                name=run_name,
+                config=vars(args),
+                dir=args.output_dir,
+                group=args.wandb_group
+            )
+            logger.info('Weights & Biases logging enabled')
+        else:
+            logger.warning("Weights & Biases not installed. Proceeding without W&B logging.")
+            wandb = None
+    
     # Resume from checkpoint if provided
     start_epoch = 0
     best_val_loss = float('inf')
@@ -458,6 +487,9 @@ def main():
             )
             
             logger.info(f"Epoch {epoch}: Val Loss = {val_loss:.4f}")
+            # Log to Weights & Biases
+            if 'wandb' in locals() and wandb is not None and getattr(wandb, 'run', None) is not None:
+                wandb.log({'val/loss': val_loss, 'epoch': epoch}, step=epoch)
             
             # Save best model
             if val_loss < best_val_loss:
@@ -479,6 +511,9 @@ def main():
     
     # Close tensorboard writer
     writer.close()
+    # Close Weights & Biases run if enabled
+    if 'wandb' in locals() and wandb is not None and getattr(wandb, 'run', None) is not None:
+        wandb.finish()
     logger.info("Training completed!")
 
 
