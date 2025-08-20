@@ -118,7 +118,22 @@ def visualize_2d_pose(image, pose_2d, keypoint_names, valid_mask=None, save_path
     
     return image_vis
 
-def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, title="3D Pose"):
+def visualize_3d_pose(
+    pose_3d,
+    keypoint_names,
+    valid_mask=None,
+    save_path=None,
+    title="3D Pose",
+    center: bool = True,
+    zoom: float = 2.0,
+    point_size: int = 60,
+    line_width: float = 2.0,
+    align_to_image: bool = False,
+    flip_x: bool = False,
+    rotate_x_deg: float = 0.0,
+    rotate_y_deg: float = 0.0,
+    rotate_z_deg: float = 0.0,
+):
     """
     Visualize 3D pose using matplotlib
     """
@@ -131,16 +146,26 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
     
-    # Fix coordinate system - flip Y and Z axes to correct orientation
+    # Optionally center the 3D pose in the view by subtracting the centroid
     pose_3d_corrected = pose_3d.copy()
-    # pose_3d_corrected[:, 1] = -pose_3d[:, 1]  # Flip Y axis
-    # pose_3d_corrected[:, 2] = -pose_3d[:, 2]  # Flip Z axis
+    if center:
+        if valid_mask is not None:
+            centroid = pose_3d_corrected[valid_mask].mean(axis=0)
+        else:
+            centroid = pose_3d_corrected.mean(axis=0)
+        pose_3d_corrected = pose_3d_corrected - centroid
+    # Optionally align orientation to image coordinates (image y increases downward)
+    if align_to_image:
+        if flip_x:
+            pose_3d_corrected[:, 0] = -pose_3d_corrected[:, 0]
+        pose_3d_corrected[:, 1] = -pose_3d_corrected[:, 1]
+        pose_3d_corrected[:, 2] = -pose_3d_corrected[:, 2]
     
     # Plot keypoints
     if valid_mask is not None:
         valid_pose = pose_3d_corrected[valid_mask]
         ax.scatter(valid_pose[:, 0], valid_pose[:, 1], valid_pose[:, 2], 
-                  c='red', s=50, alpha=0.8)
+                  c='red', s=point_size, alpha=0.85)
         
         # Add labels for valid keypoints
         # for i, (x, y, z) in enumerate(pose_3d_corrected):
@@ -153,7 +178,7 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
         #         ax.text(x, y, z, label, fontsize=7, ha='center', va='bottom')
     else:
         ax.scatter(pose_3d_corrected[:, 0], pose_3d_corrected[:, 1], pose_3d_corrected[:, 2], 
-                  c='red', s=50, alpha=0.8)
+                  c='red', s=point_size, alpha=0.85)
         
         # Add labels
         # for i, (x, y, z) in enumerate(pose_3d_corrected):
@@ -190,29 +215,47 @@ def visualize_3d_pose(pose_3d, keypoint_names, valid_mask=None, save_path=None, 
     for joint1, joint2 in connections:
         if joint1 < len(pose_3d_corrected) and joint2 < len(pose_3d_corrected):
             if valid_mask is None or (valid_mask[joint1] and valid_mask[joint2]):
-                ax.plot([pose_3d_corrected[joint1, 0], pose_3d_corrected[joint2, 0]],
-                       [pose_3d_corrected[joint1, 1], pose_3d_corrected[joint2, 1]],
-                       [pose_3d_corrected[joint1, 2], pose_3d_corrected[joint2, 2]], 'b-', alpha=0.6)
+                ax.plot(
+                    [pose_3d_corrected[joint1, 0], pose_3d_corrected[joint2, 0]],
+                    [pose_3d_corrected[joint1, 1], pose_3d_corrected[joint2, 1]],
+                    [pose_3d_corrected[joint1, 2], pose_3d_corrected[joint2, 2]],
+                    'b-', alpha=0.7, linewidth=line_width
+                )
     
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.set_title(title)
     
-    # Set equal aspect ratio
-    max_range = np.array([pose_3d_corrected[:, 0].max() - pose_3d_corrected[:, 0].min(),
-                         pose_3d_corrected[:, 1].max() - pose_3d_corrected[:, 1].min(),
-                         pose_3d_corrected[:, 2].max() - pose_3d_corrected[:, 2].min()]).max() / 2.0
-    mid_x = (pose_3d_corrected[:, 0].max() + pose_3d_corrected[:, 0].min()) * 0.5
-    mid_y = (pose_3d_corrected[:, 1].max() + pose_3d_corrected[:, 1].min()) * 0.5
-    mid_z = (pose_3d_corrected[:, 2].max() + pose_3d_corrected[:, 2].min()) * 0.5
-    
-    ax.set_xlim(mid_x - max_range, mid_x + max_range)
-    ax.set_ylim(mid_y - max_range, mid_y + max_range)
-    ax.set_zlim(mid_z - max_range, mid_z + max_range)
+    # Center-and-range limits with margin (following Global tester style)
+    if valid_mask is not None and valid_mask.any():
+        valid_points = pose_3d_corrected[valid_mask]
+    else:
+        valid_points = pose_3d_corrected
+    center_x = valid_points[:, 0].mean() if valid_points.size > 0 else 0.0
+    center_y = valid_points[:, 1].mean() if valid_points.size > 0 else 0.0
+    center_z = valid_points[:, 2].mean() if valid_points.size > 0 else 0.0
+    range_x = (valid_points[:, 0].max() - valid_points[:, 0].min()) if valid_points.size > 0 else 1.0
+    range_y = (valid_points[:, 1].max() - valid_points[:, 1].min()) if valid_points.size > 0 else 1.0
+    range_z = (valid_points[:, 2].max() - valid_points[:, 2].min()) if valid_points.size > 0 else 1.0
+    max_range = max(range_x, range_y, range_z) / max(2.0 * max(zoom, 1e-6), 1e-6)
+    margin = max_range * 0.2
+    ax.set_xlim(center_x - max_range - margin, center_x + max_range + margin)
+    ax.set_ylim(center_y - max_range - margin, center_y + max_range + margin)
+    ax.set_zlim(center_z - max_range - margin, center_z + max_range + margin)
+    ax.set_box_aspect([1, 1, 1])
+    # Grid and clear panes for cleaner look
+    ax.grid(True, alpha=0.3)
+    try:
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+    except Exception:
+        pass
     
     # Set better viewing angle to match interactive viewer
-    ax.view_init(elev=20, azim=45)
+    # ax.view_init(elev=20, azim=45)
+    ax.view_init(elev=45, azim=60)
     
     # Improve the saved figure quality and layout
     plt.tight_layout()
@@ -308,7 +351,9 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
                     pose_3d_path = os.path.join(vis_dir, f'sample_{sample_id:04d}_3d.png')
                     fig = visualize_3d_pose(
                         pose_3d_pred[i], keypoint_names, valid_mask[i],
-                        pose_3d_path, f"Sample {sample_id} - Predicted 3D Pose"
+                        pose_3d_path, f"Sample {sample_id} - Predicted 3D Pose",
+                        center=True, zoom=1.0, point_size=50, line_width=2.5,
+                        align_to_image=True, flip_x=False
                     )
                     plt.close(fig)
                     
@@ -367,10 +412,8 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
                     pose_2d_proj_np = pose_2d_proj[0].cpu().numpy()
                     for j, (x, y) in enumerate(pose_2d_proj_np):
                         if valid_mask[i, j]:
-                            # Color code points: green if within bounds, red if at boundary
-                            color = 'go' if 10 < x < 246 and 10 < y < 246 else 'ro'
-                            axes[1].plot(x, y, color, markersize=6)
-                            axes[1].text(x+2, y+2, str(j), fontsize=8, color='blue')
+                            axes[1].plot(x, y, 'bo', markersize=6)
+                            # axes[1].text(x+2, y+2, str(j), fontsize=8, color='blue')
                     
                     # Overlay comparison
                     axes[2].imshow(image_np)
