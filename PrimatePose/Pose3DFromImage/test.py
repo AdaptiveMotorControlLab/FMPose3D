@@ -15,7 +15,7 @@ import shutil
 
 # Import our modules
 from dataset import PrimateDataset, create_data_loaders
-from models.model import Pose3DEstimator, project_3d_to_2d
+from models.model_graph import Pose3D, project_3d_to_2d
 from loss import CombinedLoss
 from interactive_3d_viewer import create_interactive_3d_pose
 import plotly.offline as pyo
@@ -59,7 +59,7 @@ def copy_source_files(test_dir):
 
 def load_model(checkpoint_path, num_keypoints=37, backbone='resnet50', device='cpu'):
     """Load trained model from checkpoint"""
-    model = Pose3DEstimator(
+    model = Pose3D(
         num_keypoints=num_keypoints,
         backbone=backbone,
         pretrained=False  # Not needed for inference
@@ -89,11 +89,12 @@ def visualize_2d_pose(image, pose_2d, keypoint_names, valid_mask=None, save_path
     if valid_mask is not None and torch.is_tensor(valid_mask):
         valid_mask = valid_mask.cpu().numpy()
     
-    # Denormalize image if needed (assuming ImageNet normalization)
+    # Denormalize image if values are outside [0, 1] (assumes ImageNet normalization)
     if image.dtype != np.uint8:
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
-        image = (image * std) + mean
+        if image.min() < 0.0 or image.max() > 1.0:
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            image = (image * std) + mean
         image = np.clip(image, 0, 1)
     
     # Convert to BGR for OpenCV
@@ -109,8 +110,8 @@ def visualize_2d_pose(image, pose_2d, keypoint_names, valid_mask=None, save_path
         if vis > 0:  # Valid keypoint
             cv2.circle(image_vis, (int(x), int(y)), 3, (0, 255, 0), -1)
             # Add keypoint name
-            cv2.putText(image_vis, f'{i}', (int(x)+5, int(y)+5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+            # cv2.putText(image_vis, f'{i}', (int(x)+5, int(y)+5),
+                    #    cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
     
     if save_path:
         cv2.imwrite(save_path, image_vis)
@@ -337,11 +338,12 @@ def test_model(model, test_loader, device, output_dir, num_vis_samples=10):
                     
                     # Original image with GT 2D pose
                     image_np = images[i].permute(1, 2, 0).cpu().numpy()
-                    if image_np.max() <= 1.0:
+                    # If values fall outside [0, 1], assume ImageNet normalization and denormalize
+                    if image_np.min() < 0.0 or image_np.max() > 1.0:
                         mean = np.array([0.485, 0.456, 0.406])
                         std = np.array([0.229, 0.224, 0.225])
                         image_np = image_np * std + mean
-                        image_np = np.clip(image_np, 0, 1)
+                    image_np = np.clip(image_np, 0, 1)
                     
                     # Ground Truth 2D pose
                     axes[0].imshow(image_np)
@@ -486,7 +488,7 @@ def main():
     
     # Model configuration
     parser.add_argument('--backbone', type=str, default='resnet50',
-                       choices=['resnet18', 'resnet34', 'resnet50'],
+                       choices=['resnet18', 'resnet34', 'resnet50', 'vit_s16_dino', 'vit_small_patch16_224.dino'],
                        help='Backbone architecture')
     parser.add_argument('--num_keypoints', type=int, default=37,
                        help='Number of keypoints')
