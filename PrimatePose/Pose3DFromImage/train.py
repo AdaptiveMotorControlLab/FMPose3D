@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import argparse
 import time
@@ -14,6 +13,8 @@ from datetime import datetime
 import random
 import shutil
 import importlib.util
+
+wandb = None
 
 # Import our modules
 from dataset import PrimateDataset, create_data_loaders
@@ -69,7 +70,7 @@ def load_checkpoint(model, optimizer, scheduler, checkpoint_path):
     return checkpoint['epoch'], checkpoint['best_loss']
 
 
-def validate_model(model, val_loader, criterion, device, epoch, writer=None):
+def validate_model(model, val_loader, criterion, device, epoch):
     """Validate the model"""
     model.eval()
     total_loss = 0.0
@@ -109,17 +110,10 @@ def validate_model(model, val_loader, criterion, device, epoch, writer=None):
     for key in loss_components:
         loss_components[key] /= total_samples
     
-    # Log to tensorboard
-    if writer:
-        writer.add_scalar('Loss/Validation', avg_loss, epoch)
-        for key, value in loss_components.items():
-            if key != 'total':
-                writer.add_scalar(f'Loss/Val_{key}', value, epoch)
-    
     return avg_loss, loss_components
 
 
-def train_epoch(model, train_loader, criterion, optimizer, device, epoch, writer=None):
+def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
     """Train for one epoch"""
     model.train()
     total_loss = 0.0
@@ -148,6 +142,10 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch, writer
         loss_dict = criterion(predictions, targets, valid_mask)
         loss = loss_dict['total']
         
+        if loss.item() > 10000 and epoch >= 1:
+            print(f"Loss is too high: {loss.item()}")
+            continue
+        
         # Backward pass
         loss.backward()
         
@@ -171,22 +169,22 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch, writer
         avg_loss = total_loss / total_samples
         pbar.set_postfix({'Loss': f'{avg_loss:.4f}'})
         
-        # Log to tensorboard (every 100 batches)
-        if writer and batch_idx % 100 == 0:
+        # Log to Weights & Biases (every N batches)
+        if batch_idx % 1 == 0:
             global_step = epoch * len(train_loader) + batch_idx
-            writer.add_scalar('Loss/Train_Batch', loss.item(), global_step)
+            wandb.log({'train/batch_loss': loss.item(), 'epoch': epoch, 'global_step': global_step}, step=global_step)
     
     # Average losses
     avg_loss = total_loss / total_samples
     for key in loss_components:
         loss_components[key] /= total_samples
     
-    # Log to tensorboard
-    if writer:
-        writer.add_scalar('Loss/Train', avg_loss, epoch)
-        for key, value in loss_components.items():
-            if key != 'total':
-                writer.add_scalar(f'Loss/Train_{key}', value, epoch)
+    # Log epoch metrics to Weights & Biases
+    log_dict = {'train/loss': avg_loss, 'epoch': epoch}
+    for key, value in loss_components.items():
+        if key != 'total':
+            log_dict[f'train/{key}'] = value
+    wandb.log(log_dict, step=epoch)
     
     return avg_loss, loss_components
 
@@ -254,6 +252,7 @@ def create_experiment_dir(train_json_path, dataset_name=None, base_dir="experime
 
 
 def main():
+    global wandb
     parser = argparse.ArgumentParser(description='Train 3D Pose Estimation Model')
     
     # Data arguments
@@ -270,8 +269,8 @@ def main():
     
     # Model arguments
     parser.add_argument('--backbone', type=str, default='resnet50',
-                       choices=['resnet18', 'resnet34', 'resnet50'],
-                       help='Backbone architecture')
+                       choices=['resnet18', 'resnet34', 'resnet50', 'vit_s16_dino', 'vit_small_patch16_224.dino'],
+                       help='Backbone architecture (torchvision ResNets or ViT DINO: vit_s16_dino)')
     parser.add_argument('--num_keypoints', type=int, default=37,
                        help='Number of keypoints')
     
@@ -402,7 +401,8 @@ def main():
     model = Pose3D(
         num_keypoints=args.num_keypoints,
         backbone=args.backbone,
-        pretrained=True
+        pretrained=True,
+        image_size=tuple(args.image_size)
     )
     model.to(device)
     
@@ -431,12 +431,8 @@ def main():
         T_max=args.epochs,
         eta_min=1e-6
     )
-    
-    # Setup tensorboard
-    writer = SummaryWriter(os.path.join(args.output_dir, 'tensorboard'))
-    
+        
     # Optional: initialize Weights & Biases
-    wandb = None
     if args.wandb:
         if importlib.util.find_spec("wandb") is not None:
             import wandb as _wandb
@@ -470,26 +466,37 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         # Train for one epoch
         train_loss, train_components = train_epoch(
-            model, train_loader, criterion, optimizer, device, epoch, writer
+            model, train_loader, criterion, optimizer, device, epoch
         )
         
         # Update learning rate
         scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
-        writer.add_scalar('Learning_Rate', current_lr, epoch)
+        # Removed writer.add_scalar('Learning_Rate', current_lr, epoch)
+        if wandb is not None and getattr(wandb, 'run', None) is not None:
+            wandb.log({'train/lr': current_lr, 'epoch': epoch}, step=epoch)
         
         logger.info(f"Epoch {epoch}: Train Loss = {train_loss:.4f}, LR = {current_lr:.6f}")
+        # Log epoch-average training loss explicitly
+        if wandb is not None and getattr(wandb, 'run', None) is not None:
+            wandb.log({'train/epoch_avg_loss': train_loss, 'epoch': epoch}, step=epoch)
         
         # Validation
         if epoch % args.val_freq == 0:
             val_loss, val_components = validate_model(
-                model, val_loader, criterion, device, epoch, writer
+                model, val_loader, criterion, device, epoch
             )
             
             logger.info(f"Epoch {epoch}: Val Loss = {val_loss:.4f}")
+            wandb.log({'val/epoch_avg_loss': val_loss, 'epoch': epoch}, step=epoch)
+                
             # Log to Weights & Biases
-            if 'wandb' in locals() and wandb is not None and getattr(wandb, 'run', None) is not None:
-                wandb.log({'val/loss': val_loss, 'epoch': epoch}, step=epoch)
+            if wandb is not None and getattr(wandb, 'run', None) is not None:
+                log_dict = {'val/loss': val_loss, 'epoch': epoch}
+                for key, value in val_components.items():
+                    if key != 'total':
+                        log_dict[f'val/{key}'] = value
+                wandb.log(log_dict, step=epoch)
             
             # Save best model
             if val_loss < best_val_loss:
@@ -510,9 +517,9 @@ def main():
     logger.info(f"Final model saved: {final_model_path}")
     
     # Close tensorboard writer
-    writer.close()
+    # Removed writer.close()
     # Close Weights & Biases run if enabled
-    if 'wandb' in locals() and wandb is not None and getattr(wandb, 'run', None) is not None:
+    if wandb is not None and getattr(wandb, 'run', None) is not None:
         wandb.finish()
     logger.info("Training completed!")
 
