@@ -534,6 +534,64 @@ class JSONProcessor:
         print(f"Removed {len(data['images']) - len(filtered_images)} redundant images")
         print(f"Saved filtered JSON to {output_json_path}")
 
+    def check_vis_label_of_keypoints(self, json_path):
+        """Calculate and count all visibility labels for each keypoint/joint in the JSON file."""
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Initialize counters for each visibility label
+        vis_counts = {}
+        
+        # Get keypoint names for reference
+        keypoint_names = []
+        if data.get('categories'):
+            for category in data['categories']:
+                if 'keypoints' in category:
+                    keypoint_names = category['keypoints']
+                    break
+        
+        # print(f"Found {len(keypoint_names)} keypoints: {keypoint_names}")
+        # print("-" * 60)
+        
+        # Process all annotations
+        for ann in data['annotations']:
+            keypoints = ann['keypoints']
+            vis_labels = keypoints[2::3]  # Every 3rd element starting from index 2
+            
+            # Count visibility labels for each keypoint
+            for i, vis_label in enumerate(vis_labels):
+                if vis_label not in vis_counts:
+                    vis_counts[vis_label] = 0
+                vis_counts[vis_label] += 1
+        
+        # Print summary
+        print("Visibility Label Counts:")
+        print("-" * 30)
+        for vis_label in sorted(vis_counts.keys()):
+            count = vis_counts[vis_label]
+            total_annotations = len(data['annotations'])
+            total_keypoints_per_ann = len(keypoint_names) if keypoint_names else len(data['annotations'][0]['keypoints']) // 3
+            total_possible_keypoints = total_annotations * total_keypoints_per_ann
+            percentage = (count / total_possible_keypoints) * 100 if total_possible_keypoints > 0 else 0
+            
+            print(f"Visibility {vis_label}: {count:,} keypoints ({percentage:.2f}%)")
+        
+        print("-" * 30)
+        print(f"Total annotations: {len(data['annotations'])}")
+        print(f"Total keypoints per annotation: {total_keypoints_per_ann}")
+        print(f"Total possible keypoints: {total_possible_keypoints:,}")
+        
+        return vis_counts
+
+    def check_vis_labels_per_dataset(self, folder_path):
+        """
+        Check the visibility labels of keypoints per dataset.
+        """
+        for file in os.listdir(folder_path):
+            if file.endswith(".json"):
+                print(f"Checking {file}")
+                self.check_vis_label_of_keypoints(os.path.join(folder_path, file))
+                print("-" * 30)
 
 # Example usage:
 
@@ -604,10 +662,23 @@ if __name__ == "__main__":
     # number = processor.cal_number_of_annotations(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_train_datasets/mit_train.json")
     # print(number)
     
-    processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    #                                  output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train.json",
+    #                                  train_ratio=0.7,
+    #                                  test_ratio=0.3)
+   
+    # processor.small_dataset_filter(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train.json",
+    #                                output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train_small.json",
+    #                                sample_rate=1/50) 
+    
+    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    
+    # processor.check_vis_label_of_keypoints(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json")
+    processor.check_vis_labels_per_dataset(folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_test_datasets")
+    
     
     # processor.merge_json_files(
     #                            json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_train_datasets",
-    #                                 output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json",
-    #                              exclude_datasets=["ap10k"] 
+    #                                 output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json",
+    #                             #  exclude_datasets=["ap10k"] 
     #                            )
