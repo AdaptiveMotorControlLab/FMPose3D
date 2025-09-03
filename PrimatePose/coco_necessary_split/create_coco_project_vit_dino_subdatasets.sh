@@ -6,14 +6,14 @@ debug=0
 
 dataset_name=aptv2
 # file_name=${dataset_name}_pose_vit_ImageNet_V83_20250804_4
-file_name=${dataset_name}_pose_vit_ImageNet_small_p16_lr1e-4_V83_20250806
+file_name=${dataset_name}_pose_vit_dino_small_p8_lr5e-5_1e-5_5e-6_1e-6_V83_20250807
 
 mode="train"
 # for splitted datasets V8.3
 train_json="${data_path_prefix}/primate_data/PFM_V8.3/splitted_${mode}_datasets/${dataset_name}_${mode}.json"
 test_json="${data_path_prefix}/primate_data/PFM_V8.3/splitted_test_datasets/${dataset_name}_test.json"
 
-model_arch="top_down_vit_small_patch16_224"
+model_arch="top_down_vit_small_patch8_224"
 dino_pretrained=True
 # dino_pretrained=False
 
