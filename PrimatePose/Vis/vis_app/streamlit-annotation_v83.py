@@ -1,59 +1,8 @@
-# for v8
 import streamlit as st
 import json
 import os
 import cv2
 import numpy as np
-from PIL import Image
-
-# Bring skeletons from module
-from skeletons import PFM_SKELETON
-
-PRIMATE_COLOR_MAP = {
-    "head": (0, 180, 0), # wait
-    "neck": (0, 0, 180), # wait
-    "nose": (255, 0, 0), # "
-    "mouth_front_top": (0, 255, 0), # "upper_jaw"
-    "mouth_front_bottom": (0, 0, 255), # "lower_jaw"
-    "mouth_back_right": (255, 255, 0), # "mouth_end_right"
-    "mouth_back_left": (255, 0, 255), # "mouth_end_left"
-    "right_ear": (128, 0, 0), # "right_earbase"
-    "left_ear": (0, 128, 128), # "left_earbase": (0, 128, 128),
-    "neck": (255, 128, 0), # "neck_base"
-    "upper_back": (128, 255, 0), # "neck_end"
-    "throat_base": (0, 255, 128), # "throat_base"
-    "upper_back": (255, 0, 128), # "back_base"
-    "lower_back": (255, 128, 128), # "back_end"
-    "torso_mid_back": (128, 255, 255), # "back_middle"
-    "root_tail": (128, 0, 64), # "tail_base"
-    "end_tail": (64, 0, 128), # "tail_end"
-    "left_shoulder": (128, 64, 0), # "front_left_thai"
-    "left_elbow": (64, 128, 0), # "front_left_knee"
-    "left_hand": (0, 64, 128), # "front_left_paw"
-    "right_shoulder": (255, 64, 64), # "front_right_thai"
-    "right_elbow": (64, 255, 64), # "front_right_knee"
-    "left_foot": (255, 255, 64), # "back_left_paw"
-    "left_hip": (255, 64, 255), # "back_left_thai"
-    "left_knee": (192, 64, 192), # "back_left_knee"
-    "right_knee": (192, 192, 64), # "back_right_knee"
-    "right_foot": (64, 192, 192), # "back_right_paw"
-    "body_center": (192, 192, 192), #  "belly_bottom"
-    "right_hip": (128, 64, 64), # "body_middle_right"`
-    "left_hip": (64, 128, 128),  # "body_middle_left"
-    "right_hand": (64, 64, 255), # "front_right_paw"
-    "left_wrist": (128, 0, 128),
-    "right_wrist": (0, 255, 255),
-    "forehead": (0, 128, 0),
-    "center_hip": (64, 255, 255),
-    "left_ankle": (128, 128, 128),
-    "right_ankle": (0, 0, 128),
-    "mid_tail": (192, 192, 192),
-    "mid_end_tail": (0, 128, 255), 
-    "right_eye": (0, 255, 255),
-    "left_eye": (128, 0, 128),
-}
-
-primate_color_list = list(PRIMATE_COLOR_MAP.values())
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import Colormap
@@ -76,50 +25,14 @@ def get_cmap(n: int, name: str = "rainbow") -> Colormap:
 # "right" → "R"
 # "mid" → "M"
 # "back" → "B"
-# "center" → "C"
-keypoints_simplified = [
-    "forehead", 
-    "head",
-    "L_eye",
-    "R_eye",
-    "nose",
-    "L_E",
-    "R_E",
-    "mouth_front_top",
-    "mouth_front_bottom",
-    "mouth_B_L",
-    "mouth_B_R",
-    "neck",
-    "L_S",
-    "R_S",
-    "upper_B",
-    "torso_M_B",
-    "body_C",
-    "lower_B",
-    "L_elbow",
-    "R_elbow",
-    "L_wrist",
-    "R_wrist",
-    "L_hand",
-    "R_hand",
-    "L_hip",
-    "R_hip",
-    "C_hip",
-    "L_knee",
-    "R_knee",
-    "L_ankle",
-    "R_ankle",
-    "L_foot",
-    "R_foot",
-    "root_tail",
-    "M_tail",
-    "M_end_tail",
-    "end_tail"
-]
             
 # Define dataset configurations
 from datasets import DATASET_CONFIGS
-from skeletons import PFM_SKELETON
+from configs import PFM_SKELETON
+from configs import keypoints_simplified
+from configs import PRIMATE_COLOR_MAP
+
+primate_color_list = list(PRIMATE_COLOR_MAP.values())
 
 def get_dataset_config(image_id, images):
     """
@@ -565,7 +478,8 @@ def main():
                     image_id = image_id,
                     dataset_config = dataset_config,
                     use_simplified_keypoints = True,
-                    dataset_name = dataset_name
+                    dataset_name = dataset_name,
+                    draw_text_labels = True
                 )
             
                 # img_with_annotation = visualize_annotation(img.copy(), annotation, st.session_state.color_map, st.session_state.data["pfm_keypoints"])
@@ -576,7 +490,7 @@ def main():
                     annotation=annotation,
                     dataset_config=dataset_config,
                     dataset_name=dataset_name,
-                    use_simplified_keypoints=True,
+                    use_simplified_keypoints=False,
                 )
 
                 image_name = image_info['file_name'].split('.')[-2]
@@ -588,7 +502,7 @@ def main():
                     st.caption(f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}")
                 with tab_image:
                     st.image(
-                        img,
+                        img_with_annotation,
                         caption=f"{image_name}, annotation_id: {annotation['id']}  Image {st.session_state.current_index + 1}/{len(st.session_state.data['annotations'])}",
                         use_container_width=True,
                     )
@@ -668,6 +582,6 @@ def main():
             file_name="modified_annotations.json",
             mime="application/json"
         )
-
+        
 if __name__ == "__main__":
     main()
