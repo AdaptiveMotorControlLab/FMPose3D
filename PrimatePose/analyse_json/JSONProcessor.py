@@ -671,7 +671,7 @@ if __name__ == "__main__":
     #                                output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train_small.json",
     #                                sample_rate=1/50) 
     
-    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
     
     # processor.check_vis_label_of_keypoints(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json")
     # processor.check_vis_labels_per_dataset(folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_test_datasets")
