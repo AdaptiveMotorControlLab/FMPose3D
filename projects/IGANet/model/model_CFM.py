@@ -1,14 +1,14 @@
 import sys
-from xml.etree.ElementTree import QName
 sys.path.append("..")
 import torch
 import torch.nn as nn
+import math
 from einops import rearrange
 from model.graph_frames import Graph
 from functools import partial
 from einops import rearrange, repeat
 import torch.nn.functional as F
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.layers import DropPath
     
 class linear_block(nn.Module):
     def __init__(self, ch_in, ch_out, drop=0.1):
@@ -21,6 +21,31 @@ class linear_block(nn.Module):
     def forward(self,x):
         x = self.linear(x)
         return x
+
+class TimeEmbedding(nn.Module):
+    def __init__(self, dim: int, hidden_dim: int = 64):
+        super().__init__()
+        self.dim = dim
+        self.hidden_dim = hidden_dim
+        self.proj = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, dim)
+        )
+
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        # t: (B,F,1,1) in [0,1)
+        b, f, _, _ = t.shape
+        half_dim = max(self.dim // 2, 1)
+        inv_freq = torch.exp(-math.log(10000.0) * torch.arange(half_dim, device=t.device, dtype=t.dtype) / max(half_dim - 1, 1))
+        # shape to broadcast: (1,1,1,1,half_dim)
+        angles = t * inv_freq.view(1, 1, 1, 1, half_dim)
+        sin = torch.sin(angles)
+        cos = torch.cos(angles)
+        emb = torch.cat([sin, cos], dim=-1)  # (B,F,1,1,dim)
+        emb = emb.view(b, f, self.dim)
+        emb = self.proj(emb)  # (B,F,dim)
+        return emb
 
 class encoder(nn.Module): # in_features->64->128->256->512
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -161,7 +186,7 @@ class Block(nn.Module): # drop=0.1
         # GCN
         x_gcn_1 = rearrange(x_gcn_1,"b j c -> b c j").contiguous() 
         x_gcn_1 = self.norm1(x_gcn_1) # b,c,j
-        x_gcn_1 = rearrange(x_gcn_1,"b j c -> b c j").contiguous()
+        x_gcn_1 = rearrange(x_gcn_1,"b c j -> b j c").contiguous()
         x_gcn_1 = self.GCN_Block1(x_gcn_1)  # b,j,c
 
         # Atten
@@ -212,8 +237,12 @@ class Model(nn.Module):
         # follow module device; store as buffer to avoid hard binding to cuda(0)
         self.register_buffer('A', torch.tensor(self.graph.A, dtype=torch.float32), persistent=False)
 
-        # input to encoder will be cat([x2d(2), y_t(3), t(1)]) -> 6 dims
-        self.encoder = encoder(6, args.channel//2, args.channel)
+        # time embedding for t
+        self.t_embed_dim = 32
+        self.time_embed = TimeEmbedding(self.t_embed_dim, hidden_dim=64)
+
+        # input to encoder will be cat([x2d(2), y_t(3), t_embed(self.t_embed_dim)])
+        self.encoder = encoder(2 + 3 + self.t_embed_dim, args.channel//2, args.channel)
         #  
         self.IGANet = IGANet(args.layers, args.channel, self.A, length=args.n_joints) # 256
 
@@ -221,20 +250,19 @@ class Model(nn.Module):
 
     def forward(self, x, y_t, t):
         # x: (B,F,J,2)  y_t: (B,F,J,3)  t: (B,1,1,1) or (B,F,1,1)
-        b, f, j, _ = x.shape
-        if t.dim() == 3:
-            # allow (B,1,1) -> (B,1,1,1)
-            t = t.unsqueeze(-1)
-        # expand t to joints
-        t_feat = t.expand(b, f, j, 1).contiguous()
-        x_in = torch.cat([x, y_t, t_feat], dim=-1)  # (B,F,J,6)
+        b, f, j, dims = x.shape
+
+        # sinusoidal time embedding + MLP
+        t_emb = self.time_embed(t)  # (B,F,t_dim)
+        t_emb = t_emb.unsqueeze(2).expand(b, f, j, self.t_embed_dim).contiguous()  # (B,F,J,t_dim)
+        x_in = torch.cat([x, y_t, t_emb], dim=-1)  # (B,F,J,2+3+t_dim)
 
         x_in = rearrange(x_in, 'b f j c -> (b f) j c').contiguous() # (B*F,J,6)
-
+        
         # encoder
         x_in = self.encoder(x_in)     # (B*F,J,512)
 
-        x_in = self.IGANet(x_in)      # (B*F,J,512)
+        x_in = self.IGANet(x_in)      # (B*F, J, 512)
 
         # predict velocity v_theta(y_t, t | x2d)
         v = self.fcn(x_in)            # (B*F,J,3)
