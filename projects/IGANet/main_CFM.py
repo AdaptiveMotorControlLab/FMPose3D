@@ -40,16 +40,34 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
     else:
         model_3d.eval()
 
+    # cache for mean 3D pose (shape: F,J,3). Loaded or computed on first train batch
+    mean_3D_pose_tensor = None
+    mean_3D_pose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
+    # Initialize/load mean 3D pose once (train only)
+    npz = np.load(mean_3D_pose_path)
+    mean_arr = npz['mean_3D']  # expected shape: (1,1,J,3)
+    # Convert to tensor but delay device/dtype conversion until we have gt_3D
+    mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
+    mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
+    
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
-
+        
+        # compute a mean 3D pose using current batch and save for reuse
+        # mean_3D_pose_tensor = gt_3D.mean(dim=0).detach().unsqueeze(0)
+        # os.makedirs('./dataset', exist_ok=True)
+        # np.savez(mean_3D_pose_path, mean_3D=mean_3D_pose_tensor.cpu().numpy())
+        x0 = mean_3D_pose_tensor.to(device=gt_3D.device, dtype=gt_3D.dtype)
+        x0 = x0.expand_as(gt_3D)
+        y = mean_3D_pose_tensor.to(device=gt_3D.device, dtype=gt_3D.dtype)
+        y = y.expand_as(gt_3D)
+        
         if split =='train':
-            # if i>20:
-            #     continue
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
-            x0 = torch.randn_like(gt_3D)
+            # Use template mean 3D pose as x0 instead of random noise
+
             B = gt_3D.size(0)
             # t on correct device/dtype and broadcastable: (B,1,1,1)
             t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
@@ -65,11 +83,40 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             # Integrate from noise (t=0) to t=1 using learned velocity field
             steps = getattr(args, 'sample_steps', 16)
             dt = 1.0 / steps
-            y = torch.randn_like(gt_3D)
+            # y = torch.randn_like(gt_3D)
+
+            
             for s in range(steps):
                 t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
                 v_s = model_3d(input_2D, y, t_s)
                 y = y + dt * v_s
+           
+            
+            RK4=False
+            if RK4:
+                # RK4 sampler for CFM at test time
+                # Integrate from noise (t=0) to t=1 using learned velocity field with RK4
+                steps = getattr(args, 'sample_steps', 16)
+                dt = 1.0 / steps
+                B = gt_3D.size(0)
+                shape_t = (B, 1, 1, 1)
+                y = torch.randn_like(gt_3D)
+                for s in range(steps):
+                    t0 = s * dt
+                    t0_t = torch.full(shape_t, t0, device=gt_3D.device, dtype=gt_3D.dtype)
+                    k1 = model_3d(input_2D, y, t0_t)
+
+                    t_mid = t0 + dt * 0.5
+                    t_mid_t = torch.full(shape_t, t_mid, device=gt_3D.device, dtype=gt_3D.dtype)
+                    k2 = model_3d(input_2D, y + (dt * 0.5) * k1, t_mid_t)
+
+                    k3 = model_3d(input_2D, y + (dt * 0.5) * k2, t_mid_t)
+
+                    t1 = t0 + dt
+                    t1_t = torch.full(shape_t, t1, device=gt_3D.device, dtype=gt_3D.dtype)
+                    k4 = model_3d(input_2D, y + dt * k3, t1_t)
+
+                    y = y + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
             output_3D = y
 
         out_target = gt_3D.clone()
@@ -96,8 +143,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             
             output_3D = output_3D[:, args.pad].unsqueeze(1) 
             output_3D[:, :, 0, :] = 0
-            test_p1 = mpjpe_cal(output_3D, gt_3D)
-            
+            test_p1 = mpjpe_cal(output_3D, out_target)
+            wandb.log({'test_p1': test_p1})
             action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset, subject)
 
     if split == 'train':
@@ -145,9 +192,12 @@ if __name__ == '__main__':
         file_name = os.path.basename(__file__)
         shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
         shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
-        shutil.copyfile(src="model/model_CFM.py", dst = os.path.join(args.checkpoint, args.create_time + "_model_CFM.py"))
+        # backup the selected model file dynamically based on args.model
+        model_src_path = os.path.join("model", f"{args.model}.py")
+        model_dst_name = f"{args.create_time}_{args.model}.py"
+        shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        shutil.copyfile(src="run.sh", dst = os.path.join(args.checkpoint, args.filename+"_run.sh"))
+        shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.filename+"_run_FM.sh"))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
