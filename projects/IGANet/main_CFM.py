@@ -58,16 +58,17 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
         # mean_3D_pose_tensor = gt_3D.mean(dim=0).detach().unsqueeze(0)
         # os.makedirs('./dataset', exist_ok=True)
         # np.savez(mean_3D_pose_path, mean_3D=mean_3D_pose_tensor.cpu().numpy())
-        x0 = mean_3D_pose_tensor.to(device=gt_3D.device, dtype=gt_3D.dtype)
-        x0 = x0.expand_as(gt_3D)
-        y = mean_3D_pose_tensor.to(device=gt_3D.device, dtype=gt_3D.dtype)
-        y = y.expand_as(gt_3D)
         
         if split =='train':
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             # Use template mean 3D pose as x0 instead of random noise
-
+            x0 = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            x0 = x0.expand_as(gt_3D)
+            x0[:, :, 0, :] = 0
+            x0_noise = torch.randn_like(x0)
+            x0 = x0 + x0_noise
+            
             B = gt_3D.size(0)
             # t on correct device/dtype and broadcastable: (B,1,1,1)
             t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
@@ -78,19 +79,47 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
         else:
             # When test_augmentation=True, input_2D has an extra aug dimension: (B,2,F,J,2)
             # For now, use the first view to keep shapes consistent with the model
-            input_2D = input_2D[:, 0]
+            input_2D_nonflip = input_2D[:, 0]
+            input_2D_flip = input_2D[:, 1]
+            
             # Simple Euler sampler for CFM at test time
             # Integrate from noise (t=0) to t=1 using learned velocity field
-            steps = getattr(args, 'sample_steps', 16)
+            steps = getattr(args, 'sample_steps', args.sample_steps)
             dt = 1.0 / steps
             # y = torch.randn_like(gt_3D)
-
+            
+            y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            y = y.expand_as(gt_3D)
+            y[:, :, 0, :] = 0
+            y_noise = torch.randn_like(y)
+            y = y + y_noise
             
             for s in range(steps):
                 t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-                v_s = model_3d(input_2D, y, t_s)
+                v_s = model_3d(input_2D_nonflip, y, t_s)
                 y = y + dt * v_s
-           
+            
+            if args.test_augmentation:
+                joints_left = [4, 5, 6, 11, 12, 13] 
+                joints_right = [1, 2, 3, 14, 15, 16]
+                y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+                # y_flip[:, :, :, 0] *= -1
+                # y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                y_flip = y_flip.expand_as(gt_3D)
+                y_flip[:, :, 0, :] = 0
+                y_flip_noise = torch.randn_like(y_flip)
+                y_flip = y_flip + y_flip_noise
+                
+                for s in range(steps):
+                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                    v_s = model_3d(input_2D_flip, y_flip, t_s)
+                    y_flip = y_flip + dt * v_s
+                
+                y_flip[:, :, :, 0] *= -1
+                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                y = (y + y_flip) / 2
+                
+            # y_flip = torch.randn_like(gt_3D)
             
             RK4=False
             if RK4:
@@ -117,6 +146,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                     k4 = model_3d(input_2D, y + dt * k3, t1_t)
 
                     y = y + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            
             output_3D = y
 
         out_target = gt_3D.clone()
