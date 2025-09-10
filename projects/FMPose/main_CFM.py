@@ -103,8 +103,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                 joints_left = [4, 5, 6, 11, 12, 13] 
                 joints_right = [1, 2, 3, 14, 15, 16]
                 y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                # y_flip[:, :, :, 0] *= -1
-                # y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                y_flip[:, :, :, 0] *= -1
+                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
                 y_flip = y_flip.expand_as(gt_3D)
                 y_flip[:, :, 0, :] = 0
                 y_flip_noise = torch.randn_like(y_flip)
