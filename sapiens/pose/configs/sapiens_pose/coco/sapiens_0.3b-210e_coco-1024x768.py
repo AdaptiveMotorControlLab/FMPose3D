@@ -87,7 +87,13 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='mmpretrain.VisionTransformer',
-        arch=model_name,
+        # arch=model_name,
+        arch=dict(
+        embed_dims=embed_dim,
+        num_layers=num_layers,
+        num_heads=16,  # typically embed_dim/64
+        feedforward_channels=4*embed_dim,  # typically 4*embed_dim
+        ),
         img_size=(image_size[1], image_size[0]),
         patch_size=patch_size,
         qkv_bias=True,
