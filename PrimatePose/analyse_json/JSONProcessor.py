@@ -384,7 +384,7 @@ class JSONProcessor:
         with open(output_path, 'w') as f:
             json.dump(output_data, f, indent=4)
             print(f"Output saved to {output_json_path}")
-    
+
     def remove_annotaions_w_wrong_bbox(self, input_json_path: str, output_json_path: str) -> None:
         """
         Remove annotations with wrong bbox.
@@ -417,6 +417,182 @@ class JSONProcessor:
             json.dump(data, f, indent=4)
         print(f"Output saved to {output_json_path}")
 
+    @staticmethod
+    def cal_number_of_annotations(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return len(data['annotations'])
+
+    @staticmethod
+    def cal_number_of_images(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return len(data['images'])
+    
+    @staticmethod
+    def split_dataset_by_ratio(original_json_path, target_folder, train_ratio=0.7, test_ratio=0.3):
+        # split the original json file into  train and test json files according to the ratio of images
+        # the output_files should have the same structure as the original json file
+        
+        with open(original_json_path, 'r') as f:
+            data = json.load(f)
+        
+        # get all image ids
+        image_ids = set(img['id'] for img in data['images'])
+        train_image_ids = set(random.sample(list(image_ids), int(len(image_ids) * train_ratio)))
+        test_image_ids = image_ids - train_image_ids
+        
+        # split image ids into train and test
+        train_data = {
+            'images': [img for img in data['images'] if img['id'] in train_image_ids],
+            'annotations': [ann for ann in data['annotations'] if ann['image_id'] in train_image_ids],
+            'categories': data['categories']
+        }
+        
+        test_data = {
+            'images': [img for img in data['images'] if img['id'] in test_image_ids],
+            'annotations': [ann for ann in data['annotations'] if ann['image_id'] in test_image_ids],
+            'categories': data['categories']
+        }
+        
+        # Preserve other fields if they exist
+        for key in data:
+            if key not in ['images', 'annotations', 'categories']:
+                train_data[key] = data[key]
+                test_data[key] = data[key]
+        
+        # Create target folder if it doesn't exist
+        os.makedirs(target_folder, exist_ok=True)
+        
+        # Generate output file names based on original file name
+        original_name = os.path.splitext(os.path.basename(original_json_path))[0]
+        train_output_path = os.path.join(target_folder, f"{original_name}_train.json")
+        test_output_path = os.path.join(target_folder, f"{original_name}_test.json")
+        
+        # Save train and test data
+        with open(train_output_path, 'w') as f:
+            json.dump(train_data, f, indent=4)
+        
+        with open(test_output_path, 'w') as f:
+            json.dump(test_data, f, indent=4)
+        
+        # Print summary
+        print(f"Dataset split completed:")
+        print(f"  Original images: {len(image_ids)}")
+        print(f"  Train images: {len(train_image_ids)} ({len(train_image_ids)/len(image_ids)*100:.1f}%)")
+        print(f"  Test images: {len(test_image_ids)} ({len(test_image_ids)/len(image_ids)*100:.1f}%)")
+        print(f"  Train annotations: {len(train_data['annotations'])}")
+        print(f"  Test annotations: {len(test_data['annotations'])}")
+        print(f"  Train data saved to: {train_output_path}")
+        print(f"  Test data saved to: {test_output_path}")
+    
+    def small_dataset_filter(self, json_path, output_path, sample_rate=1/20):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        all_images = data['images']
+        sample_size = int(len(all_images) * sample_rate)
+        filtered_images = random.sample(all_images, sample_size)
+        data['images'] = filtered_images
+        
+        # get filtered image ids
+        filtered_image_ids = set(img['id'] for img in filtered_images)
+        
+        # filter annotations to keep only those that correspond to filtered images
+        data['annotations'] = [ann for ann in data['annotations'] if ann['image_id'] in filtered_image_ids]
+        
+        # save to output_path
+        with open(output_path, 'w') as f:
+            json.dump(data, f, indent=4)
+    
+    def remove_redudant_images(self, input_json_path, output_json_path):
+        """
+        Remove redundant images from JSON data.
+        make sure every image in this json file is mentioned in the annotations.
+        """
+        # Load JSON data
+        with open(input_json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Get all image IDs referenced in annotations
+        referenced_image_ids = set()
+        for annotation in data['annotations']:
+            referenced_image_ids.add(annotation['image_id'])
+        
+        # Filter images list to keep only referenced images
+        filtered_images = [img for img in data['images'] if img['id'] in referenced_image_ids]
+        
+        # Update the images list in the data
+        data['images'] = filtered_images
+        
+        # Save the updated JSON data
+        with open(output_json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+            
+        print(f"Original images count: {len(data['images'])}")
+        print(f"Images referenced in annotations: {len(referenced_image_ids)}")
+        print(f"Removed {len(data['images']) - len(filtered_images)} redundant images")
+        print(f"Saved filtered JSON to {output_json_path}")
+
+    def check_vis_label_of_keypoints(self, json_path):
+        """Calculate and count all visibility labels for each keypoint/joint in the JSON file."""
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        # Initialize counters for each visibility label
+        vis_counts = {}
+        
+        # Get keypoint names for reference
+        keypoint_names = []
+        if data.get('categories'):
+            for category in data['categories']:
+                if 'keypoints' in category:
+                    keypoint_names = category['keypoints']
+                    break
+        
+        # print(f"Found {len(keypoint_names)} keypoints: {keypoint_names}")
+        # print("-" * 60)
+        
+        # Process all annotations
+        for ann in data['annotations']:
+            keypoints = ann['keypoints']
+            vis_labels = keypoints[2::3]  # Every 3rd element starting from index 2
+            
+            # Count visibility labels for each keypoint
+            for i, vis_label in enumerate(vis_labels):
+                if vis_label not in vis_counts:
+                    vis_counts[vis_label] = 0
+                vis_counts[vis_label] += 1
+        
+        # Print summary
+        print("Visibility Label Counts:")
+        print("-" * 30)
+        for vis_label in sorted(vis_counts.keys()):
+            count = vis_counts[vis_label]
+            total_annotations = len(data['annotations'])
+            total_keypoints_per_ann = len(keypoint_names) if keypoint_names else len(data['annotations'][0]['keypoints']) // 3
+            total_possible_keypoints = total_annotations * total_keypoints_per_ann
+            percentage = (count / total_possible_keypoints) * 100 if total_possible_keypoints > 0 else 0
+            
+            print(f"Visibility {vis_label}: {count:,} keypoints ({percentage:.2f}%)")
+        
+        print("-" * 30)
+        print(f"Total annotations: {len(data['annotations'])}")
+        print(f"Total keypoints per annotation: {total_keypoints_per_ann}")
+        print(f"Total possible keypoints: {total_possible_keypoints:,}")
+        
+        return vis_counts
+
+    def check_vis_labels_per_dataset(self, folder_path):
+        """
+        Check the visibility labels of keypoints per dataset.
+        """
+        for file in os.listdir(folder_path):
+            if file.endswith(".json"):
+                print(f"Checking {file}")
+                self.check_vis_label_of_keypoints(os.path.join(folder_path, file))
+                print("-" * 30)
+
 # Example usage:
 
 if __name__ == "__main__":
@@ -428,16 +604,37 @@ if __name__ == "__main__":
 
     processor = JSONProcessor("/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/splitted_test_datasets/lote_test.json")
 
+    # species = "riken"
+    # train_file= f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_train_datasets/{species}_train.json"
+    # test_file= f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_test_datasets/{species}_test.json"
+    # print(JSONProcessor.cal_number_of_annotations(train_file))
+    # print(JSONProcessor.cal_number_of_annotations(test_file))
     # Print JSON structure
     # processor.print_structure()
     
-    mode_list = ["train", "test"] #  "val"]
-    for mode in mode_list:
-        processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
-                               output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json",
-                               exclude_datasets=["riken"])
-        processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json", \
-                                        output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_wo_riken_V82.json")
+    # mode_list = ["train", "test"] #  "val"]
+    # species = "oms"
+    # for mode in mode_list:
+        
+    #     input_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets/{species}_{mode}.json"
+    #     output_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples/{species}_{mode}_small_1_500.json"
+    #     processor.small_dataset_filter(json_path=input_json_path, \
+    #                                    output_path=output_json_path,
+    #                                    sample_rate=1/500)
+    #     num_annotations = processor.cal_number_of_annotations(json_path=output_json_path)
+    #     print(f"Number of annotations in {mode} dataset: {num_annotations}")
+        
+        
+        # input_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/{species}_{mode}_pose_v8_21.json"
+        # output_json_path = f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/8.21_sapiens/{species}_{mode}_pose_v8_21_rm_useless_images.json"
+        # processor.remove_redudant_images(input_json_path, output_json_path)
+    
+    # for mode in mode_list:
+    #     processor.merge_json_files(json_folder_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/splitted_{mode}_datasets", \
+    #                            output_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json",
+    #                            exclude_datasets=["riken"])
+    #     processor.find_annotations_with_pose(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_wo_riken_V82.json", \
+    #                                     output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_wo_riken_V82.json")
     
         # processor.remove_annotaions_w_wrong_bbox(input_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82.json", \
                                                 # output_json_path=f"/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/pfm_{mode}_pose_V82_no_wrong_bbox.json")
@@ -462,3 +659,26 @@ if __name__ == "__main__":
     # print("Annotation Errors Summary:", error_counts)
     # output_image_path = "annotations_errors.png"
     # processor.visualize_error_counts(error_counts, len(processor.data.get('annotations', [])), os.path.basename(processor.json_path), output_image_path)
+    # number = processor.cal_number_of_annotations(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_train_datasets/mit_train.json")
+    # print(number)
+    
+    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    #                                  output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train.json",
+    #                                  train_ratio=0.7,
+    #                                  test_ratio=0.3)
+   
+    # processor.small_dataset_filter(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train.json",
+    #                                output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k_train_small.json",
+    #                                sample_rate=1/50) 
+    
+    # processor.split_dataset_by_ratio(original_json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train_OOD_ap10k.json", \
+    
+    # processor.check_vis_label_of_keypoints(json_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json")
+    processor.check_vis_labels_per_dataset(folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_test_datasets")
+    
+    
+    # processor.merge_json_files(
+    #                            json_folder_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/splitted_train_datasets",
+    #                                 output_path="/home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.3/pfm_train.json",
+    #                             #  exclude_datasets=["ap10k"] 
+    #                            )

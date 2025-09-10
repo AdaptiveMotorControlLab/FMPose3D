@@ -45,7 +45,8 @@ conda install pytorch torchvision torchaudio "${PYTORCH_VERSION}" -c pytorch -c 
 # Install additional Python packages
 print_green "Installing additional Python packages..."
 pip install chumpy scipy munkres tqdm cython fsspec yapf==0.40.1 matplotlib packaging omegaconf ipdb ftfy regex
-pip install json_tricks terminaltables modelindex prettytable albumentations libcom
+pip install json_tricks terminaltables modelindex prettytable albumentations
+#  libcom
 
 # Change directory to the root of the repository
 cd "$(dirname "$0")/.."

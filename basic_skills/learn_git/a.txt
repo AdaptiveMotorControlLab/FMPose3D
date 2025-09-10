@@ -1,5 +1,9 @@
+<<<<<<< HEAD
+today is Saturday, and tomorrow is sunday
+=======
 today is Saturday, and tomorrow is sunday
 flag_1
 flag_2
 flag_test_A
 flag_test_B
+>>>>>>> main

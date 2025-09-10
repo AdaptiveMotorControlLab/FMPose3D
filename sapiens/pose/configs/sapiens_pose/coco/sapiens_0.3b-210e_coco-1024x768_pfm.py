@@ -115,9 +115,9 @@ model = dict(
         with_cls_token=False,
         out_type='featmap',
         patch_cfg=dict(padding=2),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=pretrained_checkpoint),
+        # init_cfg=dict(
+        #     type='Pretrained',
+        #     checkpoint=pretrained_checkpoint),
     ),
     head=dict(
         type='HeatmapHead',
@@ -134,10 +134,10 @@ model = dict(
         flip_mode='heatmap',
         shift_heatmap=False,
     )
-    # ,
-    # init_cfg=dict(
-    #     type='Pretrained',
-    #     checkpoint=pretrained_checkpoint)
+    ,
+    init_cfg=dict(
+        type='Pretrained',
+        checkpoint=pretrained_checkpoint)
 )
 
 # pipelines
@@ -179,7 +179,8 @@ dataset_coco = dict(
     type='CocoDataset',
     data_root=data_root,
     data_mode='topdown',
-    ann_file='8.21_sapiens/pfm_train_pose_wo_riken_chimpact_v8_21.json',
+    # ann_file='8.21_sapiens/pfm_train_pose_wo_riken_chimpact_v8_21.json',
+    ann_file="8.21_sapiens/oms_test_pose_v8_21.json",
     data_prefix=dict(img='images/'),
 )
 

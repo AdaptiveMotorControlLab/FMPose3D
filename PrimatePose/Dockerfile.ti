@@ -1,5 +1,5 @@
 FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
-
+# FROM pytorch/pytorch:2.4.1-cuda11.8-cudnn9-runtime
 ARG user_name=ti_wang
 ARG uid=1002
 ARG gid=1002
@@ -45,10 +45,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
 # change the permission of DeepLabCut package
 # RUN chmod -R 777 /opt/conda/lib/python3.10/site-packages/deeplabcut
 
-# USER ${user_name}
+USER ${user_name}
 USER root
 # ENV HOME=/root
-WORKDIR /app
+# WORKDIR /app
 
 CMD ["zsh"]
 SHELL ["/bin/zsh", "-c"]

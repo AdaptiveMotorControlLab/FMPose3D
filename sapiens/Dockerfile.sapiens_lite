@@ -1,0 +1,82 @@
+# FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+ARG user_name
+ARG uid
+ARG gid
+ENV HOME=/root 
+
+WORKDIR /
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -y && apt-get install -yy --no-install-recommends \
+    vim zsh tmux wget \
+    curl htop jupyter python3 python3-pip libgl1-mesa-glx git sudo ssh git-lfs \
+    build-essential g++ cmake \
+    && apt-get -y autoclean \
+    && apt-get -y autoremove \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+RUN apt-get update && apt-get install -y libglib2.0-0
+
+# Create a non-root user
+RUN mkdir /app /logs /data /notebooks
+RUN groupadd -g ${gid} ${user_name} \
+    && useradd -m -u ${uid} -g ${gid} ${user_name} \
+    && chown -R ${uid}:${gid} /home
+
+
+# Give LDAP user permissions to conda directories
+RUN chown -R ${user_name}:${user_name} /opt/conda
+RUN chown -R ${user_name}:${user_name} /etc/profile.d
+# Set your user as owner of the new copied files
+RUN chown -R ${user_name}:${user_name} /home/${user_name}
+
+
+# Switch to the new user and set home directory as working directory
+USER ${user_name}
+ENV HOME=/home/${user_name}
+WORKDIR ${HOME}
+
+SHELL ["/bin/zsh", "-c"]
+
+RUN conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+RUN pip install opencv-python tqdm json-tricks
+RUN mkdir -p ${HOME}/envs
+
+# First copy all the source folders
+COPY engine ${HOME}/envs/engine/
+COPY cv ${HOME}/envs/cv/
+COPY det ${HOME}/envs/det/
+
+# Then install each package in sequence
+RUN cd ${HOME}/envs/engine && pip install -e .
+RUN cd ${HOME}/envs/cv && pip install -e .
+RUN cd ${HOME}/envs/det && pip install -e .
+
+# Install Oh My Zsh and plugins
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended \
+&& git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions \
+&& git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \
+&& sed -i 's/^plugins=(.*)$/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+RUN echo "export PATH=$PATH:/home/${user_name}/.local/bin" >> /home/${user_name}/.zshrc
+
+# install pip packages
+# COPY ./requirements.txt /requirements.txt
+# RUN pip install --no-cache-dir --upgrade pip setuptools gpustat nvitop && \
+#     pip install --no-cache-dir pytest PySide6==6.3.1 && \
+#     pip install --no-cache-dir opencv-python tqdm json-tricks && \
+#     pip install --no-cache-dir mmcv -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.0/index.html && \
+#     pip install --no-cache-dir mmdet
+
+# Set environment variables
+ENV SAPIENS_ROOT=/home/${user_name}/Ti_workspace/sapiens
+ENV SAPIENS_LITE_ROOT=$SAPIENS_ROOT/lite
+
+WORKDIR /home/${user_name}/Ti_workspace/sapiens
+USER ${user_name}
+# USER root
+
+SHELL ["/bin/zsh", "-c"]
+CMD ["zsh"]

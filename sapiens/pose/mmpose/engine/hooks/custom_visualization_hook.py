@@ -133,11 +133,13 @@ class CustomPoseVisualizationHook(Hook):
         target_weight = torch.cat(target_weight, dim=0)
 
         ##------------------------------------
-        vis_dir = os.path.join(runner.work_dir, 'vis_data')
+        vis_dir = os.path.join(runner._log_dir, 'vis_data')
         if not os.path.exists(vis_dir):
             os.makedirs(vis_dir, exist_ok=True)
 
         prefix = os.path.join(vis_dir, 'train')
+        # print("prefix: ",prefix)
+        # print("./pose/mmpose/engine/hooks/custom_visualization_hook.py")
         suffix = str(total_curr_iter).zfill(6)
 
         original_image = image

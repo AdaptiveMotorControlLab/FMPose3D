@@ -105,26 +105,8 @@ RUN mkdir -p /home/${LDAP_USERNAME}/.conda && \
     echo '. /opt/conda/etc/profile.d/conda.sh' >> /home/${LDAP_USERNAME}/.zshrc
 # echo 'conda activate sapiens' >> /home/${LDAP_USERNAME}/.zshrc
 
-# Install OpenMMLab libraries with pre-built wheels
-RUN pip install -U openmim && \
-    mim install mmengine && \
-    mim install mmcv && \
-    pip install mmdet mmpretrain
-
-# Alternatively, if the above fails, use MMCV-lite (no CUDA support)
-# RUN pip install mmcv-lite mmengine mmpretrain mmdet
-
 # Now switch to the LDAP user
 USER ${LDAP_USERNAME}
 USER root
 CMD ["zsh"]
 SHELL ["/bin/zsh", "-c"]
-
-# Install Python and pip
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip \
-    git wget curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install PyTorch
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121

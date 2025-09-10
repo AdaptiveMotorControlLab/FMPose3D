@@ -2,7 +2,8 @@
 
 cd ../../.. || exit  # go to the lite folder
 # SAPIENS_CHECKPOINT_ROOT=/home/${USER}/sapiens_lite_host
-SAPIENS_CHECKPOINT_ROOT=/home/ti_wang/Ti_workspace/sapiens/sapiens_lite_host
+USER="wang3"
+SAPIENS_CHECKPOINT_ROOT=/home/${USER}/Ti_workspace/sapiens/sapiens_lite_host
 
 MODE='torchscript' ## original. no optimizations (slow). full precision inference.
 # MODE='bfloat16' ## A100 gpus. faster inference at bfloat16
@@ -12,8 +13,8 @@ SAPIENS_CHECKPOINT_ROOT=$SAPIENS_CHECKPOINT_ROOT/$MODE
 #----------------------------set your input and output directories----------------------------------------------
 # INPUT='../pose/demo/data/itw_videos/reel1'
 # OUTPUT="/home/${USER}/Desktop/sapiens/pose/Outputs/vis/itw_videos/reel1_pose17"
-INPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/st_original_images"
-OUTPUT="/home/ti_wang/Ti_workspace/sapiens/primate_data/processed_images"
+INPUT="/home/${USER}/Ti_workspace/sapiens/primate_data/st_original_images"
+OUTPUT="/home/${USER}/Ti_workspace/sapiens/primate_data/processed_images"
 
 #--------------------------MODEL CARD---------------
 MODEL_NAME='sapiens_0.3b'; 
@@ -22,8 +23,8 @@ CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/pose/checkpoints/sapiens_0.3b/sapiens_0.3b_c
 # MODEL_NAME='sapiens_0.6b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/pose/checkpoints/sapiens_0.6b/sapiens_0.6b_coco_best_coco_AP_812_$MODE.pt2
 # MODEL_NAME='sapiens_1b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/pose/checkpoints/sapiens_1b/sapiens_1b_coco_best_coco_AP_821_$MODE.pt2
 # MODEL_NAME='sapiens_2b'; CHECKPOINT=$SAPIENS_CHECKPOINT_ROOT/pose/checkpoints/sapiens_2b/sapiens_2b_coco_best_coco_AP_822_$MODE.pt2
-MODEL_NAME='sapiens_2b';
-CHECKPOINT=/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-pose-coco/sapiens_lite_host/torchscript/pose/checkpoints/sapiens_2b/sapiens_2b_coco_best_coco_AP_822_torchscript.pt2
+# MODEL_NAME='sapiens_2b';
+# CHECKPOINT=/home/ti_wang/Ti_workspace/sapiens/downloads/sapiens-pose-coco/sapiens_lite_host/torchscript/pose/checkpoints/sapiens_2b/sapiens_2b_coco_best_coco_AP_822_torchscript.pt2
 
 OUTPUT=$OUTPUT/$MODEL_NAME
 
@@ -68,6 +69,9 @@ fi
 
 export TF_CPP_MIN_LOG_LEVEL=2
 echo "Distributing ${NUM_IMAGES} image paths into ${TOTAL_JOBS} jobs."
+
+# Ensure PYTHONPATH includes necessary directories
+# export PYTHONPATH=$PYTHONPATH:/opt/conda/lib/python3.10/site-packages
 
 # Divide image paths into text files for each job
 for ((i=0; i<TOTAL_JOBS; i++)); do

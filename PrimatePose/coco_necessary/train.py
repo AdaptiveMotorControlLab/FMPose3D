@@ -11,8 +11,6 @@ from deeplabcut.pose_estimation_pytorch.runners.logger import setup_file_logging
 from deeplabcut.pose_estimation_pytorch.task import Task
 from collections import defaultdict
 import wandb
-# wandb.init(project="primatepose", tags=["debug_SSDLite"])
-# wandb.init(project="MyWandbProject", tags=["model=hrnet_w32"])
 
 def main(
     project_root: str,
@@ -27,8 +25,8 @@ def main(
     detector_save_epochs: int | None,
     snapshot_path: str | None,
     detector_path: str | None,
-    batch_size: int = 64,
-    dataloader_workers: int = 24,
+    batch_size: int = 32,
+    dataloader_workers: int = 16,
     detector_batch_size: int = 32,
     detector_dataloader_workers: int= 16,
     debug: bool = False,
@@ -92,14 +90,14 @@ def main(
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["server8"],
-                                group = "Dubug_v8_server8",
+                                group = "Debug_v83_server8",
                                 run_name = args.run_name,
                                 )
         else:
             logger_config = dict(type = "WandbLogger",
                                 project_name = "primatepose",
                                 tags = ["eval"],
-                                group = "split_datasets_v8_server8",
+                                group = "pfm_v83_server8",
                                 run_name = args.run_name,
                                 )
         
@@ -114,7 +112,7 @@ def main(
                 logger_config=logger_config,
                 snapshot_path=detector_path,
             )
-             
+            
     if epochs > 0 and args.train_pose:
         train(
             loader=loader,
@@ -148,6 +146,10 @@ if __name__ == "__main__":
     parser.add_argument("--train-pose", action="store_true", help="Whether to train pose model")
     parser.add_argument("--train-detector", action="store_true", help="Whether to train detector model")
     parser.add_argument("--run-name", type=str, default="default_run", help="Run name for wandb logging")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for pose model training")
+    parser.add_argument("--dataloader-workers", type=int, default=16, help="Number of dataloader workers")
+    parser.add_argument("--detector-batch-size", type=int, default=32, help="Batch size for detector model training")
+    parser.add_argument("--detector-dataloader-workers", type=int, default=16, help="Number of dataloader workers for detector")
     args = parser.parse_args()
     
     # backup the train.sh file and the current file in the same folder    
@@ -158,8 +160,8 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(current_file_path)
     train_sh_path = os.path.join(current_dir, "train.sh")
     
-    shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
-    shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
+    # shutil.copy(current_file_path, os.path.join(debug_dir, "train.py"))
+    # shutil.copy(train_sh_path, os.path.join(debug_dir, "train.sh"))
     
     main(
         args.project_root,
@@ -174,5 +176,9 @@ if __name__ == "__main__":
         args.detector_save_epochs,
         args.snapshot_path,
         args.detector_path,
+        batch_size=args.batch_size,
+        dataloader_workers=args.dataloader_workers,
+        detector_batch_size=args.detector_batch_size,
+        detector_dataloader_workers=args.detector_dataloader_workers,
         debug=args.debug
     )
