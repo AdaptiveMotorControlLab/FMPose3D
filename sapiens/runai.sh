@@ -9,6 +9,10 @@
 # --pvc home:${HOME} --pvc upmwmathis-scratch:/data -e HOME=${HOME} -p upmwmathis-wang3 \
 # --command -- /bin/bash -ic "sleep infinity"
 
-runai submit --gpu 1 --name sleeptest30 --image registry.rcp.epfl.ch/pfm_ti/sapiens:v0.19 --backoff-limit 0 --large-shm \
+runai submit --gpu 2 --node-pools h100 --name human6-2 --image registry.rcp.epfl.ch/pfm_ti/sapiens:v0.19 --backoff-limit 0 --large-shm \
 --pvc home:${HOME} --pvc upmwmathis-scratch:/data -e HOME=${HOME} -p upmwmathis-wang3 \
 --command -- /bin/bash -ic "sleep infinity"
+
+# runai submit --gpu 1 --name human --image registry.rcp.epfl.ch/pfm_ti/sapiens:v0.19 --backoff-limit 0 --large-shm \
+# --pvc home:${HOME} --pvc upmwmathis-scratch:/data -e HOME=${HOME} -p upmwmathis-wang3 \
+# --command -- /bin/bash -ic "sleep infinity"
