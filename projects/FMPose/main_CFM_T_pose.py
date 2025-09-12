@@ -19,7 +19,7 @@ exec('from model.' + args.model + ' import Model as CFM')
 
 # wandb logging (assumed available)
 import wandb
-WANDB_AVAILABLE = True
+WANDB_AVAILABLE = False
 
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)
@@ -271,8 +271,8 @@ if __name__ == '__main__':
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
         p1_per_step, p2_per_step = val(args, actions, test_dataloader, model)
-        p1 = p1_per_step[max(p1_per_step.keys())]
-        p2 = p2_per_step[max(p2_per_step.keys())]
+        p1 = p1_per_step[min(p1_per_step.keys())]
+        p2 = p2_per_step[min(p2_per_step.keys())]
         if WANDB_AVAILABLE:
             log_data = {'test_p1': p1, 'epoch': epoch}
             wandb.log(log_data)
