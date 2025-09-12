@@ -199,20 +199,26 @@ if __name__ == '__main__':
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
+    # allow overriding timestamp folder by user-provided folder_name
     logtime = time.strftime('%y%m%d_%H%M_%S')
     args.create_time = logtime
+
+    if args.folder_name != '':
+        folder_name = args.folder_name
+    else:
+        folder_name = logtime
     
     if WANDB_AVAILABLE:
         wandb.init(project=getattr(args, 'wandb_project', 'Pose3DCFM'),
-                   name=f"CFM_{logtime}",
+                   name=f"CFM_{folder_name}",
                    config={k: getattr(args, k) for k in dir(args) if not k.startswith('_')})
      
     if args.create_file:
         # create backup folder
         if args.debug:
-            args.checkpoint = './debug/' + logtime
+            args.checkpoint = './debug/' + folder_name
         else:
-            args.checkpoint = './checkpoint/' + logtime
+            args.checkpoint = './checkpoint/' + folder_name
     
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
@@ -227,7 +233,11 @@ if __name__ == '__main__':
         model_dst_name = f"{args.create_time}_{args.model}.py"
         shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.filename+"_run_FM.sh"))
+        if args.debug:
+            shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
+        else:
+            shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
+
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
