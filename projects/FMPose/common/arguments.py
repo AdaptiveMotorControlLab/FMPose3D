@@ -62,6 +62,7 @@ class opts():
         # 
         self.parser.add_argument('--create_file', type=int, default=1)
         self.parser.add_argument('--debug', action='store_true')
+        self.parser.add_argument('--folder_name', type=str, default='')
         
         # param for refine
         self.parser.add_argument('--lr_refine', type=float, default=1e-5)
@@ -70,6 +71,9 @@ class opts():
         self.parser.add_argument('-previous_refine_name', type=str, default='')
         
         self.parser.add_argument('--sample_steps', type=int, default=3)
+        # evaluation: run multiple sample steps at test time
+        self.parser.add_argument('--eval_multi_steps', action='store_true')
+        self.parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9')
         
     def parse(self):
         self.init()
