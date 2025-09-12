@@ -41,14 +41,14 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
         model_3d.eval()
 
     # cache for mean 3D pose (shape: F,J,3). Loaded or computed on first train batch
-    mean_3D_pose_tensor = None
-    mean_3D_pose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
-    # Initialize/load mean 3D pose once (train only)
-    npz = np.load(mean_3D_pose_path)
-    mean_arr = npz['mean_3D']  # expected shape: (1,1,J,3)
-    # Convert to tensor but delay device/dtype conversion until we have gt_3D
-    mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
-    mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
+    # # # # # # mean_3D_pose_tensor = None
+    # # # # # mean_3D_pose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
+    # # # # # Initialize/load mean 3D pose once (train only)
+    # # # # npz = np.load(mean_3D_pose_path)
+    # # # mean_arr = npz['mean_3D']  # expected shape: (1,1,J,3)
+    # # # Convert to tensor but delay device/dtype conversion until we have gt_3D
+    # # mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
+    # mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
     
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
@@ -63,11 +63,9 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             # Use template mean 3D pose as x0 instead of random noise
-            x0 = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-            x0 = x0.expand_as(gt_3D)
-            x0[:, :, 0, :] = 0
-            x0_noise = torch.randn_like(x0)
-            x0 = x0 + x0_noise
+            # x0 = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            x0_noise = torch.randn_like(gt_3D)
+            x0 = x0_noise
             
             B = gt_3D.size(0)
             # t on correct device/dtype and broadcastable: (B,1,1,1)
@@ -88,11 +86,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             dt = 1.0 / steps
             # y = torch.randn_like(gt_3D)
             
-            y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-            y = y.expand_as(gt_3D)
-            y[:, :, 0, :] = 0
-            y_noise = torch.randn_like(y)
-            y = y + y_noise
+            y = torch.randn_like(gt_3D)
             
             for s in range(steps):
                 t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
@@ -102,13 +96,9 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             if args.test_augmentation:
                 joints_left = [4, 5, 6, 11, 12, 13] 
                 joints_right = [1, 2, 3, 14, 15, 16]
-                y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y_flip = y_flip.expand_as(gt_3D)
-                y_flip[:, :, 0, :] = 0
-                y_flip_noise = torch.randn_like(y_flip)
-                y_flip = y_flip + y_flip_noise
+
+                y_flip_noise = torch.randn_like(gt_3D)
+                y_flip = y_flip_noise
                 
                 for s in range(steps):
                     t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
@@ -199,20 +189,26 @@ if __name__ == '__main__':
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
+    # allow overriding timestamp folder by user-provided folder_name
     logtime = time.strftime('%y%m%d_%H%M_%S')
     args.create_time = logtime
+
+    if args.folder_name != '':
+        folder_name = args.folder_name
+    else:
+        folder_name = logtime
     
     if WANDB_AVAILABLE:
         wandb.init(project=getattr(args, 'wandb_project', 'Pose3DCFM'),
-                   name=f"CFM_{logtime}",
+                   name=f"CFM_{folder_name}",
                    config={k: getattr(args, k) for k in dir(args) if not k.startswith('_')})
      
     if args.create_file:
         # create backup folder
         if args.debug:
-            args.checkpoint = './debug/' + logtime
+            args.checkpoint = './debug/' + folder_name
         else:
-            args.checkpoint = './checkpoint/' + logtime
+            args.checkpoint = './checkpoint/' + folder_name
     
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
@@ -227,7 +223,10 @@ if __name__ == '__main__':
         model_dst_name = f"{args.create_time}_{args.model}.py"
         shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.filename+"_run_FM.sh"))
+        if args.debug:
+            shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
+        else:
+            shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
