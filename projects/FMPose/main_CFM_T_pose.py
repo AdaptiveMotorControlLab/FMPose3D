@@ -50,15 +50,18 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
     mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
     mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
     
+    # for multi-step eval, maintain per-step accumulators across the whole split
+    eval_steps = None
+    action_error_sum_multi = None
+    if split == 'test' and getattr(args, 'eval_multi_steps', False):
+        eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
+        action_error_sum_multi = {s: define_error_list(actions) for s in eval_steps}
+
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
-        # compute a mean 3D pose using current batch and save for reuse
-        # mean_3D_pose_tensor = gt_3D.mean(dim=0).detach().unsqueeze(0)
-        # os.makedirs('./dataset', exist_ok=True)
-        # np.savez(mean_3D_pose_path, mean_3D=mean_3D_pose_tensor.cpu().numpy())
-        
+
         if split =='train':
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
@@ -75,114 +78,83 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             y_t = (1.0 - t) * x0 + t * gt_3D
             v_target = gt_3D - x0
             v_pred = model_3d(input_2D, y_t, t)
-            
-        else:
-            # When test_augmentation=True, input_2D has an extra aug dimension: (B,2,F,J,2)
-            # For now, use the first view to keep shapes consistent with the model
-            input_2D_nonflip = input_2D[:, 0]
-            input_2D_flip = input_2D[:, 1]
-            
-            # Simple Euler sampler for CFM at test time
-            # Integrate from noise (t=0) to t=1 using learned velocity field
-            steps = getattr(args, 'sample_steps', args.sample_steps)
-            dt = 1.0 / steps
-            # y = torch.randn_like(gt_3D)
-            
-            y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-            y = y.expand_as(gt_3D)
-            y[:, :, 0, :] = 0
-            y_noise = torch.randn_like(y)
-            y = y + y_noise
-            
-            for s in range(steps):
-                t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-                v_s = model_3d(input_2D_nonflip, y, t_s)
-                y = y + dt * v_s
-            
-            if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13] 
-                joints_right = [1, 2, 3, 14, 15, 16]
-                y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y_flip = y_flip.expand_as(gt_3D)
-                y_flip[:, :, 0, :] = 0
-                y_flip_noise = torch.randn_like(y_flip)
-                y_flip = y_flip + y_flip_noise
-                
-                for s in range(steps):
-                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-                    v_s = model_3d(input_2D_flip, y_flip, t_s)
-                    y_flip = y_flip + dt * v_s
-                
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y = (y + y_flip) / 2
-                
-            # y_flip = torch.randn_like(gt_3D)
-            
-            RK4=False
-            if RK4:
-                # RK4 sampler for CFM at test time
-                # Integrate from noise (t=0) to t=1 using learned velocity field with RK4
-                steps = getattr(args, 'sample_steps', 16)
-                dt = 1.0 / steps
-                B = gt_3D.size(0)
-                shape_t = (B, 1, 1, 1)
-                y = torch.randn_like(gt_3D)
-                for s in range(steps):
-                    t0 = s * dt
-                    t0_t = torch.full(shape_t, t0, device=gt_3D.device, dtype=gt_3D.dtype)
-                    k1 = model_3d(input_2D, y, t0_t)
 
-                    t_mid = t0 + dt * 0.5
-                    t_mid_t = torch.full(shape_t, t_mid, device=gt_3D.device, dtype=gt_3D.dtype)
-                    k2 = model_3d(input_2D, y + (dt * 0.5) * k1, t_mid_t)
-
-                    k3 = model_3d(input_2D, y + (dt * 0.5) * k2, t_mid_t)
-
-                    t1 = t0 + dt
-                    t1_t = torch.full(shape_t, t1, device=gt_3D.device, dtype=gt_3D.dtype)
-                    k4 = model_3d(input_2D, y + dt * k3, t1_t)
-
-                    y = y + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-            
-            output_3D = y
-
-        out_target = gt_3D.clone()
-        out_target[:, :, 0] = 0
-
-        if split == 'train':
-            loss = ((v_pred - v_target)**2).mean()
-            
-            # loss_p1 = mpjpe_cal(output_3D, out_target.clone())
+            loss = ((v_pred - v_target)**2).mean()            
             N = input_2D.size(0)
-            
             loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
             if WANDB_AVAILABLE:
                 # log per-batch training loss
                 wandb.log({'train_loss': float(loss.detach().cpu().item()), 'epoch': epoch if epoch is not None else -1})
-
-
             # loss = loss_p1
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        elif split == 'test':
-            
-            output_3D = output_3D[:, args.pad].unsqueeze(1) 
-            output_3D[:, :, 0, :] = 0
-            test_p1 = mpjpe_cal(output_3D, out_target)
-            wandb.log({'test_p1': test_p1})
-            action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset, subject)
+        else:
+            # When test_augmentation=True, input_2D has an extra aug dimension: (B,2,F,J,2)
+            # For now, use the first view to keep shapes consistent with the model
+            input_2D_nonflip = input_2D[:, 0]
+            input_2D_flip = input_2D[:, 1]
+            out_target = gt_3D.clone()
+            out_target[:, :, 0] = 0
+
+            # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
+            def euler_sample(x2d, y_local, steps):
+                dt = 1.0 / steps
+                for s in range(steps):
+                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                    v_s = model_3d(x2d, y_local, t_s)
+                    y_local = y_local + dt * v_s
+                return y_local
+
+            if getattr(args, 'eval_multi_steps', False):
+                # for each requested step count, run an independent sampling (no default output here)
+                for s_keep in eval_steps:
+                    y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+                    y = y.expand_as(gt_3D)
+                    y[:, :, 0, :] = 0
+                    y = y + torch.randn_like(y)
+                    y_s = euler_sample(input_2D_nonflip, y, s_keep)
+                    if args.test_augmentation:
+                        joints_left = [4, 5, 6, 11, 12, 13]
+                        joints_right = [1, 2, 3, 14, 15, 16]
+                        y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+                        y_flip[:, :, :, 0] *= -1
+                        y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                        y_flip = y_flip.expand_as(gt_3D)
+                        y_flip[:, :, 0, :] = 0
+                        y_flip = y_flip + torch.randn_like(y_flip)
+                        y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
+                        y_flip_s = y_flip_s.clone()
+                        y_flip_s[:, :, :, 0] *= -1
+                        y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                        y_s = (y_s + y_flip_s) / 2
+                    # per-step metrics only; do not store per-sample outputs
+                    output_3D_s = y_s[:, args.pad].unsqueeze(1)
+                    output_3D_s[:, :, 0, :] = 0
+                    # per-batch P1 for quick logging (optional)
+                    if WANDB_AVAILABLE:
+                        p1_s = mpjpe_cal(output_3D_s, gt_3D.clone())
+                        wandb.log({f'test_p1_batch_s{s_keep}': float(p1_s)})
+                    # accumulate by action across the entire test set
+                    action_error_sum_multi[s_keep] = test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
 
     if split == 'train':
         return loss_all['loss'].avg
 
     elif split == 'test':
-        mpjpe_p1, p2 = print_error(args.dataset, action_error_sum, args.train)
-        return mpjpe_p1, p2
+        # aggregate default metrics
+        if getattr(args, 'eval_multi_steps', False):
+            per_step_p1 = {}
+            per_step_p2 = {}
+            for s_keep in sorted(action_error_sum_multi.keys()):
+                p1_s, p2_s = print_error(args.dataset, action_error_sum_multi[s_keep], args.train)
+                per_step_p1[s_keep] = float(p1_s)
+                per_step_p2[s_keep] = float(p2_s)
+                if WANDB_AVAILABLE:
+                    wandb.log({f'test_p1_s{s_keep}': float(p1_s), f'test_p2_s{s_keep}': float(p2_s)})
+                logging.info(f'eval_multi_steps: steps={s_keep}, p1={float(p1_s):.4f}, p2={float(p2_s):.4f}')
+        return per_step_p1, per_step_p2
 
 def get_parameter_number(net):
     total_num = sum(p.numel() for p in net.parameters())
@@ -298,7 +270,9 @@ if __name__ == '__main__':
             loss = train(args, actions, train_dataloader, model, optimizer, epoch)
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
-        p1, p2 = val(args, actions, test_dataloader, model)
+        p1_per_step, p2_per_step = val(args, actions, test_dataloader, model)
+        p1 = p1_per_step[max(p1_per_step.keys())]
+        p2 = p2_per_step[max(p2_per_step.keys())]
         if WANDB_AVAILABLE:
             log_data = {'test_p1': p1, 'epoch': epoch}
             wandb.log(log_data)
@@ -310,8 +284,14 @@ if __name__ == '__main__':
                 args.previous_best_threshold = data_threshold
                 best_epoch = epoch
                 
-            print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
-            logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
+            if getattr(args, 'eval_multi_steps', False):
+                steps_sorted = sorted(p1_per_step.keys())
+                step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
+                print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
+                logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
+            else:
+                print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
+                logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
         else:        
             print('p1: %.4f, p2: %.4f' % (p1, p2))
             logging.info('p1: %.4f, p2: %.4f' % (p1, p2))
