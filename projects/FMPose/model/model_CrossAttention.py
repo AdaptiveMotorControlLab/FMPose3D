@@ -409,9 +409,9 @@ class Model(nn.Module):
         self.time_embed = TimeEmbedding(self.t_embed_dim, hidden_dim=64)
 
         # encoder maps concatenated [x2d(2), y_t(3), t_emb(self.t_embed_dim)] to args.channel
-        self.encoder = encoder(2 + 3 + self.t_embed_dim, args.channel//2, args.channel)
-        # project raw x2d to embedding dim for cross-attention condition
-        self.cond_proj = nn.Linear(2, args.channel)
+        self.encoder = encoder(3, args.channel//2, args.channel)
+        # project concatenated [x2d(2), t_emb(self.t_embed_dim)] to embedding dim for cross-attention condition
+        self.cond_proj = nn.Linear(2 + self.t_embed_dim, args.channel)
         #  
         self.FMPose = FMPose(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints) # 256
         self.pred_mu = decoder(args.channel, args.channel//2, 3)
@@ -423,15 +423,16 @@ class Model(nn.Module):
         t_emb = self.time_embed(t) # (B,F,t_dim)
         t_emb = t_emb.unsqueeze(2).expand(b, f, j, self.t_embed_dim).contiguous()  # (B,F,J,t_dim)
 
-        x_in = torch.cat([x, y_t, t_emb], dim=-1)           # (B,F,J,2+3+t_dim)
-        x_in = rearrange(x_in, 'b f j c -> (b f) j c').contiguous() # (B*F,J,in)
+        # x_in = torch.cat([x, y_t, t_emb], dim=-1)           # (B,F,J,3)
+        y_t = rearrange(y_t, 'b f j c -> (b f) j c').contiguous() # (B*F,J,in)
 
         # condition from raw x (2D) projected to embed dim
-        cond_in = rearrange(x, 'b f j c -> (b f) j c').contiguous()  # (B*F,J,2)
+        cond_in = torch.cat([x, t_emb], dim=-1)
+        cond_in = rearrange(cond_in, 'b f j c -> (b f) j c').contiguous()  # (B*F,J,2+t_dim)
         cond = self.cond_proj(cond_in)                                 # (B*F,J,channel)
-
+        
         # encoder -> GCN_MLP -> regression head
-        h = self.encoder(x_in)
+        h = self.encoder(y_t)
         h = self.FMPose(h, cond)
         v = self.pred_mu(h)                                  # (B*F,J,3)
         v = rearrange(v, '(b f) j c -> b f j c', b=b, f=f).contiguous() # (B,F,J,3)
