@@ -313,6 +313,13 @@ class Block(nn.Module): # drop=0.1
         self.mlp = Mlp(in_features=dim, hidden_features=1024, act_layer=act_layer, drop=drop)
 
     def forward(self, x, cond):
+        
+        ## attention channel 
+        x_atten = x
+        x_atten = self.norm_att1(x_atten)
+        x_atten = self.attn(x_atten, cond)
+        x = x + self.drop_path(x_atten)
+        
         # B,J,dim 
         res1 = x # b,j,c
         # GCN
@@ -321,12 +328,6 @@ class Block(nn.Module): # drop=0.1
         x_gcn_1 = rearrange(x_gcn_1,"b j c -> b c j").contiguous()
         x_gcn_1 = self.gcn1(x_gcn_1)  # b,j,c
         x = res1 + self.drop_path(x_gcn_1)
-
-        ## attention channel 
-        x_atten = x
-        x_atten = self.norm_att1(x_atten)
-        x_atten = self.attn(x_atten, cond)
-        x = x + self.drop_path(x_atten)
 
         # MLP
         res3 = x.clone()  # b,j,c
