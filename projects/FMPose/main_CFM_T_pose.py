@@ -271,8 +271,9 @@ if __name__ == '__main__':
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
         p1_per_step, p2_per_step = val(args, actions, test_dataloader, model)
-        p1 = p1_per_step[min(p1_per_step.keys())]
-        p2 = p2_per_step[min(p2_per_step.keys())]
+        best_step = min(p1_per_step, key=p1_per_step.get)
+        p1 = p1_per_step[best_step]
+        p2 = p2_per_step[best_step]
         if WANDB_AVAILABLE:
             log_data = {'test_p1': p1, 'epoch': epoch}
             wandb.log(log_data)
@@ -292,19 +293,22 @@ if __name__ == '__main__':
             else:
                 print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
                 logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f' % (epoch, lr, loss, p1, p2))
-        else:        
-            print('p1: %.4f, p2: %.4f' % (p1, p2))
-            logging.info('p1: %.4f, p2: %.4f' % (p1, p2))
+        else:
+            if getattr(args, 'eval_multi_steps', False):
+                steps_sorted = sorted(p1_per_step.keys())
+                step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
+                print('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
+                logging.info('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
             break
                 
-        # if epoch % opt.large_decay_epoch == 0: 
-        #     for param_group in optimizer.param_groups:
-        #         param_group['lr'] *= opt.lr_decay_large
-        #         lr *= opt.lr_decay_large
-        # else:
-        for param_group in optimizer.param_groups:
-            param_group['lr'] *= args.lr_decay
-            lr *= args.lr_decay
+        if epoch % args.large_decay_epoch == 0: 
+            for param_group in optimizer.param_groups:
+                param_group['lr'] *= args.lr_decay_large
+                lr *= args.lr_decay_large
+        else:
+            for param_group in optimizer.param_groups:
+                param_group['lr'] *= args.lr_decay
+                lr *= args.lr_decay
 
     endtime = datetime.datetime.now()   
     a = (endtime - starttime).seconds
