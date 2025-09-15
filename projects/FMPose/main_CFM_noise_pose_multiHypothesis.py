@@ -177,30 +177,38 @@ if __name__ == '__main__':
      
     if args.create_file:
         # create backup folder
-        if args.debug:
+        if args.debug and args.train==False:
             args.checkpoint = './debug/' + folder_name
-        else:
+        if args.train:
             args.checkpoint = './checkpoint/' + folder_name
-    
+
+        if args.train==False:
+            # create a new folder for the test results
+            args.checkpoint = os.path.join(args.previous_dir, 'test_results_' + args.create_time)
+
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
 
         # backup files
         import shutil
-        file_name = os.path.basename(__file__)
-        shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
-        shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
-        # backup the selected model file dynamically based on args.model
-        model_src_path = os.path.join("model", f"{args.model}.py")
-        model_dst_name = f"{args.create_time}_{args.model}.py"
-        shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
-        shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        if args.debug:
-            shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
-        else:
-            shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
+        if args.train:
+            file_name = os.path.basename(__file__)
+            shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
+            shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
+            # backup the selected model file dynamically based on args.model
+            model_src_path = os.path.join("model", f"{args.model}.py")
+            model_dst_name = f"{args.create_time}_{args.model}.py"
+            shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
+            shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
+            if args.debug:
+                shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
+            else:
+                shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
 
-
+        else: 
+            shutil.copyfile(src="run_FM_multi_hypothesis.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_multi_hypothesis.sh"))
+            
+        
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
              
@@ -231,7 +239,6 @@ if __name__ == '__main__':
     model = {}
     model['CFM'] = CFM(args).cuda()
 
-    
     if args.reload:
         model_dict = model['CFM'].state_dict()
         # model_path = sorted(glob.glob(os.path.join(args.previous_dir, '*.pth')))[0]
@@ -243,6 +250,7 @@ if __name__ == '__main__':
             model_dict[name] = pre_dict[name]
         model['CFM'].load_state_dict(model_dict)
         print("Load model Successfully!")
+        
 
 
     all_param = []
@@ -252,7 +260,6 @@ if __name__ == '__main__':
     print(all_paramters)
     logging.info(all_paramters)
     optimizer = optim.Adam(all_param, lr=args.lr, amsgrad=True)
-    
     starttime = datetime.datetime.now()
     best_epoch = 0
     
