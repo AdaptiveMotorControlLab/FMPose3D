@@ -106,7 +106,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                     v_s = model_3d(x2d, y_local, t_s)
                     y_local = y_local + dt * v_s
                 return y_local
-
+            
             if getattr(args, 'eval_multi_steps', False):
                 # for each requested step count, run an independent sampling (no default output here)
                 for s_keep in eval_steps:
@@ -153,7 +153,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                 per_step_p2[s_keep] = float(p2_s)
                 if WANDB_AVAILABLE:
                     wandb.log({f'test_p1_s{s_keep}': float(p1_s), f'test_p2_s{s_keep}': float(p2_s)})
-                logging.info(f'eval_multi_steps: steps={s_keep}, p1={float(p1_s):.4f}, p2={float(p2_s):.4f}')
+                # logging.info(f'eval_multi_steps: steps={s_keep}, p1={float(p1_s):.4f}, p2={float(p2_s):.4f}')
         return per_step_p1, per_step_p2
 
 def get_parameter_number(net):
