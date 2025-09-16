@@ -3,6 +3,9 @@ import numpy as np
 import hashlib
 from torch.autograd import Variable
 import os
+import json
+import shutil
+import glob
 def deterministic_random(min_value, max_value, data):
     digest = hashlib.sha256(data.encode()).digest()
     raw_value = int.from_bytes(digest[:4], byteorder='little', signed=False)
@@ -196,6 +199,78 @@ def save_model(previous_name, save_dir, epoch, data_threshold, model, model_name
                '%s/%s_%d_%d.pth' % (save_dir, model_name, epoch, data_threshold * 100))
     previous_name = '%s/%s_%d_%d.pth' % (save_dir, model_name, epoch, data_threshold * 100)
     return previous_name
+
+
+def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, model_name, num_saved_models=3):
+    """
+    Save a checkpoint if it belongs to the top-N best (by lower data_threshold).
+    Maintains an index file '<model_name>_top_models.json' in save_dir.
+
+    Returns the path of the last saved checkpoint if a new one was saved,
+    otherwise returns previous_name unchanged.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    ckpt_path = os.path.join(save_dir, f"{model_name}_{epoch}_{int(data_threshold * 100)}.pth")
+    index_path = os.path.join(save_dir, f"{model_name}_top_models.json")
+
+    # load current list
+    top_list = []
+    if os.path.exists(index_path):
+        with open(index_path, 'r') as f:
+            top_list = json.load(f)
+
+    # decide if we should save
+    should_save = False
+    if len(top_list) < int(num_saved_models):
+        should_save = True
+    else:
+        worst_item = max(top_list, key=lambda x: x.get('p1', float('inf')))
+        if data_threshold < float(worst_item.get('p1', float('inf'))):
+            should_save = True
+
+    if not should_save:
+        return previous_name
+
+    # save new checkpoint
+    torch.save(model.state_dict(), ckpt_path)
+
+    # append and trim to N
+    top_list.append({
+        'p1': float(data_threshold),
+        'path': ckpt_path,
+        'epoch': int(epoch)
+    })
+    # sort ascending by p1 and keep best N
+    top_list.sort(key=lambda x: x.get('p1', float('inf')))
+    while len(top_list) > int(num_saved_models):
+        removed = top_list.pop()  # remove worst (last after sort ascending)
+        if os.path.exists(removed.get('path', '')):
+            os.remove(removed['path'])
+
+    # write back index
+    with open(index_path, 'w') as f:
+        json.dump(top_list, f, indent=2)
+
+    # update best marker to point to current best (lowest p1): append _best to the original name
+    if len(top_list) > 0:
+        best_src = top_list[0].get('path')
+        if best_src and os.path.exists(best_src):
+            root_name, ext = os.path.splitext(best_src)
+            best_path = f"{root_name}_best{ext}"
+            try:
+                # ensure only one best exists: remove all existing *_best for this model_name
+                pattern = os.path.join(save_dir, f"{model_name}_*_best.pth")
+                for old_best in glob.glob(pattern):
+                    try:
+                        os.remove(old_best)
+                    except Exception:
+                        pass
+                shutil.copy2(best_src, best_path)
+            except Exception:
+                pass
+
+    return ckpt_path
+
 
 def back_to_ori_uv(cropped_uv,bb_box):
     """
