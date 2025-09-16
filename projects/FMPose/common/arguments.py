@@ -40,6 +40,8 @@ class opts():
         self.parser.add_argument('--post_refine_reload', action='store_true')
         self.parser.add_argument('--checkpoint', type=str, default='')
         self.parser.add_argument('--previous_dir', type=str, default='./pre_trained_model/pretrained')
+        self.parser.add_argument('--saved_model_path', type=str, default='')
+        
         self.parser.add_argument('--n_joints', type=int, default=17)
         self.parser.add_argument('--out_joints', type=int, default=17)
         self.parser.add_argument('--out_all', type=int, default=1)
@@ -74,6 +76,10 @@ class opts():
         # evaluation: run multiple sample steps at test time
         self.parser.add_argument('--eval_multi_steps', action='store_true')
         self.parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9')
+        # allow multiple hypothesis counts, e.g. --num_hypothesis_list 1 3 5 7 9
+        self.parser.add_argument('--num_hypothesis_list', type=str, default='1')
+        # number of best checkpoints to keep
+        self.parser.add_argument('--num_saved_models', type=int, default=3)
         
     def parse(self):
         self.init()
