@@ -1,10 +1,16 @@
 #Train CFM
-layers=10
+layers=4
 lr=1e-3
-decay=0.98
-gpu_id=1
-model_name=model_CrossAttention
-folder_name=FM_CrossAttention_x0_T_pose_noise_layers${layers}_lr${lr}_decay${decay}_$(date +%Y%m%d_%H%M)
+decay=0.95
+gpu_id=0
+eval_multi_steps=3
+batch_size=256
+large_decay_epoch=5
+lr_decay_large=0.8
+epochs=100
+num_saved_models=5
+model_name=model_GAMLP
+folder_name=FM_GAMLP_noisePose_layers${layers}_1GCNParallelAttnMLP_attnD_0.1_projD_0.2_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M)
 
 # Read WANDB_API_KEY from file if not provided via env
 key_file="$(dirname "$0")/wandb_api_key.txt"
@@ -15,7 +21,11 @@ fi
 if [ -n "$WANDB_API_KEY" ]; then
   wandb login --relogin "$WANDB_API_KEY" >/dev/null 2>&1 || true
 fi
-python3 main_CFM_T_pose.py --train --model ${model_name} --gpu ${gpu_id} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch 100 --eval_multi_steps --eval_sample_steps 1,3,5,7,9 --folder_name $folder_name 
+
+# python3 main_CFM_noise_pose.py --train --model ${model_name} --gpu ${gpu_id} --batch_size ${batch_size} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch ${epochs} --eval_multi_steps --eval_sample_steps ${eval_multi_steps} --folder_name $folder_name --large_decay_epoch ${large_decay_epoch} --lr_decay_large ${lr_decay_large}
+python3 main_CFM_noise_pose.py --train --model ${model_name} --gpu ${gpu_id} --batch_size ${batch_size} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch ${epochs} --eval_multi_steps --eval_sample_steps ${eval_multi_steps} --folder_name $folder_name --large_decay_epoch ${large_decay_epoch} --lr_decay_large ${lr_decay_large} --num_saved_models ${num_saved_models}
+
 #Test CFM
 # python3 main_CFM.py --reload --previous_dir "./debug/250908_1418_45" --model model_GUMLP --sample_steps 3 --test_augmentation True --layers 5 --gpu 0
-# python3 main_CFM_test_vis.py --reload --previous_dir "./debug/250906_2235_46" --model model_GUMLP --sample_steps 19 --batch_size 1 --test_augmentation True --layers 4 --gpu 0
+# python3 main_CFM.py --reload --previous_dir "./checkpoint/FM_x0_noise_layers4_lr1e-3_decay0.98_sample3_20250911" --model ${model_name} --sample_steps 3 --test_augmentation True --batch_size ${batch_size} --layers ${layers} --gpu ${gpu_id}
+# python3 main_CFM_T_pose.py --reload --previous_dir "./checkpoint/FM_GMLP_Tpose_noise_layers5_lr1e-3_decay0.95_B1024_20250913_1555" --model ${model_name} --eval_multi_steps --eval_sample_steps ${eval_multi_steps} --batch_size ${batch_size} --test_augmentation True --layers ${layers} --gpu ${gpu_id}
