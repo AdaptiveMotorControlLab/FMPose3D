@@ -263,9 +263,11 @@ if __name__ == '__main__':
         
         if args.train:
             data_threshold = p1
-            if args.train and data_threshold < args.previous_best_threshold: 
-                args.previous_name = save_model(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM") 
+            saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
+            # update best tracker
+            if data_threshold < args.previous_best_threshold:
                 args.previous_best_threshold = data_threshold
+                args.previous_name = saved_path
                 best_epoch = epoch
                 
             if getattr(args, 'eval_multi_steps', False):
