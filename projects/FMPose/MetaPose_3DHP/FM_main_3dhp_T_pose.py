@@ -63,15 +63,12 @@ def test(actions, dataloader, model, model_refine):
 
     error_sum_2d_in, error_sum_joints = AccumLoss(), AccumLoss()
 
-    # cache for mean 3D pose (shape: F,J,3). Loaded or computed on first train batch
-    mean_3D_pose_tensor = None
-    mean_3D_pose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
-    # Initialize/load mean 3D pose once (train only)
-    npz = np.load(mean_3D_pose_path)
-    mean_arr = npz['mean_3D']  # expected shape: (1,1,J,3)
-    # Convert to tensor but delay device/dtype conversion until we have gt_3D
-    mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
-    mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
+    # Load T-pose template once (expected shape: (1,1,J,3))
+    tpose_tensor = None
+    tpose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
+    npz = np.load(tpose_path)
+    tpose_arr = npz['mean_3D']
+    tpose_tensor = torch.from_numpy(tpose_arr).float().cuda()
   
     # for multi-step eval, maintain per-step accumulators across the whole split
     eval_steps = None
@@ -99,34 +96,31 @@ def test(actions, dataloader, model, model_refine):
                 y_local = y_local + dt * v_s
             return y_local
 
-        if getattr(args, 'eval_multi_steps', False):
-            # for each requested step count, run an independent sampling (no default output here)
-            for s_keep in eval_steps:
-                y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                y = y.expand_as(gt_3D)
-                y[:, :, 0, :] = 0
-                y = y + torch.randn_like(y)
-                y_s = euler_sample(input_2D_nonflip, y, s_keep)
-                if args.test_augmentation:
-                    joints_left = [4, 5, 6, 11, 12, 13]
-                    joints_right = [1, 2, 3, 14, 15, 16]
-                    y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                    y_flip[:, :, :, 0] *= -1
-                    y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                    y_flip = y_flip.expand_as(gt_3D)
-                    y_flip[:, :, 0, :] = 0
-                    y_flip = y_flip + torch.randn_like(y_flip)
-                    y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
-                    y_flip_s = y_flip_s.clone()
-                    y_flip_s[:, :, :, 0] *= -1
-                    y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                    y_s = (y_s + y_flip_s) / 2
-                # per-step metrics only; do not store per-sample outputs
-                output_3D_s = y_s[:, args.pad].unsqueeze(1)
-                output_3D_s[:, :, 0, :] = 0
+        # for each requested step count, run an independent sampling (no default output here)
+        for s_keep in eval_steps:
+            # Initialize from T-pose (no added noise here)
+            y = tpose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            y = y.expand_as(gt_3D)
+            y_s = euler_sample(input_2D_nonflip, y, s_keep, model)
+            if args.test_augmentation:
+                joints_left = [4, 5, 6, 11, 12, 13]
+                joints_right = [1, 2, 3, 14, 15, 16]
+                # Flip-start from T-pose as well
+                y_flip = tpose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+                y_flip = y_flip.expand_as(gt_3D)
+                y_flip[:, :, :, 0] *= -1
+                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
+                y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model)
+                y_flip_s = y_flip_s.clone()
+                y_flip_s[:, :, :, 0] *= -1
+                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                y_s = (y_s + y_flip_s) / 2
+            # per-step metrics only; do not store per-sample outputs
+            output_3D_s = y_s[:, args.pad].unsqueeze(1)
+            output_3D_s[:, :, 0, :] = 0
 
-                # accumulate by action across the entire test set
-                action_error_sum_multi[s_keep] = test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
+            # accumulate by action across the entire test set
+            action_error_sum_multi[s_keep] = eval_cal.test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
 
         # if not args.single:
         #     output_3D = output_3D[:, args.pad].unsqueeze(1)
@@ -371,10 +365,12 @@ if __name__ == '__main__':
         ##--------------------------------epoch-------------------------------- ##
 
         # with torch.no_grad():
-        p1_per_step, p2_per_step, pck_per_step, auc_per_step = test(actions, test_dataloader, model, model_refine, dataset)
+        p1_per_step, p2_per_step, pck_per_step, auc_per_step = test(actions, test_dataloader, model, model_refine)
         best_step = min(p1_per_step, key=p1_per_step.get)
         p1 = p1_per_step[best_step]
         p2 = p2_per_step[best_step]
+        pck = pck_per_step[best_step]
+        auc = auc_per_step[best_step]
         
         ## print
         if args.train:
@@ -396,9 +392,11 @@ if __name__ == '__main__':
                     param_group['lr'] *= args.lr_decay 
         else:
             if args.dataset.startswith('3dhp'):
-                
                 steps_sorted = sorted(p1_per_step.keys())
-                step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-                print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-                logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
+                step_strs = [
+                    f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}, {s}_pck: {pck_per_step[s]:.4f}, {s}_auc: {auc_per_step[s]:.4f}"
+                    for s in steps_sorted
+                ]
+                print('e: %d, p1: %.4f, p2: %.4f, pck: %.4f, auc: %.4f | %s' % (epoch, p1, p2, pck, auc, ' | '.join(step_strs)))
+                logging.info('epoch: %d, p1: %.4f, p2: %.4f, pck: %.4f, auc: %.4f | %s' % (epoch, p1, p2, pck, auc, ' | '.join(step_strs)))
             
