@@ -238,8 +238,8 @@ class Block(nn.Module): # drop=0.1
         # GCN
         self.norm1 = norm_layer(length)
         self.gcn1 = GCN_V2(dim, dim, adj)
-        self.norm2 = norm_layer(length)
-        self.gcn2 = GCN_V2(dim, dim, adj)
+        # self.norm2 = norm_layer(length)
+        # self.gcn2 = GCN_V2(dim, dim, adj)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         # channel MLP
         self.norm_mlp = norm_layer(dim)
@@ -256,11 +256,13 @@ class Block(nn.Module): # drop=0.1
         x_gcn_1 = self.norm1(x_gcn_1) # b,c,j
         x_gcn_1 = rearrange(x_gcn_1,"b c j -> b j c").contiguous()
         x_gcn_1 = self.gcn1(x_gcn_1)  # b,j,c
-        x_gcn_2 = rearrange(x_gcn_1, "b j c -> b c j").contiguous() 
-        x_gcn_2 = self.norm2(x_gcn_2) # b,c,j
-        x_gcn_2 = rearrange(x_gcn_2, "b c j -> b j c").contiguous()
-        x_gcn_2 = self.gcn2(x_gcn_2)  # b,j,c
-        x = res1 + self.drop_path(x_gcn_2)
+
+        # x_gcn_2 = rearrange(x_gcn_1, "b j c -> b c j").contiguous() 
+        # x_gcn_2 = self.norm2(x_gcn_2) # b,c,j
+        # x_gcn_2 = rearrange(x_gcn_2, "b c j -> b j c").contiguous()
+        # x_gcn_2 = self.gcn2(x_gcn_2)  # b,j,c
+        
+        x = res1 + self.drop_path(x_gcn_1)
         
         # MLP residual
         res2 = x  # b,j,c
