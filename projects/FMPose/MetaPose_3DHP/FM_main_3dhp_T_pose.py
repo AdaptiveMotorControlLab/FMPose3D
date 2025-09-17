@@ -7,14 +7,10 @@ import matplotlib
 import numpy as np
 from tqdm import tqdm
 matplotlib.use('Agg')
-import torch.nn as nn
-import torch.utils.data
-from IPython import embed
 from common.utils import *
 import torch.optim as optim
 from common.camera import *
 from common.utils import *
-import matplotlib.pyplot as plt
 import common.eval_cal as eval_cal
 from common.arguments import parse_args
 from model.utils.post_refine import post_refine
@@ -86,6 +82,8 @@ def test(actions, dataloader, model, model_refine):
         input_2D_flip = input_2D[:, 1]
         out_target = gt_3D.clone()
         out_target[:, :, args.root_joint] = 0
+
+        # print("gt_3D.shape:", gt_3D.shape)
         
         # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
         def euler_sample(x2d, y_local, steps, model_3d):
@@ -101,15 +99,22 @@ def test(actions, dataloader, model, model_refine):
             # Initialize from T-pose (no added noise here)
             y = tpose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
             y = y.expand_as(gt_3D)
+            y[:, :, 0, :] = 0
+            y = y + torch.randn_like(y)
+            
             y_s = euler_sample(input_2D_nonflip, y, s_keep, model)
+            
             if args.test_augmentation:
                 joints_left = [4, 5, 6, 11, 12, 13]
                 joints_right = [1, 2, 3, 14, 15, 16]
                 # Flip-start from T-pose as well
                 y_flip = tpose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-                y_flip = y_flip.expand_as(gt_3D)
                 y_flip[:, :, :, 0] *= -1
                 y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
+                y_flip = y_flip.expand_as(gt_3D)
+                y_flip[:, :, 0, :] = 0
+                y_flip = y_flip + torch.randn_like(y_flip)
+
                 y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model)
                 y_flip_s = y_flip_s.clone()
                 y_flip_s[:, :, :, 0] *= -1
@@ -310,11 +315,11 @@ if __name__ == '__main__':
     model_refine = post_refine(args).cuda()
 
     ## Reload model
-    if args.previous_dir != '':
+    if args.saved_model_path != '':
         # model_paths = sorted(glob.glob(os.path.join(args.previous_dir, '*.pth')))
         # model_path = model_paths[0]
         # model_path = "checkpoint/231030_0033_11/Model_Gaussian_mu_p1_22_4952.pth"
-        model_path = args.previous_dir
+        model_path = args.saved_model_path
 
         print(model_path)
 
