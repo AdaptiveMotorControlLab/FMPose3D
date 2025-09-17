@@ -184,6 +184,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
 
 
 
+@torch.no_grad()
 def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoch=None, hypothesis_num=None):
     
     model_3d = model['CFM']
@@ -287,6 +288,7 @@ def print_error_action(action_error_sum, is_train):
 
         if is_train == 0:
             print("{0:>6.2f} {1:>10.2f}".format(mean_error_each['p1'], mean_error_each['p2']))
+            logging.info("{0:>6.2f} {1:>10.2f}".format(mean_error_each['p1'], mean_error_each['p2']))
 
     if is_train == 0:
         print("{0:<12} {1:>6.4f} {2:>10.4f}".format("Average", mean_error_all['p1'].avg, \
@@ -334,6 +336,7 @@ if __name__ == '__main__':
 
         if args.train==False:
             # create a new folder for the test results
+            args.previous_dir = os.path.dirname(args.saved_model_path)
             args.checkpoint = os.path.join(args.previous_dir, 'test_results_' + args.create_time)
 
         if not os.path.exists(args.checkpoint):
@@ -425,7 +428,8 @@ if __name__ == '__main__':
         for hypothesis_num in hypothesis_list:
             print(f"Testing with {hypothesis_num} hypotheses")
             logging.info(f"Testing with {hypothesis_num} hypotheses")
-            p1_per_step, p2_per_step = test_multi_hypothesis(args, actions, test_dataloader, model, hypothesis_num=hypothesis_num)
+            with torch.no_grad():
+                p1_per_step, p2_per_step = test_multi_hypothesis(args, actions, test_dataloader, model, hypothesis_num=hypothesis_num)
         
             best_step = min(p1_per_step, key=p1_per_step.get)
             p1 = p1_per_step[best_step]
@@ -448,6 +452,8 @@ if __name__ == '__main__':
                 print('hyp: %d, p1: %.4f, p2: %.4f | %s' % (hypothesis_num, p1, p2, ' | '.join(step_strs)))
                 logging.info('hyp: %d, p1: %.4f, p2: %.4f | %s' % (hypothesis_num, p1, p2, ' | '.join(step_strs)))
             
+        break
+    
         if epoch % args.large_decay_epoch == 0: 
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= args.lr_decay_large
