@@ -13,8 +13,6 @@ from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
 # from common.arguments import parse_args
 from common.utils import *
-# from common.graph_utils import adj_mx_from_skeleton
-# from model.model_GIA import Model
 
 from common.arguments import opts as parse_args
 args = parse_args().parse()
@@ -214,7 +212,7 @@ def show3Dpose(channels, ax, color, world = True): # blue, orange
   # ax.w_xaxis.line.set_color(white) #不限制边缘线
   # ax.w_yaxis.line.set_color(white)
   # ax.w_zaxis.line.set_color(white)
-  
+
   ax.tick_params('x', labelbottom = False) # 不显示坐标轴文本
   ax.tick_params('y', labelleft = False)
   ax.tick_params('z', labelleft = False)
@@ -223,7 +221,7 @@ def show3Dpose(channels, ax, color, world = True): # blue, orange
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
     ax.invert_zaxis()
 
-def show2Dpose(channels, ax): # blue, orange
+def show2Dpose(channels, ax, color): # blue, orange
   vals = np.reshape( channels, (17, 2) )
   # vals = np.reshape( channels, (16, 2))
   # human3.6m
@@ -239,8 +237,8 @@ def show2Dpose(channels, ax): # blue, orange
     # ax.text(x[0] - 0.12, y[0], joints_name[I[i]], size = 9)
     # ax.text(x[1] - 0.12 , y[1], joints_name[J[i]], size = 9)
 
-    ax.plot(x, y, lw=1) # lw=2
-    ax.scatter(x, y,s=5) # s 默认是20
+    ax.plot(x, y, lw=4, color=color) # lw=2
+    ax.scatter(x, y, s=5, color=color) # s 默认是20
     ax.set_aspect('equal') # 正常的人体比例
 
   # ax.invert_xaxis()
@@ -251,19 +249,77 @@ def show2Dpose(channels, ax): # blue, orange
   white = (1.0, 1.0, 1.0, 0.0)
   plt.axis('off')
 
+
+def show3Dpose_no_bg(channels, ax, color, world = True): # blue, orange
+  vals = np.reshape( channels, (17, 3) )
+
+  I = np.array( [0, 0, 1, 4, 2, 5, 0, 7,  8,  8, 14, 15, 11, 12, 8,  9]) # start points
+  J = np.array( [1, 4, 2, 5, 3, 6, 7, 8, 14, 11, 15, 16, 12, 13, 9, 10]) # end points
+  LR =          [2, 1, 2, 1, 2, 1, 1, 1,  2,  1,  2,  2,  1,  1, 2,  2]
+
+  # LR = [3, 3, 3, 3, 3, 3, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1]
+
+  for i in np.arange( len(I) ):
+    if world:
+      x, y, z = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
+    else:
+      x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
+      x2, z2, y2 = [np.array( [vals[I[i], j]+np.random.random_sample()*0.01, vals[J[i], j]+np.random.random_sample()*0.01] ) for j in range(3)]
+
+    ax.plot(x, y, z, lw=2.5, color = color)
+
+  RADIUS = 0.55 
+  xroot, yroot, zroot = vals[0,0], vals[0,1], vals[0,2]
+  ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
+  ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
+  ax.set_ylim3d([-RADIUS+zroot, RADIUS+zroot])
+  # ax.set_zlim3d([0, 1.7])
+  # ax.set_aspect('equal')
+  # ax.set_aspect('auto')
+  ax.set_box_aspect([1,1,1])
+
+  # ax.set_xticks([]) # 不显示坐标 和 线
+  # ax.set_yticks([]) 
+  # ax.set_zticks([]) 
+
+  white = (1.0, 1.0, 1.0, 0.0)
+  ax.xaxis.set_pane_color(white) #不显示背景
+  ax.yaxis.set_pane_color(white)
+  ax.zaxis.set_pane_color(white)
+
+  # ax.w_xaxis.line.set_color(white) #不限制边缘线
+  # ax.w_yaxis.line.set_color(white)
+  # ax.w_zaxis.line.set_color(white)
+
+  ax.tick_params('x', labelbottom = False) # 不显示坐标轴文本
+  ax.tick_params('y', labelleft = False)
+  ax.tick_params('z', labelleft = False)
+
+  if not world: 
+    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
+    ax.invert_zaxis()
+  
+  # Fully disable background for 3D pose
+  ax.set_axis_off()
+  ax.set_facecolor('none')
+    
 def save3Dpose(index, pose3D, out_target, ax, color, save_path, action, dpi_number):
 
     pose3D[:, :, 0] = 0
-    p1 = mpjpe_cal(pose3D, out_target) * 1000
+    # p1 = mpjpe_cal(pose3D, out_target) * 1000
     pose3D = pose3D[0, 0].cpu().detach().numpy()
     plt.sca(ax)
-    show3Dpose(pose3D, ax, color= color, world= False)
+    show3Dpose_no_bg(pose3D, ax, color= color, world= False)
     # Remove the background
     # ax.set_axis_off()
     # Set the background to transparent
     # ax.patch.set_alpha(0)
-    plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '_error_'+ str('%.2f' % p1.item()) + '.png', dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=False)
-    return p1
+    # plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '.png', dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=True)
+    ax.set_axis_off()
+    ax.set_facecolor('none')
+    ax.get_figure().patch.set_alpha(0.0)
+    plt.savefig(save_path, dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=True)
+    return 0
   
 def save3Dpose_svg(index, pose3D, out_target, ax, color, save_path, action, iter_num, iter_opt, dpi_number):
 
@@ -278,80 +334,6 @@ def save3Dpose_svg(index, pose3D, out_target, ax, color, save_path, action, iter
     # ax.patch.set_alpha(0)
     plt.savefig(save_path + '/' + action + '_idx'+ str(index)+ '_iter_'+str(iter_num) + '_error_'+ str('%.4f' % p1.item()) + '.svg', dpi=300, format='svg', bbox_inches = 'tight')
     return p1
-  
-def show3Dpose_colored(channels, ax, joint_values, world = True, cmap_name = 'viridis'):
-  import matplotlib.cm as cm
-  import matplotlib.colors as mcolors
-  vals = np.reshape(channels, (17, 3))
-  I = np.array([0, 0, 1, 4, 2, 5, 0, 7,  8,  8, 14, 15, 11, 12, 8,  9])
-  J = np.array([1, 4, 2, 5, 3, 6, 7, 8, 14, 11, 15, 16, 12, 13, 9, 10])
-  LR =          [2, 1, 2, 1, 2, 1, 1, 1,  2,  1,  2,  2,  1,  1, 2,  2]
-  cmap = cm.get_cmap(cmap_name)
-  max_v = float(np.max(joint_values)) if np.max(joint_values) > 0 else 1.0
-  norm = mcolors.Normalize(vmin=0.0, vmax=max_v)
-  for i in np.arange(len(I)):
-    if world:
-      x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-    else:
-      x, z, y = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-    limb_value = 0.5 * (joint_values[I[i]] + joint_values[J[i]])
-    color = cmap(norm(limb_value))
-    ax.plot(x, y, z, lw=2.5, color=color)
-  RADIUS = 0.55
-  xroot, yroot, zroot = vals[0,0], vals[0,1], vals[0,2]
-  ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
-  ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
-  ax.set_ylim3d([-RADIUS+zroot, RADIUS+zroot])
-  ax.set_box_aspect([1,1,1])
-  white = (1.0, 1.0, 1.0, 0.0)
-  ax.xaxis.set_pane_color(white)
-  ax.yaxis.set_pane_color(white)
-  ax.zaxis.set_pane_color(white)
-  ax.tick_params('x', labelbottom=False)
-  ax.tick_params('y', labelleft=False)
-  ax.tick_params('z', labelleft=False)
-  if not world:
-    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
-    ax.invert_zaxis()
-
-def save3Dspeed(index, pose3D_ref, velocity_step, ax, save_path, action, step_idx, dpi_number):
-  pose3D = pose3D_ref.clone()
-  pose3D[:, :, 0] = 0
-  pose_center = pose3D[0, args.pad].cpu().detach().numpy()
-  v_center = velocity_step[0, args.pad].cpu().detach().numpy()  # J,3
-  speed = np.linalg.norm(v_center, axis=-1)  # J
-  plt.sca(ax)
-  ax.cla()
-  show3Dpose_colored(pose_center, ax, speed, world=False, cmap_name='turbo')
-  import matplotlib.cm as cm
-  import matplotlib.colors as mcolors
-  cmap = cm.get_cmap('turbo')
-  max_v = float(np.max(speed)) if np.max(speed) > 0 else 1.0
-  norm = mcolors.Normalize(vmin=0.0, vmax=max_v)
-  mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
-  mappable.set_array([])
-  cb = plt.colorbar(mappable, ax=ax, fraction=0.046, pad=0.04)
-  cb.set_label('per-joint speed (L2)')
-  plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '_speed_step_'+ str(step_idx) + '.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-  return max_v
-
-def save_velocity_heatmap(list_v_s, save_path, action, index, dpi_number):
-  speeds = []
-  for v in list_v_s:
-    v_center = v[:, args.pad]  # B,J,3
-    speed_bj = torch.norm(v_center, dim=-1)  # B,J
-    speed_j = torch.mean(speed_bj, dim=0).cpu().detach().numpy()  # J
-    speeds.append(speed_j)
-  speeds = np.stack(speeds, axis=0)  # S,J
-  plt.figure(figsize=(8, 4))
-  plt.imshow(speeds, aspect='auto', cmap='viridis', origin='lower')
-  plt.xlabel('joint index')
-  plt.ylabel('integration step')
-  plt.colorbar(label='avg speed per joint (L2)')
-  plt.tight_layout()
-  plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '_velocity_heatmap.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-  plt.close()
-  return True
   
 import imageio  
 def create_gif(name, folder_path, duration=0.25):
@@ -417,10 +399,14 @@ def show_frame():
     shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
     shutil.copyfile(src="run_FM_vis.sh", dst = os.path.join(folder, args.create_time + "_run_FM_vis.sh"))
 
-
+  figsize_x = 6.4*2
+  figsize_y = 3.6*2
+  dpi_number = 1000
+  
   eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
-  print("eval_steps:",eval_steps)
-        
+  
+
+  
   for i_data, data in enumerate(tqdm(dataloader, 0)):
     batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
     
@@ -442,7 +428,9 @@ def show_frame():
     # else:
     #   continue
     # error = eval_cal.mpjpe(input_2D[:, 0], input_2D_GT[:, 0]) / 2 * 1000
-        
+    if i_data < 11:
+      continue
+    
     [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
     input_2D_GT = input_2D_GT[:, 0, args.pad].unsqueeze(1) # 1,1,17,2
     input_2D_no = input_2D_no[:, 0, args.pad].unsqueeze(1)
@@ -464,8 +452,6 @@ def show_frame():
         return y_local, list_v_s
         # return y_local
     
-    cached_list_v_s = None
-    cached_pose_ref = None
     for s_keep in eval_steps:
         list_hypothesis = []
         for i in range(args.hypothesis_num):
@@ -473,11 +459,22 @@ def show_frame():
             y = torch.randn_like(gt_3D)
             
             y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            print("len(list_v_s); s_keep:",len(list_v_s), s_keep)
-            if cached_list_v_s is None:
-                cached_list_v_s = list_v_s
-                cached_pose_ref = y_s.clone()
-
+            
+            color=(0/255, 176/255, 240/255)
+          
+            # figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+            # ax1 = plt.axes(projection = '3d')
+            # img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_noisy_input'+ '.png'
+            # _ = save3Dpose(i_data, y, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
+            # plt.close(figx)
+            
+            figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+            ax1 = plt.axes(projection = '3d')
+            img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_final_input'+ '.png'
+            _ = save3Dpose(i_data, y_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
+            plt.close(figx)
+                  
+                
             if args.test_augmentation:
                 joints_left = [4, 5, 6, 11, 12, 13]
                 joints_right = [1, 2, 3, 14, 15, 16]
@@ -537,6 +534,16 @@ def show_frame():
     image = drawskeleton(input_2D_no, image)
     cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
 
+    # save 2D pose with transparent background
+    fig_2d, ax_2d = plt.subplots(figsize=(figsize_x, figsize_y))
+    color = (0/255, 176/255, 240/255)
+    show2Dpose(input_2D_no, ax_2d, color)
+    ax_2d.set_axis_off()
+    fig_2d.patch.set_alpha(0.0)
+    ax_2d.set_facecolor('none')
+    plt.savefig(out_dir + str(i_data) + '_2d_transparent.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=True)
+    plt.close(fig_2d)
+
 
     # figure
     fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
@@ -544,15 +551,6 @@ def show_frame():
     
     # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
     
-    # visualize per-step speed and heatmap
-    if cached_list_v_s is not None:
-      path_vis_v_s = path + '/' + "vis_v_s"
-      if not os.path.exists(path_vis_v_s):
-        os.makedirs(path_vis_v_s)
-      print(len(cached_list_v_s))
-      for step_idx, v_step in enumerate(cached_list_v_s):
-        _ = save3Dspeed(i_data, cached_pose_ref, v_step, ax1, path_vis_v_s, action[0], step_idx, dpi_number)
-      _ = save_velocity_heatmap(cached_list_v_s, path_vis_v_s, action[0], i_data, dpi_number)
 
     # # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(i_data)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_P, duration=0.3)
     # # create_gif(path_mix_z + '/' + action[0] +"_idx" + str(i)+ "_iter" + str(iter_num) + '.gif', folder_path=path_mix_z, duration=0.25)
@@ -560,6 +558,7 @@ def show_frame():
         
     plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
     plt.close () #完全关闭图形窗口
+    break
  
 if __name__ == "__main__":
   # Delete_Files('results/')
