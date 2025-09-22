@@ -212,12 +212,12 @@ class CameraPredictor(nn.Module):
         }
 
 
-class Pose3DPredictor(nn.Module):
+class Pose3D(nn.Module):
     """
     Predicts 3D pose in camera coordinate system from combined image and 2D pose features
     """
     def __init__(self, visual_dim=2048, pose_2d_dim=512, num_keypoints=37, hidden_dim=1024):
-        super(Pose3DPredictor, self).__init__()
+        super(Pose3D, self).__init__()
         
         self.num_keypoints = num_keypoints
         input_dim = visual_dim + pose_2d_dim  # Use both visual and 2D pose features for camera space
@@ -272,7 +272,7 @@ class Pose3DEstimator(nn.Module):
             visual_dim=self.visual_encoder.feature_dim
         )
         self.camera_predictor = CameraPredictor(input_dim=self.visual_encoder.feature_dim)
-        self.pose_3d_predictor = Pose3DPredictor(
+        self.pose_3d_predictor = Pose3D(
             visual_dim=self.visual_encoder.feature_dim,
             pose_2d_dim=512,
             num_keypoints=num_keypoints
