@@ -19,7 +19,7 @@ exec('from model.' + args.model + ' import Model as CFM')
 
 # wandb logging (assumed available)
 import wandb
-WANDB_AVAILABLE = True
+WANDB_AVAILABLE = False
 
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)
@@ -98,6 +98,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                 joints_right = [1, 2, 3, 14, 15, 16]
 
                 y_flip_noise = torch.randn_like(gt_3D)
+                # y_flip_noise[:, :, :, 0] *= -1
+                # y_flip_noise[:, :, joints_left + joints_right, :] = y_flip_noise[:, :, joints_right + joints_left, :] 
                 y_flip = y_flip_noise
                 
                 for s in range(steps):
@@ -163,8 +165,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
             
             output_3D = output_3D[:, args.pad].unsqueeze(1) 
             output_3D[:, :, 0, :] = 0
-            test_p1 = mpjpe_cal(output_3D, out_target)
-            wandb.log({'test_p1': test_p1})
+            # test_p1 = mpjpe_cal(output_3D, out_target)
+            # wandb.log({'test_p1': test_p1})
             action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset, subject)
 
     if split == 'train':
