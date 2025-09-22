@@ -80,10 +80,14 @@ if __name__ == "__main__":
     
     val_json_path = "/home/ti_wang/Ti_workspace/sapiens/COCO_data/annotations_indent/person_keypoints_val2017.json" 
     train_json_path = "/home/ti_wang/Ti_workspace/sapiens/COCO_data/annotations_indent/person_keypoints_train2017.json"
-    print("val: ", cal_number_of_valid_annotations(val_json_path)) # 6352
-    print("val images: ", get_the_number_of_valid_images(val_json_path)) # 2346
-    print("train: ", cal_number_of_valid_annotations(train_json_path)) # 149813
-    print("train images: ", get_the_number_of_valid_images(train_json_path)) # 56599
+    print("val annotations (pose): ", cal_number_of_valid_annotations(val_json_path)) # 6352
+    print("val images (pose): ", get_the_number_of_valid_images(val_json_path)) # 2346
+    print("val annotations: ", cal_number_of_annotations(val_json_path)) # 11004
+    print("val images: ", cal_number_of_images(val_json_path)) # 5000
+    print("train annotations (pose): ", cal_number_of_valid_annotations(train_json_path)) # 149813
+    print("train images (pose): ", get_the_number_of_valid_images(train_json_path)) # 56599
+    print("train annotations: ", cal_number_of_annotations(train_json_path)) # 262465
+    print("train images: ", cal_number_of_images(train_json_path)) # 118287
     
     # train_json_path = "/home/ti_wang/Ti_workspace/sapiens/COCO_data/annotations_indent/person_keypoints_train2017.json"
     # print("train: ", cal_number_of_annotations(train_json_path)) # 262465

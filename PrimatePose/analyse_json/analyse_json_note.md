@@ -186,11 +186,12 @@ for the categories, please use the "categories" in /home/ti_wang/Ti_workspace/Pr
 save the converted json file to this folder: /home/ti_wang/Ti_workspace/PrimatePose/data/tiwang/primate_data/PFM_V8.2/samples
 
 
-# Knowledge about primate dataset
+# Knowledge about primate dataset 
 
 ## check_vis_labels_per_dataset
 
 only oap omc and lote contain keypoints with vis_label=1;
+
 ```bash
 Checking oap_train.json
 Visibility Label Counts:

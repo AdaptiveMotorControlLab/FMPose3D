@@ -15,6 +15,8 @@ import shutil
 import importlib.util
 
 wandb = None
+USE_WANDB = False
+GLOBAL_STEP = 0
 
 # Import our modules
 from dataset import PrimateDataset, create_data_loaders
@@ -115,6 +117,7 @@ def validate_model(model, val_loader, criterion, device, epoch):
 
 def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
     """Train for one epoch"""
+    global GLOBAL_STEP
     model.train()
     total_loss = 0.0
     total_samples = 0
@@ -170,21 +173,15 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
         pbar.set_postfix({'Loss': f'{avg_loss:.4f}'})
         
         # Log to Weights & Biases (every N batches)
-        if batch_idx % 1 == 0:
-            global_step = epoch * len(train_loader) + batch_idx
-            wandb.log({'train/batch_loss': loss.item(), 'epoch': epoch, 'global_step': global_step}, step=global_step)
+        # if USE_WANDB and (batch_idx % 1 == 0):
+        #     GLOBAL_STEP += 1
+        #     wandb.log({'train/batch/loss': loss.item()}, step=GLOBAL_STEP)
     
     # Average losses
+    print(f"Total samples: {total_samples}")
     avg_loss = total_loss / total_samples
     for key in loss_components:
         loss_components[key] /= total_samples
-    
-    # Log epoch metrics to Weights & Biases
-    log_dict = {'train/loss': avg_loss, 'epoch': epoch}
-    for key, value in loss_components.items():
-        if key != 'total':
-            log_dict[f'train/{key}'] = value
-    wandb.log(log_dict, step=epoch)
     
     return avg_loss, loss_components
 
@@ -252,7 +249,7 @@ def create_experiment_dir(train_json_path, dataset_name=None, base_dir="experime
 
 
 def main():
-    global wandb
+    global wandb, USE_WANDB
     parser = argparse.ArgumentParser(description='Train 3D Pose Estimation Model')
     
     # Data arguments
@@ -434,21 +431,32 @@ def main():
         
     # Optional: initialize Weights & Biases
     if args.wandb:
-        if importlib.util.find_spec("wandb") is not None:
-            import wandb as _wandb
-            wandb = _wandb
-            run_name = args.wandb_run_name or os.path.basename(args.output_dir)
-            wandb.init(
-                project=args.wandb_project_name,
-                name=run_name,
-                config=vars(args),
-                dir=args.output_dir,
-                group=args.wandb_group
-            )
-            logger.info('Weights & Biases logging enabled')
-        else:
-            logger.warning("Weights & Biases not installed. Proceeding without W&B logging.")
-            wandb = None
+        spec = importlib.util.find_spec("wandb")
+        if spec is None:
+            logger.error("--wandb specified but the 'wandb' package is not installed. Please install with: pip install wandb")
+            sys.exit(1)
+        import wandb as _wandb
+        global wandb, USE_WANDB
+        wandb = _wandb
+        run_name = args.wandb_run_name or os.path.basename(args.output_dir)
+        wandb.init(
+            project=args.wandb_project_name,
+            name=run_name,
+            config=vars(args),
+            dir=args.output_dir,
+            group=args.wandb_group,
+            resume='never'
+        )
+        USE_WANDB = True
+        logger.info('Weights & Biases logging enabled')
+        # Define metric step mapping
+        # wandb.define_metric('global_step')
+        # wandb.define_metric('train/batch/*', step_metric='global_step')
+        # wandb.define_metric('train/*', step_metric='epoch')
+        # wandb.define_metric('val/*', step_metric='epoch')
+        # # Metric summaries
+        # wandb.define_metric('train/loss', summary='last')
+        # wandb.define_metric('val/loss', summary='min')
     
     # Resume from checkpoint if provided
     start_epoch = 0
@@ -472,14 +480,13 @@ def main():
         # Update learning rate
         scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
-        # Removed writer.add_scalar('Learning_Rate', current_lr, epoch)
-        if wandb is not None and getattr(wandb, 'run', None) is not None:
-            wandb.log({'train/lr': current_lr, 'epoch': epoch}, step=epoch)
+        if USE_WANDB:
+            wandb.log({'train/lr': current_lr}, step=epoch)
         
         logger.info(f"Epoch {epoch}: Train Loss = {train_loss:.4f}, LR = {current_lr:.6f}")
         # Log epoch-average training loss explicitly
-        if wandb is not None and getattr(wandb, 'run', None) is not None:
-            wandb.log({'train/epoch_avg_loss': train_loss, 'epoch': epoch}, step=epoch)
+        if USE_WANDB:
+            wandb.log({'train/epoch_avg_loss': train_loss}, step=epoch)
         
         # Validation
         if epoch % args.val_freq == 0:
@@ -488,15 +495,8 @@ def main():
             )
             
             logger.info(f"Epoch {epoch}: Val Loss = {val_loss:.4f}")
-            wandb.log({'val/epoch_avg_loss': val_loss, 'epoch': epoch}, step=epoch)
-                
-            # Log to Weights & Biases
-            if wandb is not None and getattr(wandb, 'run', None) is not None:
-                log_dict = {'val/loss': val_loss, 'epoch': epoch}
-                for key, value in val_components.items():
-                    if key != 'total':
-                        log_dict[f'val/{key}'] = value
-                wandb.log(log_dict, step=epoch)
+            wandb.log({'val/avg_loss': val_loss}, step=epoch)
+
             
             # Save best model
             if val_loss < best_val_loss:
@@ -504,6 +504,8 @@ def main():
                 best_model_path = os.path.join(args.output_dir, 'best_model.pth')
                 save_checkpoint(model, optimizer, scheduler, epoch, best_val_loss, best_model_path)
                 logger.info(f"New best model saved with validation loss: {best_val_loss:.4f}")
+                # if USE_WANDB:
+                    # wandb.run.summary['best_val_loss'] = best_val_loss
         
         # Save checkpoint
         if epoch % args.save_freq == 0:
@@ -519,7 +521,7 @@ def main():
     # Close tensorboard writer
     # Removed writer.close()
     # Close Weights & Biases run if enabled
-    if wandb is not None and getattr(wandb, 'run', None) is not None:
+    if USE_WANDB:
         wandb.finish()
     logger.info("Training completed!")
 

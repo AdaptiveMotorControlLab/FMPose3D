@@ -5,7 +5,9 @@
 
 # CHECKPOINT_PATH="./experiments/oms_20250724_1622/best_model.pth"
 # CHECKPOINT_PATH="./experiments/oms_20250726_1756/best_model.pth"
-CHECKPOINT_PATH="./experiments/oms_20250808_1732/best_model.pth"
+# CHECKPOINT_PATH="./experiments/oms_20250808_1904/best_model.pth"
+# CHECKPOINT_PATH="./experiments/oms_20250820_1125/checkpoint_epoch_24.pth"
+CHECKPOINT_PATH="./experiments/oms_20250820_1747/checkpoint_epoch_50.pth"
 
 # Default paths (modify these according to your setup)
 DEFAULT_TEST_JSON="/home/ti_wang/Ti_workspace/PrimatePose/Pose3D/data/oms_test_small.json"
@@ -29,16 +31,16 @@ echo "Test JSON: $DEFAULT_TEST_JSON"
 echo ""
 
 # Run the test script
-python test.py \
+CUDA_VISIBLE_DEVICES=1 python test.py \
     --checkpoint "$CHECKPOINT_PATH" \
     --test_json "$DEFAULT_TEST_JSON" \
     --image_root "$DEFAULT_IMAGE_ROOT" \
-    --backbone resnet50 \
+    --backbone vit_s16_dino \
     --num_keypoints 37 \
     --image_size 256 256 \
     --batch_size 16 \
     --num_workers 4 \
-    --num_vis_samples 10
+    --num_vis_samples 30
 
 echo ""
 echo "Test completed! Check the generated test_results directory for outputs."

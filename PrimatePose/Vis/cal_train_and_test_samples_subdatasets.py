@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
 import numpy as np
+import colorsys
 
 def gcd(a, b):
     """Calculate greatest common divisor"""
@@ -422,7 +423,7 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
     
     # Set up the plot with publication-quality settings
     plt.rcParams.update({
-        'font.size': 12,
+        'font.size': 13,
         'font.family': 'serif',
         'font.serif': ['DejaVu Serif', 'Liberation Serif', 'Times', 'serif'],
         'axes.linewidth': 1.2,
@@ -435,14 +436,57 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
     # Create figure with appropriate size for publication
     fig, ax = plt.subplots(figsize=(12, 10))
     
-    # Generate a beautiful color palette
-    colors = plt.cm.Set3(np.linspace(0, 1, len(labels)))
-    
-    # Alternative: Use a custom color palette for better aesthetics
-    if len(labels) <= 12:
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', 
-                  '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43',
-                  '#10AC84', '#EE5A24'][:len(labels)]
+    # Utility: slightly increase saturation/lightness to make tones more vivid while keeping Morandi character
+    def adjust_hex_saturation_lightness(hex_color, sat_scale=1.15, light_scale=1.05):
+        hex_color = hex_color.lstrip('#')
+        r = int(hex_color[0:2], 16) / 255.0
+        g = int(hex_color[2:4], 16) / 255.0
+        b = int(hex_color[4:6], 16) / 255.0
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        s = max(0.0, min(1.0, s * sat_scale))
+        l = max(0.0, min(1.0, l * light_scale))
+        rr, gg, bb = colorsys.hls_to_rgb(h, l, s)
+        return '#%02x%02x%02x' % (int(rr * 255), int(gg * 255), int(bb * 255))
+
+    # Generate evenly spaced hues (HUSL) to avoid similar colors anywhere, then apply Morandi-style adjustment
+    num_labels = len(labels)
+    base_palette = sns.color_palette("husl", n_colors=num_labels)
+    # Convert to hex for adjustment
+    base_hex = ['#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255)) for (r, g, b) in base_palette]
+
+    # Make palette vivid yet Morandi-inspired (soft but bright)
+    vivid_palette = [adjust_hex_saturation_lightness(c, sat_scale=1.25, light_scale=1.10) for c in base_hex]
+
+    # Interleave indices to increase contrast between neighbors for arbitrary label orders
+    left_index = 0
+    right_index = num_labels - 1
+    interleaved_indices = []
+    while left_index <= right_index:
+        interleaved_indices.append(left_index)
+        if left_index != right_index:
+            interleaved_indices.append(right_index)
+        left_index += 1
+        right_index -= 1
+    interleaved_colors = [vivid_palette[i] for i in interleaved_indices]
+
+    # Map colors to labels in their current order using the interleaved palette
+    colors_by_label = {}
+    for position, dataset_label in enumerate(labels):
+        colors_by_label[dataset_label] = interleaved_colors[position % num_labels]
+
+    # Gentle but distinct overrides for key datasets (also slightly more vivid)
+    explicit_overrides = {
+        'oap': adjust_hex_saturation_lightness('#C48E85', sat_scale=1.35, light_scale=1.12),  # brighter terracotta (red)
+        'omc': adjust_hex_saturation_lightness('#8BA6B7', sat_scale=1.35, light_scale=1.12),  # brighter steel blue (blue)
+        'ak':  adjust_hex_saturation_lightness('#9BBE8C', sat_scale=1.30, light_scale=1.12),  # soft vivid sage (green)
+        'oms': adjust_hex_saturation_lightness('#B7A1C5', sat_scale=1.30, light_scale=1.12),  # soft vivid lavender (purple)
+        'ap10k': adjust_hex_saturation_lightness('#E7C26A', sat_scale=1.30, light_scale=1.12), # soft vivid mustard (yellow)
+    }
+    for key, hex_color in explicit_overrides.items():
+        if key in colors_by_label:
+            colors_by_label[key] = hex_color
+
+    colors = [colors_by_label[dataset_label] for dataset_label in labels]
     
     # Create the pie chart using adjusted sizes for display (NO LABELS OR PERCENTAGES)
     wedges, texts, autotexts = ax.pie(adjusted_sizes, labels=None, autopct='',
@@ -460,7 +504,7 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
         elif real_pct < 1.0:
             pct_str = f"{real_pct:.2f}%"
         else:
-            pct_str = f"{real_pct:.1f}%"
+            pct_str = f"{real_pct:.2f}%"
         
         if label == 'ak':
             label = 'AnimalKingdom'
@@ -473,7 +517,7 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
         elif label == 'deepwild':
             label = 'DeepWild'
         elif label == 'mit':
-            label = 'MIT'
+            label = 'MIT-Marmoset'
         elif label == 'mp':
             label = 'MacaquePose'
         elif label == 'ap10k':
@@ -489,17 +533,17 @@ def create_pie_chart(labels, sizes, percentages, total_images, custom_order=None
         legend_labels.append(f'{label}: {size:,} ({pct_str})')
     
     # Add legend outside the pie chart (closer to the pie)
-    ax.legend(wedges, legend_labels, 
-            #  title="Dataset Distribution", 
-             loc="center left", 
-             bbox_to_anchor=(0.95, 0, 0.5, 1),  # Moved closer: 1 -> 0.85
-             fontsize=12,          # Increase label font size: 10 -> 12
-             title_fontsize=14,    # Increase title font size: 12 -> 14
-             frameon=True,
-             fancybox=True,
-             shadow=True,
-             labelspacing=1.8,     # Increase vertical spacing between label rows
-             handletextpad=0.8)    # Increase spacing between color blocks and text
+    # ax.legend(wedges, legend_labels, 
+    #         #  title="Dataset Distribution", 
+    #          loc="center", 
+    #          bbox_to_anchor=(0.95, 0, 0.5, 1),  # Moved closer: 1 -> 0.85
+    #          fontsize=13,          # Increase label font size: 10 -> 12
+    #          title_fontsize=16,    # Increase title font size: 12 -> 14
+    #          frameon=True,
+    #          fancybox=True,
+    #          shadow=True,
+    #          labelspacing=1.8,     # Increase vertical spacing between label rows
+    #          handletextpad=0.8)    # Increase spacing between color blocks and text
     
     # Set title
     title_text = 'Distribution of Images Across Primate Datasets\n' + f'Total Images: {total_images:,}'
@@ -569,6 +613,7 @@ def vis_ratio_subdataset():
     # Step 1: Calculate statistics
     sorted_datasets, labels, sizes, percentages, total_images = calculate_dataset_stats()
     print("labels:", labels)
+    print("percentages:", percentages)
     custom_order = ['ak', 'oap', 'mbw', 'oms', 'deepwild', 'mit', 'mp', 'ap10k', 'omc', 'aptv2', 'anipose', 'lote']
     # print("labels:", labels)
     # Step 2: Create visualization with small dataset highlighting (rotated 25° anticlockwise)
@@ -578,12 +623,10 @@ def vis_ratio_subdataset():
     
     return sorted_datasets
 
-
-
 if __name__ == "__main__":
     # Run the analysis
     print("Running dataset analysis...")
-    # results = analyze_subdatasets()
+    results = analyze_subdatasets()
     
     # print("\n" + "="*80)
     # print("Analysis complete! Now generating visualization...")
