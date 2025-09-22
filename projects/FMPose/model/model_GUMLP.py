@@ -377,7 +377,7 @@ class Model(nn.Module):
     def forward(self, x, y_t, t):
         # x: (B,F,J,2)  y_t: (B,F,J,3)  t: (B,1,1,1) or (B,F,1,1)
         b, f, j, _ = x.shape
-        # build time embedding
+        # build time embeddings
         t_emb = self.time_embed(t) # (B,F,t_dim)
         t_emb = t_emb.unsqueeze(2).expand(b, f, j, self.t_embed_dim).contiguous()  # (B,F,J,t_dim)
 
