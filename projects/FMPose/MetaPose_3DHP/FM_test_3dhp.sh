@@ -25,5 +25,4 @@ fi
 python FM_main_3dhp_noise_pose.py --gpu ${gpu_id} --nepoch 1 --batch_size ${batch_size} --test --token_dim 256 \
 --frames 1 --layers ${layers} --channel 512 --d_hid 1024 --eval_sample_steps ${eval_sample_steps} \
 --model ${model_name} \
---dataset '3dhp_valid' --keypoints 'gt_17_univ'\
---saved_model_path '/home/ti_wang/Ti_workspace/projects/FMPose/checkpoint/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_lr1e-3_decay0.95_lr_decay_large_e5_0.8_B256_20250915_2211/CFM_24_4975.pth'
+--dataset '3dhp_valid' --keypoints 'gt_17_univ' --saved_model_path '/home/ti_wang/Ti_workspace/projects/FMPose/checkpoint/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_lr1e-3_decay0.95_lr_decay_large_e5_0.8_B256_20250915_2211/CFM_24_4975.pth'

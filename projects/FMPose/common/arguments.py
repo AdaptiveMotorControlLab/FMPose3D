@@ -78,6 +78,7 @@ class opts():
         self.parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9')
         # allow multiple hypothesis counts, e.g. --num_hypothesis_list 1 3 5 7 9
         self.parser.add_argument('--num_hypothesis_list', type=str, default='1')
+        self.parser.add_argument('--hypothesis_num', type=int, default=1)
         # number of best checkpoints to keep
         self.parser.add_argument('--num_saved_models', type=int, default=3)
         
