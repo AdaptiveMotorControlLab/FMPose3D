@@ -439,62 +439,7 @@ def show_frame():
     input_2D_flip = input_2D[:, 1]
     out_target = gt_3D.clone() # B F J 3
     out_target[:, :, args.root_joint] = 0
-    
-    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
-    def euler_sample(x2d, y_local, steps, model_3d):
-        list_v_s = []
-        dt = 1.0 / steps
-        for s in range(steps):
-            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-            v_s = model_3d(x2d, y_local, t_s)
-            y_local = y_local + dt * v_s
-            list_v_s.append(v_s)
-        return y_local, list_v_s
-        # return y_local
-    
-    for s_keep in eval_steps:
-        list_hypothesis = []
-        for i in range(args.hypothesis_num):
-            
-            y = torch.randn_like(gt_3D)
-            
-            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            
-            color=(0/255, 176/255, 240/255)
-          
-            # figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            # ax1 = plt.axes(projection = '3d')
-            # img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_noisy_input'+ '.png'
-            # _ = save3Dpose(i_data, y, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            # plt.close(figx)
-            
-            figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            ax1 = plt.axes(projection = '3d')
-            img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_final_input'+ '.png'
-            _ = save3Dpose(i_data, y_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            plt.close(figx)
-                  
-                
-            if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13]
-                joints_right = [1, 2, 3, 14, 15, 16]
-                
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                y_s = (y_s + y_flip_s) / 2
-            
-            # per-step metrics only; do not store per-sample outputs
-            output_3D_s = y_s[:, args.pad].unsqueeze(1)
-            output_3D_s[:, :, 0, :] = 0
-            
-            list_hypothesis.append(output_3D_s)
-        
-        output_3D_s = aggregate_hypothesis(list_hypothesis)
-                
+     
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
     # pose 打印在image上
@@ -534,6 +479,7 @@ def show_frame():
     image = drawskeleton(input_2D_no, image)
     cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
 
+
     # save 2D pose with transparent background
     fig_2d, ax_2d = plt.subplots(figsize=(figsize_x, figsize_y))
     color = (0/255, 176/255, 240/255)
@@ -544,6 +490,68 @@ def show_frame():
     plt.savefig(out_dir + str(i_data) + '_2d_transparent.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=True)
     plt.close(fig_2d)
 
+
+    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
+    def euler_sample(x2d, y_local, steps, model_3d):
+        list_v_s = []
+        dt = 1.0 / steps
+        for s in range(steps):
+            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+            v_s = model_3d(x2d, y_local, t_s)
+            y_local = y_local + dt * v_s
+            list_v_s.append(v_s)
+        return y_local, list_v_s
+        # return y_local
+    
+    for s_keep in eval_steps:
+        list_hypothesis = []
+        for hy_index in range(args.hypothesis_num):
+            
+            y = torch.randn_like(gt_3D)
+            
+            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
+            
+            color=(0/255, 176/255, 240/255)
+          
+            # figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+            # ax1 = plt.axes(projection = '3d')
+            # img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_noisy_input'+ '.png'
+            # _ = save3Dpose(i_data, y, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
+            # plt.close(figx)
+            
+            figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+            ax1 = plt.axes(projection = '3d')
+            img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + str(hy_index) + '.png'
+            _ = save3Dpose(i_data, y_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
+            plt.close(figx)
+                  
+                
+            if args.test_augmentation:
+                joints_left = [4, 5, 6, 11, 12, 13]
+                joints_right = [1, 2, 3, 14, 15, 16]
+                
+                y_flip = torch.randn_like(gt_3D)
+                y_flip[:, :, :, 0] *= -1
+                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
+                y_flip_s[:, :, :, 0] *= -1
+                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                y_s = (y_s + y_flip_s) / 2
+            
+            # per-step metrics only; do not store per-sample outputs
+            output_3D_s = y_s[:, args.pad].unsqueeze(1)
+            output_3D_s[:, :, 0, :] = 0
+            
+            list_hypothesis.append(output_3D_s)
+        
+        output_3D_s = aggregate_hypothesis(list_hypothesis)
+
+        figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+        ax1 = plt.axes(projection = '3d')
+        img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + '_final.png'
+        _ = save3Dpose(i_data,output_3D_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
+        plt.close(figx) 
+        
 
     # figure
     fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
