@@ -36,6 +36,8 @@ class opts():
         self.parser.add_argument('--pad', type=int, default=175) # 175  pad = (self.opt.frames-1) // 2 
         self.parser.add_argument('--reload', action='store_true')
         self.parser.add_argument('--model_dir', type=str, default='')
+        # Optional: load model class from a specific file path
+        self.parser.add_argument('--model_path', type=str, default='')
 
         self.parser.add_argument('--post_refine_reload', action='store_true')
         self.parser.add_argument('--checkpoint', type=str, default='')
@@ -81,6 +83,7 @@ class opts():
         self.parser.add_argument('--hypothesis_num', type=int, default=1)
         # number of best checkpoints to keep
         self.parser.add_argument('--num_saved_models', type=int, default=3)
+        self.parser.add_argument('--sh_file', type=str, default='')
         
     def parse(self):
         self.init()
