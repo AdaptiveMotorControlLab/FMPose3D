@@ -43,6 +43,7 @@ def val(opt, actions, val_loader, model, steps=None):
 def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, steps=None):
 
     loss_all = {'loss': AccumLoss()}
+    action_error_sum = define_error_list(actions)
     
     model_3d = model['CFM']
     if split == 'train':
@@ -188,7 +189,9 @@ if __name__ == '__main__':
         if args.debug:
             shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
         else:
-            shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
+            sh_base = os.path.basename(args.sh_file)
+            dst_name = f"{args.create_time}_" + sh_base
+            shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
