@@ -181,18 +181,11 @@ if __name__ == '__main__':
         if getattr(args, 'model_path', ''):
             model_src_path = os.path.abspath(args.model_path)
             model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-        else:
-            model_src_path = os.path.join("model", f"{args.model}.py")
-            model_dst_name = f"{args.create_time}_{args.model}.py"
         shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        if args.debug:
-            shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
-        else:
-            sh_base = os.path.basename(args.sh_file)
-            dst_name = f"{args.create_time}_" + sh_base
-            shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
-
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
@@ -224,15 +217,10 @@ if __name__ == '__main__':
     model = {}
     model['CFM'] = CFM(args).cuda()
 
-    
     if args.reload:
         model_dict = model['CFM'].state_dict()
         # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
-        if getattr(args, 'saved_model_path', ''):
-            model_path = args.saved_model_path
-        else:
-            model_path = glob.glob(os.path.join(args.previous_dir, '*.pth'))[0]
-        # model_path = "./pre_trained_model/IGANet_8_4834.pth"
+        model_path = args.saved_model_path
         print(model_path)
         pre_dict = torch.load(model_path)
         for name, key in model_dict.items():
