@@ -12,7 +12,7 @@ num_saved_models=5
 model_path='model/model_G_P_Attn.py'
 folder_name=FM_GAMLP_noisePose_1GCN_P_Attn_attnD_0.2_projD_0.25_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
 
-sh_file='run_FM_TPoseX.sh'
+sh_file='run_FM_noiseX.sh'
 # Read WANDB_API_KEY from file if not provided via env
 key_file="$(dirname "$0")/wandb_api_key.txt"
 if [ -z "$WANDB_API_KEY" ] && [ -f "$key_file" ]; then
