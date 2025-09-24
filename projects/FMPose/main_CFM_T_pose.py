@@ -206,8 +206,9 @@ if __name__ == '__main__':
         if args.debug:
             shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
         else:
-            shutil.copyfile(src="run_FM_TPose.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_TPose.sh"))
-
+            sh_base = os.path.basename(args.sh_file)
+            dst_name = f"{args.create_time}_" + sh_base
+            shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
