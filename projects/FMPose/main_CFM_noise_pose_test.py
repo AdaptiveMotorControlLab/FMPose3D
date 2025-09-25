@@ -101,18 +101,15 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
                 return y_local
             
             # start from noise as in original variant
-            y = torch.randn_like(gt_3D)
-            y_s = euler_sample(input_2D_nonflip, y, steps_to_use)
+            y_noise = torch.randn_like(gt_3D)
+            y_s = euler_sample(input_2D_nonflip, y_noise, steps_to_use)
             if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13]
-                joints_right = [1, 2, 3, 14, 15, 16]
                 y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
+                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
                 y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
-                y_flip_s = y_flip_s.clone()
+                y_flip_s = y_flip_s
                 y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
             output_3D = y_s[:, args.pad].unsqueeze(1)
             output_3D[:, :, 0, :] = 0
