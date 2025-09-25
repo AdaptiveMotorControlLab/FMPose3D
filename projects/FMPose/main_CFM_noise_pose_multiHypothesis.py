@@ -12,7 +12,6 @@ from common.utils import *
 from common.load_data_hm36 import Fusion
 from common.h36m_dataset import Human36mDataset
 import time
-import re
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -42,6 +41,41 @@ def val(opt, actions, val_loader, model):
 
 def aggregate_hypothesis(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)
+
+def uncertainty_aware_aggregate_hypothesis(list_hypothesis):
+    # list_hypothesis: list of tensors, each (B,1,J,3)
+    # returns aggregated tensor (B,1,J,3)
+    if len(list_hypothesis) == 0:
+        raise ValueError("list_hypothesis is empty")
+    stack = torch.stack(list_hypothesis, dim=0)  # (H,B,1,J,3)
+    mu = stack.mean(dim=0)  # (B,1,J,3)
+    std = stack.std(dim=0, unbiased=False)  # (B,1,J,3)
+
+    # per-hypothesis, per-joint Euclidean distance to mu
+    diff = stack - mu  # (H,B,1,J,3)
+    dist = torch.sqrt((diff * diff).sum(dim=-1))  # (H,B,1,J)
+    sigma_norm = torch.sqrt((std * std).sum(dim=-1))  # (B,1,J)
+
+    # threshold factor k; read from args if available
+    k = 0.9
+    thresh = k * sigma_norm  # (B,1,J)
+    keep = dist <= thresh  # (H,B,1,J)
+    # print("dist.mean:", dist.detach().mean().item(), "thresh.mean:", thresh.detach().mean().item())
+    # print("dist:", dist.detach())    
+    # print("thresh.item:", thresh.detach())
+    # print("keep:", keep)
+    keep_exp = keep.unsqueeze(-1)  # (H,B,1,J,1)
+    keep_count = keep_exp.sum(dim=0)  # (B,1,J,1)
+
+    # avoid division by zero by clamping, but also fallback to mu where count==0
+    safe_count = keep_count.clamp(min=1.0)
+    agg = (stack * keep_exp).sum(dim=0) / safe_count  # (B,1,J,3)
+
+    zero_mask = (keep_count.squeeze(-1) == 0).unsqueeze(-1)  # (B,1,J,1)
+    agg = torch.where(zero_mask, mu, agg)
+    return agg
+
+
 
 def train(opt, actions, train_loader, model, optimizer, epoch):
     split = 'train'
@@ -169,7 +203,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                     list_hypothesis.append(output_3D_s)
                 
                 output_3D_s = aggregate_hypothesis(list_hypothesis)
-                
+                # output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
                 # per-batch P1 for quick logging (optional)
                 if WANDB_AVAILABLE:
                     p1_s = mpjpe_cal(output_3D_s, gt_3D.clone())
@@ -194,8 +228,6 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
         return per_step_p1, per_step_p2
 
 
-
-@torch.no_grad()
 def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoch=None, hypothesis_num=None):
     
     model_3d = model['CFM']
@@ -252,7 +284,9 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
                 
                 list_hypothesis.append(output_3D_s)
             
-            output_3D_s = aggregate_hypothesis(list_hypothesis)
+            # output_3D_s = aggregate_hypothesis(list_hypothesis)
+            # uncertainty-aware aggregation across hypotheses
+            output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
             
             # per-batch P1 for quick logging (optional)
             if WANDB_AVAILABLE:
