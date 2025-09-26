@@ -67,10 +67,70 @@ def plot_actions_counts(actions_stats_path, out_path=None, figsize=(10, 4.8), dp
     fig.savefig(pdf_path, bbox_inches='tight')
     return out_path
 
+
+def cal_ratio_for_each_actions(actions_stats_path):
+    with open(actions_stats_path, 'r') as f:
+        stats = json.load(f)
+    counts = stats.get('counts', {})
+    total = sum(counts.values())
+    ratios = {k: v / total for k, v in counts.items()}
+    return ratios
+
+
+def cal_avg_mpjpe(mpjpe_per_action):
+    # avg_mpjpe = {k: mpjpe_per_action[k] * ratio[k] for k in mpjpe_per_action.keys()}
+    avg_mpjpe = {k: mpjpe_per_action[k] * 1.0/15 for k in mpjpe_per_action.keys()}
+    avg_mpjpe = sum(avg_mpjpe.values())
+    return avg_mpjpe
+
+mpjpe_per_action_PerturbPE = {
+    'Directions': 45.9,
+    'Discussion': 50.1,
+    'Eating': 41.2,
+    'Greeting': 43.2,
+    'Phoning': 52.7,
+    'Photo': 57.4,
+    'Posing': 43.0,
+    'Purchases': 38.4,
+    'Sitting': 55.4,
+    'SittingDown': 61.8,
+    'Smoking': 45.8,
+    'Waiting': 46.8,
+    'WalkDog': 48.5,
+    'Walking': 38.9,
+    'WalkTogether': 42.8
+}
+
+mpjpe_per_action_CFM = {
+    'Directions': 46.20,
+    'Discussion': 49.75,
+    'Eating': 46.34,
+    'Greeting': 49.78,
+    'Phoning': 51.29,
+    'Photo': 57.77,
+    'Posing': 47.68,
+    'Purchases': 45.45,
+    'Sitting': 58.46,
+    'SittingDown': 61.79,
+    'Smoking': 50.23,
+    'Waiting': 47.14,
+    'WalkDog': 52.68,
+    'Walking': 39.31,
+    'WalkTogether': 42.06
+}
+
 if __name__ == '__main__':
+    
     default_json = 'test_actions_stats.json'
-    if os.path.exists(default_json):
-        saved = plot_actions_counts(default_json)
-        print(f'Saved figure to {saved}')
-    else:
-        print(f'Not found: {default_json}')
+    
+    # if os.path.exists(default_json):
+    #     saved = plot_actions_counts(default_json)
+    #     print(f'Saved figure to {saved}')
+    # else:
+    #     print(f'Not found: {default_json}')
+    # ratios = cal_ratio_for_each_actions(default_json)
+    # print(ratios)
+    avg_mpjpe = cal_avg_mpjpe(mpjpe_per_action_PerturbPE) # paper:50.8; 47.46, 如果按比例，48.15；
+    # print(avg_mpjpe)
+    # avg_mpjpe = cal_avg_mpjpe(mpjpe_per_action_CFM)
+    print(avg_mpjpe)
