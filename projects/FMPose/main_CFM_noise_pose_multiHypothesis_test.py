@@ -223,9 +223,19 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     # This yields uniform weights at the root (we set root to 0 later anyway)
     dist[:, :, 0] = 0.0
 
-    # Convert 2D losses to weights via softmax along hypothesis dimension (lower loss -> higher weight)
-    tau = float(getattr(args, 'weight_softmax_tau', 1.0))
-    weights = torch.softmax(-dist / max(tau, 1e-6), dim=1)  # (B,H,J)
+    # Convert 2D losses to weights using softmax over top-k hypotheses per joint
+    tau = float(getattr(args, 'weight_softmax_tau', 0.1))
+    H = dist.size(1)
+    k = int(getattr(args, 'weight_topk', min(3, H)))
+    k = max(1, min(k, H))
+
+    # top-k smallest distances along hypothesis dim
+    topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
+    topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)   # (B,k,J)
+
+    # scatter back to full H with zeros elsewhere
+    weights = torch.zeros_like(dist)  # (B,H,J)
+    weights.scatter_(1, topk_idx, topk_weights)
 
     # Weighted sum of root-relative 3D hypotheses per joint
     weights_exp = weights.unsqueeze(-1)                     # (B,H,J,1)
