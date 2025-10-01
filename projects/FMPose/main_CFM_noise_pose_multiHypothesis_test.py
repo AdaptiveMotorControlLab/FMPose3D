@@ -32,13 +32,6 @@ if getattr(args, 'model_path', ''):
 import wandb
 WANDB_AVAILABLE = False
 
-def train(opt, actions, train_loader, model, optimizer, epoch):
-    return step('train', opt, actions, train_loader, model, optimizer, epoch)
-
-def val(opt, actions, val_loader, model):
-    with torch.no_grad():
-        return step('test', opt, actions, val_loader, model)
-
 def aggregate_hypothesis(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)
 
@@ -155,8 +148,7 @@ def aggregate_hypothesis_camera(list_hypothesis, batch_cam, input_2D, gt_3D):
     agg[:, :, 0, :] = 0
     return agg
 
-
-def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D):
+def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D, topk=3):
     """
     Select per-joint 3D from the hypothesis whose 2D projection yields minimal L2 error.
 
@@ -224,17 +216,20 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     dist[:, :, 0] = 0.0
 
     # Convert 2D losses to weights using softmax over top-k hypotheses per joint
-    tau = float(getattr(args, 'weight_softmax_tau', 0.1))
+    tau = float(getattr(args, 'weight_softmax_tau', 1.0))
     H = dist.size(1)
-    k = int(getattr(args, 'weight_topk', min(3, H)))
+    k = int(getattr(args, 'topk', min(3, H)))
+    # print("k:", k)
     k = max(1, min(k, H))
 
     # top-k smallest distances along hypothesis dim
     topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
+    # topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)   # (B,k,J)
     topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)   # (B,k,J)
 
     # scatter back to full H with zeros elsewhere
     weights = torch.zeros_like(dist)  # (B,H,J)
+    # weights.scatter_(1, topk_idx, topk_weights)
     weights.scatter_(1, topk_idx, topk_weights)
 
     # Weighted sum of root-relative 3D hypotheses per joint
@@ -245,158 +240,6 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     agg = weighted_bj3.unsqueeze(1).to(dtype=dtype)
     agg[:, :, 0, :] = 0
     return agg
-
-
-def train(opt, actions, train_loader, model, optimizer, epoch):
-    split = 'train'
-    loss_all = {'loss': AccumLoss()}
-    model_3d = model['CFM']
-    model_3d.train()
-
-    for i, data in enumerate(tqdm(train_loader, 0)):
-        batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
-        
-        if split =='train':
-            # Conditional Flow Matching training
-            # gt_3D, input_2D shape: (B,F,J,C)
-            x0_noise = torch.randn_like(gt_3D)
-            x0 = x0_noise
-            
-            B = gt_3D.size(0)
-            # t on correct device/dtype and broadcastable: (B,1,1,1)
-            t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
-            y_t = (1.0 - t) * x0 + t * gt_3D
-            v_target = gt_3D - x0
-            v_pred = model_3d(input_2D, y_t, t)
-
-            loss = ((v_pred - v_target)**2).mean()            
-            N = input_2D.size(0)
-            loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
-            if WANDB_AVAILABLE:
-                # log per-batch training loss
-                wandb.log({'train_loss': float(loss.detach().cpu().item()), 'epoch': epoch if epoch is not None else -1})
-            # loss = loss_p1
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-    return loss_all['loss'].avg
- 
-def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
-
-    loss_all = {'loss': AccumLoss()}
-
-    action_error_sum = define_error_list(actions)
-    
-    model_3d = model['CFM']
-    if split == 'train':
-        model_3d.train()
-    else:
-        model_3d.eval()
-
-    # for multi-step eval, maintain per-step accumulators across the whole split
-    eval_steps = None
-    action_error_sum_multi = None
-    if split == 'test':
-        eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
-        action_error_sum_multi = {s: define_error_list(actions) for s in eval_steps}
-
-    for i, data in enumerate(tqdm(dataLoader, 0)):
-        batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
-        
-        if split =='train':
-            # Conditional Flow Matching training
-            # gt_3D, input_2D shape: (B,F,J,C)
-            x0_noise = torch.randn_like(gt_3D)
-            x0 = x0_noise
-            
-            B = gt_3D.size(0)
-            # t on correct device/dtype and broadcastable: (B,1,1,1)
-            t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
-            y_t = (1.0 - t) * x0 + t * gt_3D
-            v_target = gt_3D - x0
-            v_pred = model_3d(input_2D, y_t, t)
-
-            loss = ((v_pred - v_target)**2).mean()            
-            N = input_2D.size(0)
-            loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
-            if WANDB_AVAILABLE:
-                # log per-batch training loss
-                wandb.log({'train_loss': float(loss.detach().cpu().item()), 'epoch': epoch if epoch is not None else -1})
-            # loss = loss_p1
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        else:
-            # When test_augmentation=True, input_2D has an extra aug dimension: (B,2,F,J,2)
-            # For now, use the first view to keep shapes consistent with the model
-            input_2D_nonflip = input_2D[:, 0]
-            input_2D_flip = input_2D[:, 1]
-            out_target = gt_3D.clone()
-            out_target[:, :, 0] = 0
-
-            # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
-            def euler_sample(x2d, y_local, steps):
-                dt = 1.0 / steps
-                for s in range(steps):
-                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-                    v_s = model_3d(x2d, y_local, t_s)
-                    y_local = y_local + dt * v_s
-                return y_local
-            
-            for s_keep in eval_steps:
-                
-                list_hypothesis = []
-                for i in range(args.num_hypothesis):
-                    
-                    y = torch.randn_like(gt_3D)
-                    y_s = euler_sample(input_2D_nonflip, y, s_keep)
-                    if args.test_augmentation:
-                        joints_left = [4, 5, 6, 11, 12, 13]
-                        joints_right = [1, 2, 3, 14, 15, 16]
-                        
-                        y_flip = torch.randn_like(gt_3D)
-                        y_flip[:, :, :, 0] *= -1
-                        y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                        y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
-                        y_flip_s[:, :, :, 0] *= -1
-                        y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                        y_s = (y_s + y_flip_s) / 2
-                    
-                    # per-step metrics only; do not store per-sample outputs
-                    output_3D_s = y_s[:, args.pad].unsqueeze(1)
-                    output_3D_s[:, :, 0, :] = 0
-                    
-                    list_hypothesis.append(output_3D_s)
-                
-                # output_3D_s = aggregate_hypothesis(list_hypothesis)
-                output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
-                # per-batch P1 for quick logging (optional)
-                if WANDB_AVAILABLE:
-                    p1_s = mpjpe_cal(output_3D_s, gt_3D.clone())
-                    wandb.log({f'test_p1_batch_s{s_keep}': float(p1_s)})
-                # accumulate by action across the entire test set
-                action_error_sum_multi[s_keep] = test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
-                
-    if split == 'train':
-        return loss_all['loss'].avg
-
-    elif split == 'test':
-        # aggregate default metrics
-        per_step_p1 = {}
-        per_step_p2 = {}
-        for s_keep in sorted(action_error_sum_multi.keys()):
-            p1_s, p2_s = print_error(args.dataset, action_error_sum_multi[s_keep], args.train)
-            per_step_p1[s_keep] = float(p1_s)
-            per_step_p2[s_keep] = float(p2_s)
-            if WANDB_AVAILABLE:
-                wandb.log({f'test_p1_s{s_keep}': float(p1_s), f'test_p2_s{s_keep}': float(p2_s)})
-            # logging.info(f'eval_multi_steps: steps={s_keep}, p1={float(p1_s):.4f}, p2={float(p2_s):.4f}')
-        return per_step_p1, per_step_p2
-
 
 def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoch=None, hypothesis_num=None, steps=None):
     
@@ -458,11 +301,11 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
                 
                 list_hypothesis.append(output_3D_s)
             
-            output_3D_s = aggregate_hypothesis(list_hypothesis)
+            # output_3D_s = aggregate_hypothesis(list_hypothesis)
             # uncertainty-aware aggregation across hypotheses
             # output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
-            
-            output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D)
+            output_3D_s = aggregate_hypothesis_camera(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D)
+            # output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
             
             # per-batch P1 for quick logging (optional)
             if WANDB_AVAILABLE:
@@ -556,7 +399,7 @@ if __name__ == '__main__':
         if args.train==False:
             # create a new folder for the test results
             args.previous_dir = os.path.dirname(args.saved_model_path)
-            args.checkpoint = os.path.join(args.previous_dir, 'test_results_' + args.create_time)
+            args.checkpoint = os.path.join(args.previous_dir, folder_name)
 
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
@@ -627,11 +470,7 @@ if __name__ == '__main__':
     best_epoch = 0
     
     for epoch in range(1, args.nepoch):
-        if args.train:
-            loss = train(args, actions, train_dataloader, model, optimizer, epoch)
-            if WANDB_AVAILABLE:
-                wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
-                
+        
         # parse hypotheses list and eval steps
         hypothesis_list = [int(x) for x in args.num_hypothesis_list.split(',')]
         eval_steps_list = [int(s) for s in str(getattr(args, 'eval_sample_steps', '3')).split(',') if str(s).strip()]
