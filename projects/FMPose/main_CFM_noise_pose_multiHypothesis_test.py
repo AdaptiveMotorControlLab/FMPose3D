@@ -209,7 +209,7 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
 
     # Per-hypothesis per-joint 2D error
     diff = proj2d_bhj - target_2d.unsqueeze(1)    # (B,H,J,2)
-    dist = torch.norm(diff, dim=-1)               # (B,H,J)
+    dist = torch.norm(diff, dim=-1) # (B,H,J)
 
     # For root joint (0), avoid NaNs in softmax by setting equal distances
     # This yields uniform weights at the root (we set root to 0 later anyway)
@@ -224,8 +224,132 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
 
     # top-k smallest distances along hypothesis dim
     topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
-    # topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)   # (B,k,J)
-    topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)   # (B,k,J)
+    
+    # ============ 调试开关 ============
+    DEBUG_WEIGHTS = False  # 👈 设为 False 关闭调试输出
+    
+    if DEBUG_WEIGHTS:
+        # ============ 详细调试输出 ============
+        print(f"\n{'='*60}")
+        print(f"DEBUG: Weight Calculation Details")
+        print(f"{'='*60}")
+        print(f"tau = {tau}")
+        print(f"k = {k}, H (total hypotheses) = {H}")
+        
+        # 检查 topk_vals 的统计信息
+        print(f"\ntopk_vals statistics:")
+        print(f"  shape: {topk_vals.shape}")
+        print(f"  mean: {topk_vals.mean().item():.6f}")
+        print(f"  std: {topk_vals.std().item():.6f}")
+        print(f"  min: {topk_vals.min().item():.6f}")
+        print(f"  max: {topk_vals.max().item():.6f}")
+        
+        # 查看具体的一个样本的一个关节
+        b_sample, j_sample = 0, 5  # batch 0, joint 5
+        if B > 0 and J > j_sample:
+            print(f"\n示例: Batch {b_sample}, Joint {j_sample}")
+            print(f"  topk_vals[{b_sample},:,{j_sample}] = {topk_vals[b_sample, :, j_sample].detach().cpu().numpy()}")
+            print(f"  topk_idx[{b_sample},:,{j_sample}] = {topk_idx[b_sample, :, j_sample].detach().cpu().numpy()}")
+            
+            # 计算差异
+            if k >= 2:
+                diff_vals = topk_vals[b_sample, 1, j_sample] - topk_vals[b_sample, 0, j_sample]
+                print(f"  差异 (第2小 - 第1小): {diff_vals.item():.6f}")
+                print(f"  相对差异: {(diff_vals / (topk_vals[b_sample, 0, j_sample] + 1e-8)).item():.2%}")
+        
+        # 计算 softmax 输入
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        print(f"\nsoftmax 输入 (-topk_vals / tau):")
+        print(f"  mean: {softmax_input.mean().item():.6f}")
+        print(f"  std: {softmax_input.std().item():.6f}")
+        print(f"  range: [{softmax_input.min().item():.6f}, {softmax_input.max().item():.6f}]")
+        
+        if B > 0 and J > j_sample:
+            print(f"  示例 softmax_input[{b_sample},:,{j_sample}] = {softmax_input[b_sample, :, j_sample].detach().cpu().numpy()}")
+    
+    # ========== 选择权重计算方法 ==========
+    # 方法选择: 'softmax' | 'inverse' | 'hard' | 'exp'
+    weight_method = 'inverse'  # 👈 使用 inverse 方法（已添加 NaN 保护）
+
+    if DEBUG_WEIGHTS:
+        print(f"\n使用的权重计算方法: {weight_method}")
+        b_sample, j_sample = 0, 5  # 用于调试输出的样本索引
+    
+    if weight_method == 'softmax':
+        # 原始 softmax 方法
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+    elif weight_method == 'inverse':
+        # 反比例权重 - 推荐！误差越小权重越大
+        eps = 1e-6
+        inv_weights = 1.0 / (topk_vals + eps)
+        topk_weights = inv_weights / inv_weights.sum(dim=1, keepdim=True)
+        if DEBUG_WEIGHTS:
+            print(f"  inverse 方法计算详情:")
+            if B > 0 and J > j_sample:
+                print(f"    topk_vals[{b_sample},:,{j_sample}] = {topk_vals[b_sample, :, j_sample].detach().cpu().numpy()}")
+                print(f"    inv_weights[{b_sample},:,{j_sample}] (归一化前: 1/topk_vals) = {inv_weights[b_sample, :, j_sample].detach().cpu().numpy()}")
+                print(f"    inv_weights sum = {inv_weights[b_sample, :, j_sample].sum().item():.6f}")
+                print(f"    topk_weights[{b_sample},:,{j_sample}] (归一化后) = {topk_weights[b_sample, :, j_sample].detach().cpu().numpy()}")
+                print(f"    topk_weights sum = {topk_weights[b_sample, :, j_sample].sum().item():.6f} (应该 = 1.0)")
+    elif weight_method == 'exp':
+        # 指数权重 - 更激进，使用更小的温度参数
+        # 温度越小，差异越大
+        temp = 0.005  # 👈 减小这个值会让差异更大
+        
+        # 防止数值下溢：clip topk_vals，避免 exp(-very_large/temp) -> 0
+        # 如果 topk_val > temp * 20，exp(-topk_val/temp) < 2e-9，实际上权重为0
+        max_safe_val = temp * 20  # 对应 exp(-20) ≈ 2e-9
+        topk_vals_clipped = torch.clamp(topk_vals, max=max_safe_val)
+        
+        exp_vals = torch.exp(-topk_vals_clipped / temp)
+        exp_sum = exp_vals.sum(dim=1, keepdim=True)
+        
+        # 避免除以零
+        topk_weights = exp_vals / torch.clamp(exp_sum, min=1e-10)
+        
+        # 检查 NaN 并回退到均匀权重
+        nan_mask = torch.isnan(topk_weights).any(dim=1, keepdim=True)  # (B,1,J)
+        uniform_weights = torch.ones_like(topk_weights) / k
+        topk_weights = torch.where(nan_mask.expand_as(topk_weights), uniform_weights, topk_weights)
+        
+        if DEBUG_WEIGHTS:
+            print(f"  exp 方法计算详情 (temp={temp}):")
+            if B > 0 and J > j_sample:
+                print(f"    topk_vals[{b_sample},:,{j_sample}] = {topk_vals[b_sample, :, j_sample].detach().cpu().numpy()}")
+                print(f"    topk_vals_clipped[{b_sample},:,{j_sample}] = {topk_vals_clipped[b_sample, :, j_sample].detach().cpu().numpy()}")
+                print(f"    exp(-topk_vals_clipped/{temp})[{b_sample},:,{j_sample}] = {exp_vals[b_sample, :, j_sample].detach().cpu().numpy()}")
+                if nan_mask[b_sample, 0, j_sample]:
+                    print(f"    ⚠️  检测到 NaN，已回退到均匀权重")
+    else:
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+    
+    if DEBUG_WEIGHTS:
+        # 检查权重分布
+        print(f"\n最终 topk_weights (使用 {weight_method} 方法):")
+        print(f"  mean: {topk_weights.mean().item():.6f}")
+        print(f"  std: {topk_weights.std().item():.6f}")
+        print(f"  理论均匀值 (1/k): {1.0/k:.6f}")
+        
+        if B > 0 and J > j_sample:
+            print(f"  示例 topk_weights[{b_sample},:,{j_sample}] = {topk_weights[b_sample, :, j_sample].detach().cpu().numpy()}")
+            
+        # 检查有多少关节的权重接近均匀
+        weight_diff = (topk_weights.max(dim=1)[0] - topk_weights.min(dim=1)[0])  # (B,J)
+        near_uniform = (weight_diff < 0.1).float().mean()
+        print(f"\n权重接近均匀分布的关节比例 (diff < 0.1): {near_uniform.item():.2%}")
+        
+        # 查看所有假设的原始距离（不只是 top-k）
+        print(f"\n完整 dist 张量统计 (所有假设的2D误差):")
+        print(f"  dist shape: {dist.shape}")
+        print(f"  dist mean: {dist.mean().item():.6f}")
+        print(f"  dist std: {dist.std().item():.6f}")
+        
+        if B > 0 and J > j_sample:
+            print(f"  示例 dist[{b_sample},:,{j_sample}] (所有{H}个假设): {dist[b_sample, :, j_sample].detach().cpu().numpy()}")
+        
+        print(f"{'='*60}\n")
 
     # scatter back to full H with zeros elsewhere
     weights = torch.zeros_like(dist)  # (B,H,J)
@@ -262,9 +386,13 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
         # When test_augmentation=True, input_2D has an extra aug dimension: (B,2,F,J,2)
-        # For now, use the first view to keep shapes consistent with the model
-        input_2D_nonflip = input_2D[:, 0]
-        input_2D_flip = input_2D[:, 1]
+        # When test_augmentation=False, input_2D has shape: (B,F,J,2)
+        if args.test_augmentation:
+            input_2D_nonflip = input_2D[:, 0]
+            input_2D_flip = input_2D[:, 1]
+        else:
+            input_2D_nonflip = input_2D
+            input_2D_flip = None
         out_target = gt_3D.clone()
         out_target[:, :, 0] = 0
 
@@ -304,8 +432,8 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
             # output_3D_s = aggregate_hypothesis(list_hypothesis)
             # uncertainty-aware aggregation across hypotheses
             # output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
-            output_3D_s = aggregate_hypothesis_camera(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D)
-            # output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
+            # output_3D_s = aggregate_hypothesis_camera(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D)
+            output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
             
             # per-batch P1 for quick logging (optional)
             if WANDB_AVAILABLE:
