@@ -227,7 +227,8 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     
     # ============ 调试开关 ============
     DEBUG_WEIGHTS = False  # 👈 设为 False 关闭调试输出
-    
+    if args.debug:
+        DEBUG_WEIGHTS = True
     if DEBUG_WEIGHTS:
         # ============ 详细调试输出 ============
         print(f"\n{'='*60}")
@@ -238,9 +239,8 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
         
         # 检查 topk_vals 的统计信息
         print(f"\ntopk_vals statistics:")
-        print(f"  shape: {topk_vals.shape}")
         print(f"  mean: {topk_vals.mean().item():.6f}")
-        print(f"  std: {topk_vals.std().item():.6f}")
+        # print(f"  std: {topk_vals.std().item():.6f}")
         print(f"  min: {topk_vals.min().item():.6f}")
         print(f"  max: {topk_vals.max().item():.6f}")
         
@@ -269,7 +269,7 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     
     # ========== 选择权重计算方法 ==========
     # 方法选择: 'softmax' | 'inverse' | 'hard' | 'exp'
-    weight_method = 'inverse'  # 👈 使用 inverse 方法（已添加 NaN 保护）
+    weight_method = 'exp'  # 👈 使用 inverse 方法（已添加 NaN 保护）
 
     if DEBUG_WEIGHTS:
         print(f"\n使用的权重计算方法: {weight_method}")
@@ -295,7 +295,7 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     elif weight_method == 'exp':
         # 指数权重 - 更激进，使用更小的温度参数
         # 温度越小，差异越大
-        temp = 0.005  # 👈 减小这个值会让差异更大
+        temp = args.exp_temp  # 👈 减小这个值会让差异更大
         
         # 防止数值下溢：clip topk_vals，避免 exp(-very_large/temp) -> 0
         # 如果 topk_val > temp * 20，exp(-topk_val/temp) < 2e-9，实际上权重为0
@@ -586,7 +586,6 @@ if __name__ == '__main__':
         model['CFM'].load_state_dict(model_dict)
         print("Load model Successfully!")
         
-
     all_param = []
     all_paramters = 0
     lr = args.lr
