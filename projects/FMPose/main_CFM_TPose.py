@@ -18,16 +18,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 # Support loading the model class from a specific file path if provided
 CFM = None
-if getattr(args, 'model_path', ''):
-    import importlib.util
-    import pathlib
-    model_abspath = os.path.abspath(args.model_path)
-    module_name = pathlib.Path(model_abspath).stem
-    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    CFM = getattr(module, 'Model')
+import importlib.util
+import pathlib
+model_abspath = os.path.abspath(args.model_path)
+module_name = pathlib.Path(model_abspath).stem
+spec = importlib.util.spec_from_file_location(module_name, model_abspath)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+CFM = getattr(module, 'Model')
 
 # wandb logging (assumed available)
 import wandb
@@ -70,12 +69,14 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
         # if i>10 and i< len(dataLoader)-10:
         #     continue
+        gt_3D[:, :, 0, :] = 0
+        
         if split =='train':
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             # Use template mean 3D pose as x0 instead of random noise
             x0 = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
-            x0 = x0.expand_as(gt_3D)
+            # x0 = x0.expand_as(gt_3D)
             
             # t on correct device/dtype and broadcastable: (B,1,1,1)
             t = torch.rand(gt_3D.size(0), 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
