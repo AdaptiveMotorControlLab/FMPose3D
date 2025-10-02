@@ -1,14 +1,12 @@
 import sys
 sys.path.append("..")
 import random
-import torch
 import numpy as np
 import matplotlib.pyplot as plt 
 import os
 import cv2
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
 from common.utils import *
@@ -29,7 +27,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
 dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
-dataloader = torch.utils.data.DataLoader(test_data, batch_size=256, shuffle=True, num_workers=16)
+dataloader = torch.utils.data.DataLoader(test_data, batch_size=2, shuffle=True, num_workers=16)
 
 # count actions utility
 def count_and_save_actions(loader, out_path='Vis/actions/test_actions_stats.json'):
@@ -519,6 +517,9 @@ def plot_samples_per_action(loader, samples_root='samples', per_action=4, dpi=30
       batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
       [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
 
+      print(batch_cam.shape)
+      # break
+    
       B = gt_3D.size(0)
       for b in range(B):
         full_action = action[b]
@@ -608,6 +609,5 @@ if __name__ == "__main__":
   # count_and_save_actions(dataloader)
   # show_frame()
   
-
   # Run the sampler to save figures under samples/
   plot_samples_per_action(dataloader, samples_root='./Vis/samples', per_action=4, dpi=300)
