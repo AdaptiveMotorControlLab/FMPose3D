@@ -50,7 +50,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         model_3d.train()
     else:
         model_3d.eval()
-
+        
     # determine steps for single-step evaluation per call
     steps_to_use = steps
 
@@ -58,8 +58,9 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
-
         if split =='train':
+            
+            # gt_3D[:, :, 0] = 0
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             x0_noise = torch.randn_like(gt_3D)
