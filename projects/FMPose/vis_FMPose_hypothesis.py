@@ -8,18 +8,22 @@ import os
 import cv2
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
-# from common.arguments import parse_args
 from common.utils import *
-# from common.graph_utils import adj_mx_from_skeleton
-# from model.model_GIA import Model
-
 from common.arguments import opts as parse_args
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-exec('from model.' + args.model + ' import Model as CFM')
+if getattr(args, 'model_path', ''):
+    import importlib.util
+    import pathlib
+    model_abspath = os.path.abspath(args.model_path)
+    module_name = pathlib.Path(model_abspath).stem
+    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    CFM = getattr(module, 'Model')
 
 import matplotlib
 plt.switch_backend('agg')
@@ -32,7 +36,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
 dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
-dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=True, num_workers=16)
+dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=True, num_workers=16)
 
 
 model = {}
@@ -47,7 +51,6 @@ if args.reload:
         model_dict[name] = pre_dict[name]
     model['CFM'].load_state_dict(model_dict)
     print("Load model Successfully!")
-
 
 def getFiles(path):
     image_files = []
@@ -103,7 +106,7 @@ def drawskeleton(kps, img, thickness=3, mpii=2):
 
     return img
 
-def show3Dpose_GT(channels, ax, world = True): # blue, orange
+def show3Dpose_GT(channels, ax, world = True, linewidth = 2.5): # blue, orange
   # colors = [(255/255, 128/255, 255/255), # 躯干
   #           (127/255, 127/255, 255/255), # 手
   #           (255/255, 127/255, 127/255)] # 脚
@@ -130,7 +133,7 @@ def show3Dpose_GT(channels, ax, world = True): # blue, orange
     else:
       x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
 
-    ax.plot(x, y, z, lw=2.5, color = colors[LR[i]-1])
+    ax.plot(x, y, z, lw=linewidth, color = colors[LR[i]-1])
     # ax.scatter(x, y, z, color=(0, 1, 0))
 
   RADIUS = 0.55 
@@ -164,7 +167,7 @@ def show3Dpose_GT(channels, ax, world = True): # blue, orange
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
     ax.invert_zaxis()
 
-def show3Dpose(channels, ax, color, world = True): # blue, orange
+def show3Dpose(channels, ax, color, world = True, linewidth = 2.5): # blue, orange
   # colors = [(255/255, 128/255, 255/255), # 躯干
   #           (127/255, 127/255, 255/255), # 手
   #           (255/255, 127/255, 127/255)] # 脚
@@ -190,7 +193,7 @@ def show3Dpose(channels, ax, color, world = True): # blue, orange
       x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
       x2, z2, y2 = [np.array( [vals[I[i], j]+np.random.random_sample()*0.01, vals[J[i], j]+np.random.random_sample()*0.01] ) for j in range(3)]
 
-    ax.plot(x, y, z, lw=2.5, color = color)
+    ax.plot(x, y, z, lw=linewidth, color = color)
 
   RADIUS = 0.55 
   xroot, yroot, zroot = vals[0,0], vals[0,1], vals[0,2]
@@ -303,7 +306,6 @@ def show_input(img, ax):
     # ax.set_yticks([]) 
     plt.axis('off')
 
-
 def input_augmentation(input_2D, model, joints_left, joints_right):
     output_3D_non_flip = model(input_2D[:, 0])
     output_3D_flip     = model(input_2D[:, 1])
@@ -342,8 +344,8 @@ def show_frame():
     import shutil
     file_name = os.path.basename(__file__)
     shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
-    shutil.copyfile(src="run_FM_vis.sh", dst = os.path.join(folder, args.create_time + "_run_FM_vis.sh"))
-
+    shutil.copyfile(src="run_FM_multi_hypothesis.sh", dst = os.path.join(folder, args.create_time + "_run_FM_multi_hypothesis.sh"))
+    shutil.copyfile(src="vis_FMPose_hypothesis.py", dst = os.path.join(folder, args.create_time + "_vis_FMPose_hypothesis.py"))
   figsize_x = 6.4*2
   figsize_y = 3.6*2
   dpi_number = 1000
@@ -402,7 +404,7 @@ def show_frame():
             y = torch.randn_like(gt_3D)
             
             y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            vis_v_s = True
+            vis_v_s = False
             if vis_v_s:
               path_vis_v_s = folder + '/' + "vis_v_s"
               if not os.path.exists(path_vis_v_s):
@@ -411,7 +413,7 @@ def show_frame():
                 
                 figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
                 ax1 = plt.axes(projection = '3d')  
-                img_path = path_vis_v_s + '/' "steps_" + str(i) + "_" + action[0] + '_idx_' + str(i_data) + '.png'
+                img_path = path_vis_v_s + '/' + "steps_" + str(i) + "_" + action[0] + '_idx_' + str(i_data) + '.png'
                 _ = save3Dpose(i_data, list_v_s[i], out_target, ax1, (0.99, 0, 0), img_path, action[0], dpi_number=dpi_number)
                 plt.close(figx)
                 
@@ -434,6 +436,8 @@ def show_frame():
             list_hypothesis.append(output_3D_s)
         
         output_3D_s = aggregate_hypothesis(list_hypothesis)
+        list_hypothesis_last = list_hypothesis
+        output_3D_s_last = output_3D_s
                 
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
@@ -478,6 +482,34 @@ def show_frame():
     # figure
     fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
     ax1 = plt.axes(projection = '3d')  
+
+    gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
+    gt_vis[:, :, 0, :] = 0
+    gt_np = gt_vis[0, 0].cpu().detach().numpy()
+    show3Dpose_GT(gt_np, ax1, world=False, linewidth=1.0)
+
+
+    # Overlay: all hypotheses (gray), aggregated (blue), GT (red)
+    if 'list_hypothesis_last' in locals() and 'output_3D_s_last' in locals():
+      print("list_hypothesis_last:", len(list_hypothesis_last))
+      num_h = len(list_hypothesis_last)
+      for idx, hypo in enumerate(list_hypothesis_last):
+        hypo_vis = hypo.clone()
+        hypo_vis[:, :, 0, :] = 0
+        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+        if num_h > 1:
+          shade = 0.35 + 0.45 * (idx / (num_h - 1))
+        else:
+          shade = 0.6
+        show3Dpose(pose_np, ax1, color=(shade, shade, shade), world=False, linewidth=1.0)
+
+      agg_vis = output_3D_s_last.clone()
+      agg_vis[:, :, 0, :] = 0
+      agg_np = agg_vis[0, 0].cpu().detach().numpy()
+      show3Dpose(agg_np, ax1, color=(0/255, 176/255, 240/255), world=False, linewidth=1.0)
+
+      overlay_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_overlay.png')
+      plt.savefig(overlay_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
     
     # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
     
