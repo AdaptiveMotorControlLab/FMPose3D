@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
-# from common.arguments import parse_args
 from common.utils import *
 
 from common.arguments import opts as parse_args
@@ -32,7 +31,6 @@ dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
 dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=True, num_workers=16)
 
-
 model = {}
 model['CFM'] = CFM(args).cuda()
 
@@ -45,7 +43,6 @@ if args.reload:
         model_dict[name] = pre_dict[name]
     model['CFM'].load_state_dict(model_dict)
     print("Load model Successfully!")
-
 
 def getFiles(path):
     image_files = []
@@ -527,15 +524,13 @@ def show_frame():
                   
                 
             if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13]
-                joints_right = [1, 2, 3, 14, 15, 16]
                 
                 y_flip = torch.randn_like(gt_3D)
                 y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
                 y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
                 y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
             
             # per-step metrics only; do not store per-sample outputs
