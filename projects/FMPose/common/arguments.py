@@ -1,6 +1,17 @@
 import argparse
 import math
 
+def str2bool(v):
+    """Convert string to boolean for argparse"""
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 class opts():
     def __init__(self):
         self.parser = argparse.ArgumentParser()
@@ -14,7 +25,7 @@ class opts():
         self.parser.add_argument('-k', '--keypoints', default='cpn_ft_h36m_dbb', type=str)
         self.parser.add_argument('--data_augmentation', type=bool, default=True)
         self.parser.add_argument('--reverse_augmentation', type=bool, default=False)
-        self.parser.add_argument('--test_augmentation', type=bool, default=True)
+        self.parser.add_argument('--test_augmentation', type=str2bool, default=True)
         self.parser.add_argument('--crop_uv', type=int, default=0)
         self.parser.add_argument('--root_path', type=str, default='dataset/')
         self.parser.add_argument('-a', '--actions', default='*', type=str)
@@ -84,7 +95,12 @@ class opts():
         # number of best checkpoints to keep
         self.parser.add_argument('--num_saved_models', type=int, default=3)
         self.parser.add_argument('--sh_file', type=str, default='')
+        # uncertainty-aware aggregation threshold factor
         
+        self.parser.add_argument('--ua_k', type=float, default=0.9)
+        self.parser.add_argument('--topk', type=int, default=3)
+        self.parser.add_argument('--weight_softmax_tau', type=float, default=1.0)
+        self.parser.add_argument('--exp_temp', type=float, default=0.002)
     def parse(self):
         self.init()
         
