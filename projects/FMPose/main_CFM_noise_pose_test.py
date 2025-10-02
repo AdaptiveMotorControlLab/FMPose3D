@@ -137,12 +137,7 @@ def print_error_action(action_error_sum, is_train):
         print("{0:=^12} {1:=^10} {2:=^8}".format("Action", "p#1 mm", "p#2 mm"))
         logging.info("{0:=^12} {1:=^10} {2:=^8}".format("Action", "p#1 mm", "p#2 mm"))
 
-
     for action, value in action_error_sum.items():
-        if is_train == 0:
-            print("{0:<12} ".format(action), end="")
-            logging.info("{0:<12} ".format(action))
-
         mean_error_each['p1'] = action_error_sum[action]['p1'].avg * 1000.0
         mean_error_all['p1'].update(mean_error_each['p1'], 1)
 
@@ -150,8 +145,8 @@ def print_error_action(action_error_sum, is_train):
         mean_error_all['p2'].update(mean_error_each['p2'], 1)
 
         if is_train == 0:
-            print("{0:>6.2f} {1:>10.2f}".format(mean_error_each['p1'], mean_error_each['p2']))
-            logging.info("{0:>6.2f} {1:>10.2f}".format(mean_error_each['p1'], mean_error_each['p2']))
+            print("{0:<12} {1:>6.2f} {2:>10.2f}".format(action, mean_error_each['p1'], mean_error_each['p2']))
+            logging.info("{0:<12} {1:>6.2f} {2:>10.2f}".format(action, mean_error_each['p1'], mean_error_each['p2']))
 
     if is_train == 0:
         print("{0:<12} {1:>6.2f} {2:>10.2f}".format("Average", mean_error_all['p1'].avg, \
