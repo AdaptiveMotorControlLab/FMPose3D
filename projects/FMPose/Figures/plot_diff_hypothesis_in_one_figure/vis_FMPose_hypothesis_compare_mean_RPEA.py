@@ -694,16 +694,71 @@ def show_frame():
       print("list_hypothesis_last:", len(list_hypothesis_last))
       num_h = len(list_hypothesis_last)
       
+      # Prepare GT for reuse
+      gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
+      gt_vis[:, :, 0, :] = 0
+      gt_np = gt_vis[0, 0].cpu().detach().numpy()
+      
+      # Create a subfolder for individual hypotheses
+      hypothesis_folder = os.path.join(path, 'hypotheses')
+      os.makedirs(hypothesis_folder, exist_ok=True)
+      
+      # Save each hypothesis as a separate figure
+      for idx, hypo in enumerate(list_hypothesis_last):
+        fig_hypo = plt.figure(figsize=(figsize_x, figsize_y))
+        ax_hypo = plt.axes(projection='3d')
+        
+        # Plot GT in red
+        show3Dpose_GT(gt_np, ax_hypo, world=False, linewidth=1.0)
+        
+        # Plot this hypothesis
+        hypo_vis = hypo.clone()
+        hypo_vis[:, :, 0, :] = 0
+        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+        if num_h > 1:
+          shade = 0.35 + 0.45 * (idx / (num_h - 1))
+        else:
+          shade = 0.6
+        show3Dpose(pose_np, ax_hypo, color=(shade, shade, shade), world=False, linewidth=1.5)
+        
+        # Save individual hypothesis
+        hypo_path = os.path.join(hypothesis_folder, f'hypothesis_{idx:02d}.png')
+        plt.savefig(hypo_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+        plt.close(fig_hypo)
+      
+      print(f"Saved {num_h} individual hypotheses to {hypothesis_folder}")
+      
+      # Save a figure with GT + all hypotheses (no aggregation)
+      fig_all_hypo = plt.figure(figsize=(figsize_x, figsize_y))
+      ax_all_hypo = plt.axes(projection='3d')
+      
+      # Plot GT in red
+      show3Dpose_GT(gt_np, ax_all_hypo, world=False, linewidth=1.0)
+      
+      # Plot all hypotheses in gray
+      for idx, hypo in enumerate(list_hypothesis_last):
+        hypo_vis = hypo.clone()
+        hypo_vis[:, :, 0, :] = 0
+        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+        if num_h > 1:
+          shade = 0.35 + 0.45 * (idx / (num_h - 1))
+        else:
+          shade = 0.6
+        show3Dpose(pose_np, ax_all_hypo, color=(shade, shade, shade), world=False, linewidth=1.2)
+      
+      # Save all hypotheses figure
+      all_hypo_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_all_hypotheses.png')
+      plt.savefig(all_hypo_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+      plt.close(fig_all_hypo)
+      print(f"Saved all hypotheses: {all_hypo_path}")
+      
       # Single figure with both Mean and RPEA
       fig_compare = plt.figure(figsize=(figsize_x, figsize_y))
       ax_compare = plt.axes(projection='3d')
      
       # Plot GT in red
-      gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
-      gt_vis[:, :, 0, :] = 0
-      gt_np = gt_vis[0, 0].cpu().detach().numpy()
       show3Dpose_GT(gt_np, ax_compare, world=False, linewidth=1.2)
- 
+
       # Plot all hypotheses in gray
       for idx, hypo in enumerate(list_hypothesis_last):
         hypo_vis = hypo.clone()
