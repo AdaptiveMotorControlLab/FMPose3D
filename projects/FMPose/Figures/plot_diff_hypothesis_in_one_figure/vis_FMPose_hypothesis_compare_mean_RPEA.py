@@ -683,14 +683,14 @@ def show_frame():
     show3Dpose_GT(gt_np, ax1, world=False, linewidth=1.0)
 
 
-    # Visualization 1: Mean aggregation result
+    # Visualization: Mean and RPEA aggregation results in the same figure
     if 'list_hypothesis_last' in locals() and 'output_3D_mean' in locals():
       print("list_hypothesis_last:", len(list_hypothesis_last))
       num_h = len(list_hypothesis_last)
       
-      # Figure for Mean aggregation
-      fig_mean = plt.figure(figsize=(figsize_x, figsize_y))
-      ax_mean = plt.axes(projection='3d')
+      # Single figure with both Mean and RPEA
+      fig_compare = plt.figure(figsize=(figsize_x, figsize_y))
+      ax_compare = plt.axes(projection='3d')
       
       # Plot all hypotheses in gray
       for idx, hypo in enumerate(list_hypothesis_last):
@@ -701,55 +701,31 @@ def show_frame():
           shade = 0.35 + 0.45 * (idx / (num_h - 1))
         else:
           shade = 0.6
-        show3Dpose(pose_np, ax_mean, color=(shade, shade, shade), world=False, linewidth=1.2)
+        show3Dpose(pose_np, ax_compare, color=(shade, shade, shade), world=False, linewidth=1.2)
       
       # Plot Mean aggregated result in blue
       agg_mean_vis = output_3D_mean.clone()
       agg_mean_vis[:, :, 0, :] = 0
       agg_mean_np = agg_mean_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_mean_np, ax_mean, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
+      show3Dpose(agg_mean_np, ax_compare, color=(0/255, 176/255, 240/255), world=False, linewidth=1.5)
+      
+      # Plot RPEA aggregated result in orange
+      agg_rpea_vis = output_3D_RPEA.clone()
+      agg_rpea_vis[:, :, 0, :] = 0
+      agg_rpea_np = agg_rpea_vis[0, 0].cpu().detach().numpy()
+      show3Dpose(agg_rpea_np, ax_compare, color=(255/255, 140/255, 0/255), world=False, linewidth=1.5)  # Orange color
       
       # Plot GT in red
       gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
       gt_vis[:, :, 0, :] = 0
       gt_np = gt_vis[0, 0].cpu().detach().numpy()
-      show3Dpose_GT(gt_np, ax_mean, world=False, linewidth=1.0)
+      show3Dpose_GT(gt_np, ax_compare, world=False, linewidth=1.0)
       
-      # Save Mean aggregation figure
-      mean_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_mean.png')
-      plt.savefig(mean_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-      plt.close(fig_mean)
-      print(f"Saved Mean aggregation: {mean_path}")
-      
-      # Figure for RPEA aggregation
-      fig_rpea = plt.figure(figsize=(figsize_x, figsize_y))
-      ax_rpea = plt.axes(projection='3d')
-      
-      # Plot all hypotheses in gray
-      for idx, hypo in enumerate(list_hypothesis_last):
-        hypo_vis = hypo.clone()
-        hypo_vis[:, :, 0, :] = 0
-        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
-        if num_h > 1:
-          shade = 0.35 + 0.45 * (idx / (num_h - 1))
-        else:
-          shade = 0.6
-        show3Dpose(pose_np, ax_rpea, color=(shade, shade, shade), world=False, linewidth=1.2)
-      
-      # Plot RPEA aggregated result in green
-      agg_rpea_vis = output_3D_RPEA.clone()
-      agg_rpea_vis[:, :, 0, :] = 0
-      agg_rpea_np = agg_rpea_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_rpea_np, ax_rpea, color=(34/255, 139/255, 34/255), world=False, linewidth=1.2)  # Green color
-      
-      # Plot GT in red
-      show3Dpose_GT(gt_np, ax_rpea, world=False, linewidth=1.0)
-      
-      # Save RPEA aggregation figure
-      rpea_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_rpea.png')
-      plt.savefig(rpea_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-      plt.close(fig_rpea)
-      print(f"Saved RPEA aggregation: {rpea_path}")
+      # Save comparison figure
+      compare_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_compare.png')
+      plt.savefig(compare_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+      plt.close(fig_compare)
+      print(f"Saved Mean vs RPEA comparison: {compare_path}")
     
     # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
     
