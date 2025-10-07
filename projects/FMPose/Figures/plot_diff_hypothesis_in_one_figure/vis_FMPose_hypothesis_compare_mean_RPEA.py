@@ -640,7 +640,13 @@ def show_frame():
         
         list_hypothesis_last = list_hypothesis
         # output_3D_s_last = output_3D_s
-                
+    
+    loss_mean = mpjpe_cal(output_3D_mean, out_target)*1000  
+    loss_RPEA = mpjpe_cal(output_3D_RPEA, out_target)*1000  
+    delta = loss_mean - loss_RPEA
+    print(f"loss_mean: {loss_mean.item():.2f}, loss_RPEA: {loss_RPEA.item():.2f}", f"delta: {delta.item():.2f}")
+    if delta < 10 or loss_mean > 65:
+      continue
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
     # pose 打印在image上
@@ -691,7 +697,13 @@ def show_frame():
       # Single figure with both Mean and RPEA
       fig_compare = plt.figure(figsize=(figsize_x, figsize_y))
       ax_compare = plt.axes(projection='3d')
-      
+     
+      # Plot GT in red
+      gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
+      gt_vis[:, :, 0, :] = 0
+      gt_np = gt_vis[0, 0].cpu().detach().numpy()
+      show3Dpose_GT(gt_np, ax_compare, world=False, linewidth=1.2)
+ 
       # Plot all hypotheses in gray
       for idx, hypo in enumerate(list_hypothesis_last):
         hypo_vis = hypo.clone()
@@ -707,22 +719,16 @@ def show_frame():
       agg_mean_vis = output_3D_mean.clone()
       agg_mean_vis[:, :, 0, :] = 0
       agg_mean_np = agg_mean_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_mean_np, ax_compare, color=(0/255, 176/255, 240/255), world=False, linewidth=1.5)
+      show3Dpose(agg_mean_np, ax_compare, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
       
       # Plot RPEA aggregated result in orange
       agg_rpea_vis = output_3D_RPEA.clone()
       agg_rpea_vis[:, :, 0, :] = 0
       agg_rpea_np = agg_rpea_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_rpea_np, ax_compare, color=(255/255, 140/255, 0/255), world=False, linewidth=1.5)  # Orange color
-      
-      # Plot GT in red
-      gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
-      gt_vis[:, :, 0, :] = 0
-      gt_np = gt_vis[0, 0].cpu().detach().numpy()
-      show3Dpose_GT(gt_np, ax_compare, world=False, linewidth=1.0)
+      show3Dpose(agg_rpea_np, ax_compare, color=(255/255, 140/255, 0/255), world=False, linewidth=1.2)  # Orange color
       
       # Save comparison figure
-      compare_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_compare.png')
+      compare_path = os.path.join(path, action[0] + '_idx_' + str(i_data) +'loss_mean_' + f'{loss_mean.item():.1f}' + '_delta_' + f'{delta.item():.1f}' + '_compare.png')
       plt.savefig(compare_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
       plt.close(fig_compare)
       print(f"Saved Mean vs RPEA comparison: {compare_path}")
