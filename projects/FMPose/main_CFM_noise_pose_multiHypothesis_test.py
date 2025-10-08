@@ -218,8 +218,9 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     # Convert 2D losses to weights using softmax over top-k hypotheses per joint
     tau = float(getattr(args, 'weight_softmax_tau', 1.0))
     H = dist.size(1)
-    k = int(getattr(args, 'topk', min(3, H)))
+    k = int(getattr(args, 'topk', None))
     # print("k:", k)
+    # k = int(H//2)+1
     k = max(1, min(k, H))
 
     # top-k smallest distances along hypothesis dim
@@ -411,22 +412,30 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
                 
                 y = torch.randn_like(gt_3D)
                 y_s = euler_sample(input_2D_nonflip, y, s_keep)
-                if args.test_augmentation:
-                    joints_left = [4, 5, 6, 11, 12, 13]
-                    joints_right = [1, 2, 3, 14, 15, 16]
-                    
+                
+                # if args.test_augmentation:
+                #     y_flip = torch.randn_like(gt_3D)
+                #     y_flip[:, :, :, 0] *= -1
+                #     y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
+                #     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
+                #     y_flip_s[:, :, :, 0] *= -1
+                #     y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
+                #     y_s = (y_s + y_flip_s) / 2
+                
+                if args.test_augmentation_flip_hypothesis:
                     y_flip = torch.randn_like(gt_3D)
-                    y_flip[:, :, :, 0] *= -1
-                    y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                    # y_flip[:, :, :, 0] *= -1
+                    # y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
                     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
                     y_flip_s[:, :, :, 0] *= -1
-                    y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                    y_s = (y_s + y_flip_s) / 2
+                    y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
+                    y_flip_s = y_flip_s[:, args.pad].unsqueeze(1)
+                    y_flip_s[:, :, 0, :] = 0
+                    list_hypothesis.append(y_flip_s)
                 
                 # per-step metrics only; do not store per-sample outputs
                 output_3D_s = y_s[:, args.pad].unsqueeze(1)
                 output_3D_s[:, :, 0, :] = 0
-                
                 list_hypothesis.append(output_3D_s)
             
             # output_3D_s = aggregate_hypothesis(list_hypothesis)
