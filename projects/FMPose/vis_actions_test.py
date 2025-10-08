@@ -600,7 +600,6 @@ if __name__ == "__main__":
   manualSeed = 1
   random.seed(manualSeed)
   torch.manual_seed(manualSeed)
-  torch.manual_seed(manualSeed)
   np.random.seed(manualSeed)
   torch.cuda.manual_seed_all(manualSeed)
   torch.backends.cudnn.benchmark = False
