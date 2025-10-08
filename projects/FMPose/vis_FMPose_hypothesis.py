@@ -38,7 +38,6 @@ dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
 dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=True, num_workers=16)
 
-
 model = {}
 model['CFM'] = CFM(args).cuda()
 
