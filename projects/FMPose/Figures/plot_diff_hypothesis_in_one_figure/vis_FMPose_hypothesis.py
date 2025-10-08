@@ -8,15 +8,22 @@ import os
 import cv2
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
 from common.utils import *
-
 from common.arguments import opts as parse_args
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-exec('from model.' + args.model + ' import Model as CFM')
+if getattr(args, 'model_path', ''):
+    import importlib.util
+    import pathlib
+    model_abspath = os.path.abspath(args.model_path)
+    module_name = pathlib.Path(model_abspath).stem
+    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    CFM = getattr(module, 'Model')
 
 import matplotlib
 plt.switch_backend('agg')
@@ -29,7 +36,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
 dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
-dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=True, num_workers=16)
+dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=True, num_workers=16)
 
 model = {}
 model['CFM'] = CFM(args).cuda()
@@ -98,7 +105,7 @@ def drawskeleton(kps, img, thickness=3, mpii=2):
 
     return img
 
-def show3Dpose_GT(channels, ax, world = True): # blue, orange
+def show3Dpose_GT(channels, ax, world = True, linewidth = 2.5): # blue, orange
   # colors = [(255/255, 128/255, 255/255), # 躯干
   #           (127/255, 127/255, 255/255), # 手
   #           (255/255, 127/255, 127/255)] # 脚
@@ -125,7 +132,7 @@ def show3Dpose_GT(channels, ax, world = True): # blue, orange
     else:
       x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
 
-    ax.plot(x, y, z, lw=2.5, color = colors[LR[i]-1])
+    ax.plot(x, y, z, lw=linewidth, color = colors[LR[i]-1])
     # ax.scatter(x, y, z, color=(0, 1, 0))
 
   RADIUS = 0.55 
@@ -159,7 +166,7 @@ def show3Dpose_GT(channels, ax, world = True): # blue, orange
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
     ax.invert_zaxis()
 
-def show3Dpose(channels, ax, color, world = True): # blue, orange
+def show3Dpose(channels, ax, color, world = True, linewidth = 2.5): # blue, orange
   # colors = [(255/255, 128/255, 255/255), # 躯干
   #           (127/255, 127/255, 255/255), # 手
   #           (255/255, 127/255, 127/255)] # 脚
@@ -185,7 +192,7 @@ def show3Dpose(channels, ax, color, world = True): # blue, orange
       x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
       x2, z2, y2 = [np.array( [vals[I[i], j]+np.random.random_sample()*0.01, vals[J[i], j]+np.random.random_sample()*0.01] ) for j in range(3)]
 
-    ax.plot(x, y, z, lw=2.5, color = color)
+    ax.plot(x, y, z, lw=linewidth, color = color)
 
   RADIUS = 0.55 
   xroot, yroot, zroot = vals[0,0], vals[0,1], vals[0,2]
@@ -218,7 +225,7 @@ def show3Dpose(channels, ax, color, world = True): # blue, orange
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
     ax.invert_zaxis()
 
-def show2Dpose(channels, ax, color): # blue, orange
+def show2Dpose(channels, ax): # blue, orange
   vals = np.reshape( channels, (17, 2) )
   # vals = np.reshape( channels, (16, 2))
   # human3.6m
@@ -234,8 +241,8 @@ def show2Dpose(channels, ax, color): # blue, orange
     # ax.text(x[0] - 0.12, y[0], joints_name[I[i]], size = 9)
     # ax.text(x[1] - 0.12 , y[1], joints_name[J[i]], size = 9)
 
-    ax.plot(x, y, lw=4, color=color) # lw=2
-    ax.scatter(x, y, s=5, color=color) # s 默认是20
+    ax.plot(x, y, lw=1) # lw=2
+    ax.scatter(x, y,s=5) # s 默认是20
     ax.set_aspect('equal') # 正常的人体比例
 
   # ax.invert_xaxis()
@@ -246,76 +253,19 @@ def show2Dpose(channels, ax, color): # blue, orange
   white = (1.0, 1.0, 1.0, 0.0)
   plt.axis('off')
 
-
-def show3Dpose_no_bg(channels, ax, color, world = True): # blue, orange
-  vals = np.reshape( channels, (17, 3) )
-
-  I = np.array( [0, 0, 1, 4, 2, 5, 0, 7,  8,  8, 14, 15, 11, 12, 8,  9]) # start points
-  J = np.array( [1, 4, 2, 5, 3, 6, 7, 8, 14, 11, 15, 16, 12, 13, 9, 10]) # end points
-  LR =          [2, 1, 2, 1, 2, 1, 1, 1,  2,  1,  2,  2,  1,  1, 2,  2]
-
-  # LR = [3, 3, 3, 3, 3, 3, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1]
-
-  for i in np.arange( len(I) ):
-    if world:
-      x, y, z = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
-    else:
-      x, z, y = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
-      x2, z2, y2 = [np.array( [vals[I[i], j]+np.random.random_sample()*0.01, vals[J[i], j]+np.random.random_sample()*0.01] ) for j in range(3)]
-
-    ax.plot(x, y, z, lw=2.5, color = color)
-
-  RADIUS = 0.55 
-  xroot, yroot, zroot = vals[0,0], vals[0,1], vals[0,2]
-  ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
-  ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
-  ax.set_ylim3d([-RADIUS+zroot, RADIUS+zroot])
-  # ax.set_zlim3d([0, 1.7])
-  # ax.set_aspect('equal')
-  # ax.set_aspect('auto')
-  ax.set_box_aspect([1,1,1])
-
-  # ax.set_xticks([]) # 不显示坐标 和 线
-  # ax.set_yticks([]) 
-  # ax.set_zticks([]) 
-
-  white = (1.0, 1.0, 1.0, 0.0)
-  ax.xaxis.set_pane_color(white) #不显示背景
-  ax.yaxis.set_pane_color(white)
-  ax.zaxis.set_pane_color(white)
-
-  # ax.w_xaxis.line.set_color(white) #不限制边缘线
-  # ax.w_yaxis.line.set_color(white)
-  # ax.w_zaxis.line.set_color(white)
-
-  ax.tick_params('x', labelbottom = False) # 不显示坐标轴文本
-  ax.tick_params('y', labelleft = False)
-  ax.tick_params('z', labelleft = False)
-
-  if not world: 
-    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
-    ax.invert_zaxis()
-  
-  # Fully disable background for 3D pose
-  ax.set_axis_off()
-  ax.set_facecolor('none')
-    
 def save3Dpose(index, pose3D, out_target, ax, color, save_path, action, dpi_number):
 
     pose3D[:, :, 0] = 0
     # p1 = mpjpe_cal(pose3D, out_target) * 1000
     pose3D = pose3D[0, 0].cpu().detach().numpy()
     plt.sca(ax)
-    show3Dpose_no_bg(pose3D, ax, color= color, world= False)
+    show3Dpose(pose3D, ax, color= color, world= False)
     # Remove the background
     # ax.set_axis_off()
     # Set the background to transparent
     # ax.patch.set_alpha(0)
-    # plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '.png', dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=True)
-    ax.set_axis_off()
-    ax.set_facecolor('none')
-    ax.get_figure().patch.set_alpha(0.0)
-    plt.savefig(save_path, dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=True)
+    # plt.savefig(save_path + '/' + action + '_idx_'+ str(index) + '.png', dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=False)
+    plt.savefig(save_path, dpi=dpi_number, format='png', bbox_inches = 'tight', transparent=False)
     return 0
   
 def save3Dpose_svg(index, pose3D, out_target, ax, color, save_path, action, iter_num, iter_opt, dpi_number):
@@ -355,7 +305,6 @@ def show_input(img, ax):
     # ax.set_yticks([]) 
     plt.axis('off')
 
-
 def input_augmentation(input_2D, model, joints_left, joints_right):
     output_3D_non_flip = model(input_2D[:, 0])
     output_3D_flip     = model(input_2D[:, 1])
@@ -394,8 +343,8 @@ def show_frame():
     import shutil
     file_name = os.path.basename(__file__)
     shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
-    shutil.copyfile(src="run_FM_vis.sh", dst = os.path.join(folder, args.create_time + "_run_FM_vis.sh"))
-
+    shutil.copyfile(src="vis_FM_multi_hypothesis.sh", dst = os.path.join(folder, args.create_time + "_vis_FM_multi_hypothesis.sh"))
+    shutil.copyfile(src="vis_FMPose_hypothesis.py", dst = os.path.join(folder, args.create_time + "_vis_FMPose_hypothesis.py"))
   figsize_x = 6.4*2
   figsize_y = 3.6*2
   dpi_number = 1000
@@ -425,9 +374,7 @@ def show_frame():
     # else:
     #   continue
     # error = eval_cal.mpjpe(input_2D[:, 0], input_2D_GT[:, 0]) / 2 * 1000
-    if i_data < 11:
-      continue
-    
+        
     [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
     input_2D_GT = input_2D_GT[:, 0, args.pad].unsqueeze(1) # 1,1,17,2
     input_2D_no = input_2D_no[:, 0, args.pad].unsqueeze(1)
@@ -436,7 +383,58 @@ def show_frame():
     input_2D_flip = input_2D[:, 1]
     out_target = gt_3D.clone() # B F J 3
     out_target[:, :, args.root_joint] = 0
-     
+    
+    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
+    def euler_sample(x2d, y_local, steps, model_3d):
+        list_v_s = []
+        dt = 1.0 / steps
+        for s in range(steps):
+            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+            v_s = model_3d(x2d, y_local, t_s)
+            y_local = y_local + dt * v_s
+            list_v_s.append(v_s)
+        return y_local, list_v_s
+        # return y_local
+    
+    for s_keep in eval_steps:
+        list_hypothesis = []
+        for i in range(args.hypothesis_num):
+            
+            y = torch.randn_like(gt_3D)
+            
+            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
+            vis_v_s = False
+            if vis_v_s:
+              path_vis_v_s = folder + '/' + "vis_v_s"
+              if not os.path.exists(path_vis_v_s):
+                os.makedirs(path_vis_v_s)
+              for i in range(len(list_v_s)):
+                
+                figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
+                ax1 = plt.axes(projection = '3d')  
+                img_path = path_vis_v_s + '/' + "steps_" + str(i) + "_" + action[0] + '_idx_' + str(i_data) + '.png'
+                _ = save3Dpose(i_data, list_v_s[i], out_target, ax1, (0.99, 0, 0), img_path, action[0], dpi_number=dpi_number)
+                plt.close(figx)
+                
+            # if args.test_augmentation:
+            #     y_flip = torch.randn_like(gt_3D)
+            #     y_flip[:, :, :, 0] *= -1
+            #     y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
+            #     y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
+            #     y_flip_s[:, :, :, 0] *= -1
+            #     y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
+            #     y_s = (y_s + y_flip_s) / 2
+            
+            # per-step metrics only; do not store per-sample outputs
+            output_3D_s = y_s[:, args.pad].unsqueeze(1)
+            output_3D_s[:, :, 0, :] = 0
+            
+            list_hypothesis.append(output_3D_s)
+        
+        output_3D_s = aggregate_hypothesis(list_hypothesis)
+        list_hypothesis_last = list_hypothesis
+        output_3D_s_last = output_3D_s
+                
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
     # pose 打印在image上
@@ -459,14 +457,6 @@ def show_frame():
     path = folder + "/" + str(i_data)
     if not os.path.exists(path):
         os.makedirs(path) 
-    # path_nonflip_PU_svg = path + '/' + "nonflip_PU_svg"
-    # path_nonflip_P = path + '/' + "nonflip_P"
-    # path_nonflip_PU = path + '/' + "nonflip_PU"
-    # # path_mix_z = path + '/' + "mix_z"
-    # path_list = [path_nonflip_P, path_nonflip_PU]
-    # for path1 in path_list:
-    #     if not os.path.exists(path1):
-    #         os.makedirs(path1)
    
     # show images
     out_dir = path + '/' + subject[0] + '_' + action[0] + camera_index + '_'
@@ -477,80 +467,37 @@ def show_frame():
     cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
 
 
-    # save 2D pose with transparent background
-    fig_2d, ax_2d = plt.subplots(figsize=(figsize_x, figsize_y))
-    color = (0/255, 176/255, 240/255)
-    show2Dpose(input_2D_no, ax_2d, color)
-    ax_2d.set_axis_off()
-    fig_2d.patch.set_alpha(0.0)
-    ax_2d.set_facecolor('none')
-    plt.savefig(out_dir + str(i_data) + '_2d_transparent.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=True)
-    plt.close(fig_2d)
-
-
-    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
-    def euler_sample(x2d, y_local, steps, model_3d):
-        list_v_s = []
-        dt = 1.0 / steps
-        for s in range(steps):
-            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-            v_s = model_3d(x2d, y_local, t_s)
-            y_local = y_local + dt * v_s
-            list_v_s.append(v_s)
-        return y_local, list_v_s
-        # return y_local
-    
-    for s_keep in eval_steps:
-        list_hypothesis = []
-        for hy_index in range(args.hypothesis_num):
-            
-            y = torch.randn_like(gt_3D)
-            
-            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            
-            color=(0/255, 176/255, 240/255)
-          
-            # figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            # ax1 = plt.axes(projection = '3d')
-            # img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_noisy_input'+ '.png'
-            # _ = save3Dpose(i_data, y, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            # plt.close(figx)
-            
-            figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            ax1 = plt.axes(projection = '3d')
-            img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + str(hy_index) + '.png'
-            _ = save3Dpose(i_data, y_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            plt.close(figx)
-                  
-                
-            if args.test_augmentation:
-                
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
-                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
-                y_s = (y_s + y_flip_s) / 2
-            
-            # per-step metrics only; do not store per-sample outputs
-            output_3D_s = y_s[:, args.pad].unsqueeze(1)
-            output_3D_s[:, :, 0, :] = 0
-            
-            list_hypothesis.append(output_3D_s)
-        
-        output_3D_s = aggregate_hypothesis(list_hypothesis)
-
-        figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-        ax1 = plt.axes(projection = '3d')
-        img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + '_final.png'
-        _ = save3Dpose(i_data,output_3D_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-        plt.close(figx) 
-        
-
     # figure
     fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
     ax1 = plt.axes(projection = '3d')  
+
+    gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
+    gt_vis[:, :, 0, :] = 0
+    gt_np = gt_vis[0, 0].cpu().detach().numpy()
+    show3Dpose_GT(gt_np, ax1, world=False, linewidth=1.0)
+
+
+    # Overlay: all hypotheses (gray), aggregated (blue), GT (red)
+    if 'list_hypothesis_last' in locals() and 'output_3D_s_last' in locals():
+      print("list_hypothesis_last:", len(list_hypothesis_last))
+      num_h = len(list_hypothesis_last)
+      for idx, hypo in enumerate(list_hypothesis_last):
+        hypo_vis = hypo.clone()
+        hypo_vis[:, :, 0, :] = 0
+        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+        if num_h > 1:
+          shade = 0.35 + 0.45 * (idx / (num_h - 1))
+        else:
+          shade = 0.6
+        show3Dpose(pose_np, ax1, color=(shade, shade, shade), world=False, linewidth=1.2)
+
+      agg_vis = output_3D_s_last.clone()
+      agg_vis[:, :, 0, :] = 0
+      agg_np = agg_vis[0, 0].cpu().detach().numpy()
+      show3Dpose(agg_np, ax1, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
+
+      overlay_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_overlay.png')
+      plt.savefig(overlay_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
     
     # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
     
@@ -561,7 +508,6 @@ def show_frame():
         
     plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
     plt.close () #完全关闭图形窗口
-    break
  
 if __name__ == "__main__":
   # Delete_Files('results/')

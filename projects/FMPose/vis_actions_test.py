@@ -1,14 +1,12 @@
 import sys
 sys.path.append("..")
 import random
-import torch
 import numpy as np
 import matplotlib.pyplot as plt 
 import os
 import cv2
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 from common.load_data_hm36_vis import Fusion
 from common.h36m_dataset import Human36mDataset
 from common.utils import *
@@ -16,7 +14,6 @@ from common.utils import *
 from common.arguments import opts as parse_args
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-exec('from model.' + args.model + ' import Model as CFM')
 
 import matplotlib
 plt.switch_backend('agg')
@@ -26,23 +23,61 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 ## dataset
 # dataset_path = "/home/xiu/codes/pose/Baseline/dataset/data_2d_h36m_gt.npz"
+
 dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
 dataset = Human36mDataset(dataset_path, args)
 test_data = Fusion(opt=args, train=False, dataset=dataset, root_path =args.root_path)
-dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=True, num_workers=16)
+dataloader = torch.utils.data.DataLoader(test_data, batch_size=2, shuffle=True, num_workers=16)
 
-model = {}
-model['CFM'] = CFM(args).cuda()
+# count actions utility
+def count_and_save_actions(loader, out_path='Vis/actions/test_actions_stats.json'):
+    from collections import Counter
+    counts = Counter()
+    with torch.no_grad():
+        for _, _, _, _, _, action, _, _, _ in tqdm(loader, 0):
+            # Follow mpjpe_by_action_p1 pattern using num = len(action)
+            action_list = list(action)
+            num = len(action_list)
+            if num == 1:
+                full_name = action_list[0]
+                end_index = full_name.find(' ')
+                if end_index != -1:
+                    base_name = full_name[:end_index]
+                else:
+                    base_name = full_name
+                counts[base_name] += 1
+            else:
+                for i in range(num):
+                    full_name = action_list[i]
+                    end_index = full_name.find(' ')
+                    if end_index != -1:
+                        base_name = full_name[:end_index]
+                    else:
+                        base_name = full_name
+                    counts[base_name] += 1
 
-if args.reload:
-    model_dict = model['CFM'].state_dict()
-    model_path = args.saved_model_path
-    print(model_path)
-    pre_dict = torch.load(model_path)
-    for name, key in model_dict.items():
-        model_dict[name] = pre_dict[name]
-    model['CFM'].load_state_dict(model_dict)
-    print("Load model Successfully!")
+    import json
+    import os
+    import csv
+    dir_path = os.path.dirname(out_path) or '.'
+    os.makedirs(dir_path, exist_ok=True)
+
+    stats = {
+        'num_unique_actions': len(counts),
+        'counts': dict(counts)
+    }
+    with open(out_path, 'w') as f:
+        json.dump(stats, f, indent=2, ensure_ascii=False)
+    print(f"Saved actions stats to {out_path}. Unique actions: {len(counts)}")
+
+    # also save CSV next to JSON
+    csv_path = os.path.splitext(out_path)[0] + '.csv'
+    with open(csv_path, 'w', newline='') as cf:
+        writer = csv.writer(cf)
+        writer.writerow(['action', 'count'])
+        for k, v in counts.items():
+            writer.writerow([k, v])
+    print(f"Saved actions stats CSV to {csv_path}")
 
 def getFiles(path):
     image_files = []
@@ -142,10 +177,10 @@ def show3Dpose_GT(channels, ax, world = True): # blue, orange
   # ax.set_yticks([]) 
   # ax.set_zticks([]) 
 
-  white = (1.0, 1.0, 1.0, 0.0)
-  ax.xaxis.set_pane_color(white) #不显示背景
-  ax.yaxis.set_pane_color(white)
-  ax.zaxis.set_pane_color(white)
+  # white = (1.0, 1.0, 1.0, 0.0)
+  # ax.xaxis.set_pane_color(white) #不显示背景
+  # ax.yaxis.set_pane_color(white)
+  # ax.zaxis.set_pane_color(white)
 
   # ax.w_xaxis.line.set_color(white) #不限制边缘线
   # ax.w_yaxis.line.set_color(white)
@@ -355,18 +390,6 @@ def show_input(img, ax):
     # ax.set_yticks([]) 
     plt.axis('off')
 
-
-def input_augmentation(input_2D, model, joints_left, joints_right):
-    output_3D_non_flip = model(input_2D[:, 0])
-    output_3D_flip     = model(input_2D[:, 1])
-
-    output_3D_flip[:, :, :, 0] *= -1
-    output_3D_flip[:, :, joints_left + joints_right, :] = output_3D_flip[:, :, joints_right + joints_left, :] 
-
-    output_3D = (output_3D_non_flip + output_3D_flip) / 2
-
-    return output_3D
-
 def mpjpe_cal(predicted, target):
     assert predicted.shape == target.shape
     return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
@@ -376,8 +399,6 @@ def aggregate_hypothesis(list_hypothesis):
 
 
 def show_frame():
-  model_FMPose = model['CFM']
-  model_FMPose.eval()
   
   import time
   logtime = time.strftime('%y%m%d_%H%M_%S')
@@ -400,11 +421,9 @@ def show_frame():
   figsize_y = 3.6*2
   dpi_number = 1000
   
-  eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
-  
-
   
   for i_data, data in enumerate(tqdm(dataloader, 0)):
+    
     batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
     
     index_image = index + args.pad + 1
@@ -422,11 +441,7 @@ def show_frame():
     #   (subject[0] == 'S11' and action[0] == 'Photo' and index_image == 362) and cam_ind[0] == 1 or \
     #   (subject[0] == 'S11' and action[0] == 'Posing' and index_image == 185) and cam_ind[0] == 1:
     #   pass
-    # else:
-    #   continue
-    # error = eval_cal.mpjpe(input_2D[:, 0], input_2D_GT[:, 0]) / 2 * 1000
-    if i_data < 11:
-      continue
+
     
     [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
     input_2D_GT = input_2D_GT[:, 0, args.pad].unsqueeze(1) # 1,1,17,2
@@ -487,90 +502,111 @@ def show_frame():
     plt.savefig(out_dir + str(i_data) + '_2d_transparent.png', dpi=dpi_number, format='png', bbox_inches='tight', transparent=True)
     plt.close(fig_2d)
 
-
-    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
-    def euler_sample(x2d, y_local, steps, model_3d):
-        list_v_s = []
-        dt = 1.0 / steps
-        for s in range(steps):
-            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-            v_s = model_3d(x2d, y_local, t_s)
-            y_local = y_local + dt * v_s
-            list_v_s.append(v_s)
-        return y_local, list_v_s
-        # return y_local
-    
-    for s_keep in eval_steps:
-        list_hypothesis = []
-        for hy_index in range(args.hypothesis_num):
-            
-            y = torch.randn_like(gt_3D)
-            
-            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            
-            color=(0/255, 176/255, 240/255)
-          
-            # figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            # ax1 = plt.axes(projection = '3d')
-            # img_path = folder + '/' + action[0] + '_idx_' + str(i_data) + '_noisy_input'+ '.png'
-            # _ = save3Dpose(i_data, y, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            # plt.close(figx)
-            
-            figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-            ax1 = plt.axes(projection = '3d')
-            img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + str(hy_index) + '.png'
-            _ = save3Dpose(i_data, y_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-            plt.close(figx)
-                  
-                
-            if args.test_augmentation:
-                
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
-                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
-                y_s = (y_s + y_flip_s) / 2
-            
-            # per-step metrics only; do not store per-sample outputs
-            output_3D_s = y_s[:, args.pad].unsqueeze(1)
-            output_3D_s[:, :, 0, :] = 0
-            
-            list_hypothesis.append(output_3D_s)
-        
-        output_3D_s = aggregate_hypothesis(list_hypothesis)
-
-        figx  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-        ax1 = plt.axes(projection = '3d')
-        img_path = path + '/' + action[0] + '_idx_' + str(i_data) +'_hypo_' + '_final.png'
-        _ = save3Dpose(i_data,output_3D_s, out_target, ax1, color, img_path, action[0], dpi_number=dpi_number)
-        plt.close(figx) 
-        
-
-    # figure
-    fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-    ax1 = plt.axes(projection = '3d')  
-    
-    # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
-    
-
-    # # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(i_data)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_P, duration=0.3)
-    # # create_gif(path_mix_z + '/' + action[0] +"_idx" + str(i)+ "_iter" + str(iter_num) + '.gif', folder_path=path_mix_z, duration=0.25)
-    # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(index_image)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_PU, duration=0.3)
-        
     plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
     plt.close () #完全关闭图形窗口
     break
  
+
+def plot_samples_per_action(loader, samples_root='samples', per_action=4, dpi=300):
+  os.makedirs(samples_root, exist_ok=True)
+  target_actions = define_actions('All')
+  remaining = {a: per_action for a in target_actions}
+
+  with torch.no_grad():
+    for data in tqdm(loader, 0):
+      batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
+      [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
+
+      print(batch_cam.shape)
+      # break
+    
+      B = gt_3D.size(0)
+      for b in range(B):
+        full_action = action[b]
+        if not isinstance(full_action, str):
+          full_action = str(full_action)
+        end_index = full_action.find(' ')
+        base_action = full_action[:end_index] if end_index != -1 else full_action
+
+        if base_action not in remaining or remaining[base_action] <= 0:
+          continue
+
+        subj = subject[b] if isinstance(subject[b], str) else str(subject[b])
+        cam_id = int(cam_ind[b].item()) if hasattr(cam_ind[b], 'item') else int(cam_ind[b])
+        if cam_id == 0:
+          camera_index = '.54138969'
+        elif cam_id == 1:
+          camera_index = '.55011271'
+        elif cam_id == 2:
+          camera_index = '.58860488'
+        else:
+          camera_index = '.60457274'
+
+        idx_image = int(index[b].item()) if hasattr(index[b], 'item') else int(index[b])
+        idx_image = idx_image + args.pad + 1
+
+        image_dir = '/media/ti/datasets/Human3.6M/my/images'
+        image_path = os.path.join(image_dir, str(subj), full_action + camera_index, f"{idx_image:04d}.jpg")
+        if not os.path.exists(image_path):
+          continue
+        img = cv2.imread(image_path)
+        if img is None:
+          continue
+
+        # 2D pose for this sample/frame
+        # input_2D_no: (B, 2, F, J, 2) -> [b, 0, pad] -> (J,2)
+        try:
+          kps2d = input_2D_no[b, 0, args.pad].detach().cpu().numpy()
+        except Exception:
+          continue
+        img_overlay = drawskeleton(kps2d, img.copy())
+        img_overlay_rgb = cv2.cvtColor(img_overlay, cv2.COLOR_BGR2RGB)
+
+        # 3D GT pose for the same sample/frame
+        pose3d = gt_3D[b, args.pad].detach().cpu().numpy()  # (J,3)
+        # set root joint to origin for visualization
+        pose3d[args.root_joint] = 0
+
+        # Create figure with two subplots (second is 3D)
+        fig = plt.figure(figsize=(10, 4))
+        ax_img = fig.add_subplot(1, 2, 1)
+        ax_3d = fig.add_subplot(1, 2, 2, projection='3d')
+        ax_img.imshow(img_overlay_rgb)
+        ax_img.axis('off')
+        color = (0/255, 176/255, 240/255)
+        show3Dpose(pose3d, ax_3d, color=color, world=False)
+        fig.tight_layout()
+
+        out_dir = os.path.join(samples_root, base_action)
+        os.makedirs(out_dir, exist_ok=True)
+        example_idx = per_action - remaining[base_action] + 1
+        out_name = f"{base_action}_{example_idx:02d}.png"
+        out_path = os.path.join(out_dir, out_name)
+        plt.savefig(out_path, dpi=dpi, bbox_inches='tight')
+        plt.close(fig)
+
+        remaining[base_action] -= 1
+
+      # stop early if all collected
+      if all(v <= 0 for v in remaining.values()):
+        break
+
+  # also return a small report
+  return {k: per_action - max(0, v) for k, v in remaining.items()}
+
+
 if __name__ == "__main__":
-  # Delete_Files('results/')
+#   # Delete_Files('results/')
   manualSeed = 1
   random.seed(manualSeed)
-  torch.manual_seed(manualSeed)
   torch.manual_seed(manualSeed)
   np.random.seed(manualSeed)
   torch.cuda.manual_seed_all(manualSeed)
   torch.backends.cudnn.benchmark = False
   torch.backends.cudnn.deterministic = True
-  show_frame()
+  # Always compute and save action stats to Vis/actions before visualization
+  # count_and_save_actions(dataloader)
+  # show_frame()
+  
+  # Run the sampler to save figures under samples/
+  plot_samples_per_action(dataloader, samples_root='./Vis/samples', per_action=4, dpi=300)

@@ -1,4 +1,5 @@
 import os
+import glob
 import torch
 import random
 import logging
@@ -27,7 +28,7 @@ if getattr(args, 'model_path', ''):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     CFM = getattr(module, 'Model')
-    
+
 # wandb logging (assumed available)
 import wandb
 WANDB_AVAILABLE = False
@@ -42,6 +43,7 @@ def val(opt, actions, val_loader, model, steps=None):
 def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, steps=None):
 
     loss_all = {'loss': AccumLoss()}
+
     action_error_sum = define_error_list(actions)
     
     model_3d = model['CFM']
@@ -49,7 +51,16 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         model_3d.train()
     else:
         model_3d.eval()
-        
+
+    # cache for mean 3D pose (shape: F,J,3). Loaded or computed on first train batch
+    mean_3D_pose_tensor = None
+    mean_3D_pose_path = os.path.join('./dataset', 'mean_3D_pose.npz')
+    npz = np.load(mean_3D_pose_path)
+    mean_arr = npz['mean_3D']  # expected shape: (1,1,J,3)
+    # Convert to tensor but delay device/dtype conversion until we have gt_3D
+    mean_3D_pose_tensor = torch.from_numpy(mean_arr).float()
+    mean_3D_pose_tensor = mean_3D_pose_tensor.cuda()
+    
     # determine steps for single-step evaluation per call
     steps_to_use = steps
 
@@ -57,13 +68,16 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
+        # if i>10 and i< len(dataLoader)-10:
+        #     continue
         if split =='train':
-            
-            # gt_3D[:, :, 0] = 0
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
-            x0_noise = torch.randn_like(gt_3D)
-            x0 = x0_noise
+            # Use template mean 3D pose as x0 instead of random noise
+            x0 = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            x0 = x0.expand_as(gt_3D)
+            x0_noise = torch.randn_like(x0)
+            x0 = x0 + x0_noise
             
             B = gt_3D.size(0)
             # t on correct device/dtype and broadcastable: (B,1,1,1)
@@ -100,17 +114,22 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
                     y_local = y_local + dt * v_s
                 return y_local
             
-            # start from noise as in original variant
-            y = torch.randn_like(gt_3D)
+            y = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
+            y = y.expand_as(gt_3D)
+            y = y + torch.randn_like(y)
             y_s = euler_sample(input_2D_nonflip, y, steps_to_use)
             if args.test_augmentation:
-                y_flip = torch.randn_like(gt_3D)
+                joints_left = [4, 5, 6, 11, 12, 13]
+                joints_right = [1, 2, 3, 14, 15, 16]
+                y_flip = mean_3D_pose_tensor.clone().to(device=gt_3D.device, dtype=gt_3D.dtype)
                 y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
+                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
+                y_flip = y_flip.expand_as(gt_3D)
+                y_flip = y_flip + torch.randn_like(y_flip)
                 y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
-                y_flip_s = y_flip_s.clone()
+                y_flip_s = y_flip_s
                 y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
+                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
             output_3D = y_s[:, args.pad].unsqueeze(1)
             output_3D[:, :, 0, :] = 0
@@ -166,7 +185,7 @@ if __name__ == '__main__':
             # create a new folder for the test results
             args.folder_dir = os.path.dirname(args.saved_model_path)
             args.checkpoint = os.path.join(args.folder_dir, 'test_results_' + args.create_time)
-
+    
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
 
@@ -179,11 +198,17 @@ if __name__ == '__main__':
         if getattr(args, 'model_path', ''):
             model_src_path = os.path.abspath(args.model_path)
             model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+        else:
+            model_src_path = os.path.join("model", f"{args.model}.py")
+            model_dst_name = f"{args.create_time}_{args.model}.py"
         shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        sh_base = os.path.basename(args.sh_file)
-        dst_name = f"{args.create_time}_" + sh_base
-        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
+        if args.debug:
+            shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
+        else:
+            sh_base = os.path.basename(args.sh_file)
+            dst_name = f"{args.create_time}_" + sh_base
+            shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
@@ -217,8 +242,10 @@ if __name__ == '__main__':
 
     if args.reload:
         model_dict = model['CFM'].state_dict()
-        # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
-        model_path = args.saved_model_path
+        if getattr(args, 'saved_model_path', ''):
+            model_path = args.saved_model_path
+        else:
+            model_path = glob.glob(os.path.join(args.previous_dir, '*.pth'))[0]
         print(model_path)
         pre_dict = torch.load(model_path)
         for name, key in model_dict.items():
@@ -242,10 +269,11 @@ if __name__ == '__main__':
             loss = train(args, actions, train_dataloader, model, optimizer, epoch)
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
-        # evaluate per step externally (single-step val per call)
+        # evaluate per step externally
         p1_per_step = {}
         p2_per_step = {}
         eval_steps_list = [int(s) for s in str(getattr(args, 'eval_sample_steps', '3')).split(',') if str(s).strip()]
+        # print(eval_steps_list)
         for s_eval in eval_steps_list:
             p1_s, p2_s = val(args, actions, test_dataloader, model, steps=s_eval)
             p1_per_step[s_eval] = float(p1_s)
@@ -256,11 +284,18 @@ if __name__ == '__main__':
         if WANDB_AVAILABLE:
             log_data = {'test_p1': p1, 'epoch': epoch}
             wandb.log(log_data)
-        
+            
         if args.train:
             data_threshold = p1
-            saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
-            # update best tracker
+            saved_path = save_top_N_models(
+                args.previous_name,
+                args.checkpoint,
+                epoch,
+                data_threshold,
+                model['CFM'],
+                "CFM",
+                num_saved_models=getattr(args, 'num_saved_models', 3)
+            )
             if data_threshold < args.previous_best_threshold:
                 args.previous_best_threshold = data_threshold
                 args.previous_name = saved_path
@@ -285,7 +320,8 @@ if __name__ == '__main__':
         else:
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= args.lr_decay
-    
+                lr *= args.lr_decay
+
     endtime = datetime.datetime.now()   
     a = (endtime - starttime).seconds
     h = a//3600

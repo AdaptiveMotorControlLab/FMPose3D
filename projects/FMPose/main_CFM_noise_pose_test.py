@@ -1,4 +1,5 @@
 import os
+import glob
 import torch
 import random
 import logging
@@ -49,7 +50,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         model_3d.train()
     else:
         model_3d.eval()
-        
+
     # determine steps for single-step evaluation per call
     steps_to_use = steps
 
@@ -57,9 +58,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
+
         if split =='train':
-            
-            # gt_3D[:, :, 0] = 0
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             x0_noise = torch.randn_like(gt_3D)
@@ -101,14 +101,13 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
                 return y_local
             
             # start from noise as in original variant
-            y = torch.randn_like(gt_3D)
-            y_s = euler_sample(input_2D_nonflip, y, steps_to_use)
+            y_noise = torch.randn_like(gt_3D)
+            y_s = euler_sample(input_2D_nonflip, y_noise, steps_to_use)
             if args.test_augmentation:
                 y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
                 y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
                 y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
-                y_flip_s = y_flip_s.clone()
+                y_flip_s = y_flip_s
                 y_flip_s[:, :, :, 0] *= -1
                 y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
@@ -126,10 +125,36 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             wandb.log({f'test_p1_s{steps_to_use}': float(p1_s), f'test_p2_s{steps_to_use}': float(p2_s)})
         return float(p1_s), float(p2_s)
 
-def get_parameter_number(net):
-    total_num = sum(p.numel() for p in net.parameters())
-    trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
-    return {'Total': total_num, 'Trainable': trainable_num}
+def print_error(data_type, action_error_sum, is_train):
+    mean_error_p1, mean_error_p2  = print_error_action(action_error_sum, is_train)
+    return mean_error_p1, mean_error_p2
+
+def print_error_action(action_error_sum, is_train):
+    mean_error_each = {'p1': 0.0, 'p2': 0.0}
+    mean_error_all  = {'p1': AccumLoss(), 'p2': AccumLoss()}
+
+    if is_train == 0:
+        print("{0:=^12} {1:=^10} {2:=^8}".format("Action", "p#1 mm", "p#2 mm"))
+        logging.info("{0:=^12} {1:=^10} {2:=^8}".format("Action", "p#1 mm", "p#2 mm"))
+
+    for action, value in action_error_sum.items():
+        mean_error_each['p1'] = action_error_sum[action]['p1'].avg * 1000.0
+        mean_error_all['p1'].update(mean_error_each['p1'], 1)
+
+        mean_error_each['p2'] = action_error_sum[action]['p2'].avg * 1000.0
+        mean_error_all['p2'].update(mean_error_each['p2'], 1)
+
+        if is_train == 0:
+            print("{0:<12} {1:>6.2f} {2:>10.2f}".format(action, mean_error_each['p1'], mean_error_each['p2']))
+            logging.info("{0:<12} {1:>6.2f} {2:>10.2f}".format(action, mean_error_each['p1'], mean_error_each['p2']))
+
+    if is_train == 0:
+        print("{0:<12} {1:>6.2f} {2:>10.2f}".format("Average", mean_error_all['p1'].avg, \
+                mean_error_all['p2'].avg))
+        logging.info("{0:<12} {1:>6.2f} {2:>10.2f}".format("Average", mean_error_all['p1'].avg, \
+                mean_error_all['p2'].avg))
+    
+    return mean_error_all['p1'].avg, mean_error_all['p2'].avg
 
 if __name__ == '__main__':
     manualSeed = 1
@@ -180,10 +205,11 @@ if __name__ == '__main__':
             model_src_path = os.path.abspath(args.model_path)
             model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
         shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
-        shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
+
         sh_base = os.path.basename(args.sh_file)
         dst_name = f"{args.create_time}_" + sh_base
         shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
+
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
@@ -217,10 +243,9 @@ if __name__ == '__main__':
 
     if args.reload:
         model_dict = model['CFM'].state_dict()
-        # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
         model_path = args.saved_model_path
         print(model_path)
-        pre_dict = torch.load(model_path)
+        pre_dict = torch.load(model_path, weights_only=True, map_location=torch.device('cuda'))
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
         model['CFM'].load_state_dict(model_dict)
@@ -247,6 +272,8 @@ if __name__ == '__main__':
         p2_per_step = {}
         eval_steps_list = [int(s) for s in str(getattr(args, 'eval_sample_steps', '3')).split(',') if str(s).strip()]
         for s_eval in eval_steps_list:
+            print(f"Evaluating step {s_eval}")
+            logging.info(f"Evaluating step {s_eval}")
             p1_s, p2_s = val(args, actions, test_dataloader, model, steps=s_eval)
             p1_per_step[s_eval] = float(p1_s)
             p2_per_step[s_eval] = float(p2_s)

@@ -12,11 +12,21 @@ from common.utils import *
 from common.load_data_hm36 import Fusion
 from common.h36m_dataset import Human36mDataset
 import time
-import re
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-exec('from model.' + args.model + ' import Model as CFM')
+# Support loading the model class from a specific file path if provided
+CFM = None
+if getattr(args, 'model_path', ''):
+    import importlib.util
+    import pathlib
+    model_abspath = os.path.abspath(args.model_path)
+    module_name = pathlib.Path(model_abspath).stem
+    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    CFM = getattr(module, 'Model')
 
 # wandb logging (assumed available)
 import wandb
@@ -31,6 +41,41 @@ def val(opt, actions, val_loader, model):
 
 def aggregate_hypothesis(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)
+
+def uncertainty_aware_aggregate_hypothesis(list_hypothesis):
+    # list_hypothesis: list of tensors, each (B,1,J,3)
+    # returns aggregated tensor (B,1,J,3)
+    if len(list_hypothesis) == 0:
+        raise ValueError("list_hypothesis is empty")
+    stack = torch.stack(list_hypothesis, dim=0)  # (H,B,1,J,3)
+    mu = stack.mean(dim=0)  # (B,1,J,3)
+    std = stack.std(dim=0, unbiased=False)  # (B,1,J,3)
+
+    # per-hypothesis, per-joint Euclidean distance to mu
+    diff = stack - mu  # (H,B,1,J,3)
+    dist = torch.sqrt((diff * diff).sum(dim=-1))  # (H,B,1,J)
+    sigma_norm = torch.sqrt((std * std).sum(dim=-1))  # (B,1,J)
+
+    # threshold factor k; read from args if available
+    k = 0.9
+    thresh = k * sigma_norm  # (B,1,J)
+    keep = dist <= thresh  # (H,B,1,J)
+    # print("dist.mean:", dist.detach().mean().item(), "thresh.mean:", thresh.detach().mean().item())
+    # print("dist:", dist.detach())    
+    # print("thresh.item:", thresh.detach())
+    # print("keep:", keep)
+    keep_exp = keep.unsqueeze(-1)  # (H,B,1,J,1)
+    keep_count = keep_exp.sum(dim=0)  # (B,1,J,1)
+
+    # avoid division by zero by clamping, but also fallback to mu where count==0
+    safe_count = keep_count.clamp(min=1.0)
+    agg = (stack * keep_exp).sum(dim=0) / safe_count  # (B,1,J,3)
+
+    zero_mask = (keep_count.squeeze(-1) == 0).unsqueeze(-1)  # (B,1,J,1)
+    agg = torch.where(zero_mask, mu, agg)
+    return agg
+
+
 
 def train(opt, actions, train_loader, model, optimizer, epoch):
     split = 'train'
@@ -158,7 +203,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
                     list_hypothesis.append(output_3D_s)
                 
                 output_3D_s = aggregate_hypothesis(list_hypothesis)
-                
+                # output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
                 # per-batch P1 for quick logging (optional)
                 if WANDB_AVAILABLE:
                     p1_s = mpjpe_cal(output_3D_s, gt_3D.clone())
@@ -183,19 +228,21 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None):
         return per_step_p1, per_step_p2
 
 
-
-@torch.no_grad()
-def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoch=None, hypothesis_num=None):
+def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoch=None, hypothesis_num=None, steps=None):
     
     model_3d = model['CFM']
     model_3d.eval()
     split = 'test'
     
-    eval_steps = None
-    action_error_sum_multi = None
-    if split == 'test':
+    # determine which steps to evaluate (extracted from function; can be provided by caller)
+    if steps is None:
         eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
-        action_error_sum_multi = {s: define_error_list(actions) for s in eval_steps}
+    else:
+        if isinstance(steps, (list, tuple, set)):
+            eval_steps = sorted({int(s) for s in steps})
+        else:
+            eval_steps = [int(steps)]
+    action_error_sum_multi = {s: define_error_list(actions) for s in eval_steps}
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
@@ -241,7 +288,9 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
                 
                 list_hypothesis.append(output_3D_s)
             
-            output_3D_s = aggregate_hypothesis(list_hypothesis)
+            # output_3D_s = aggregate_hypothesis(list_hypothesis)
+            # uncertainty-aware aggregation across hypotheses
+            output_3D_s = uncertainty_aware_aggregate_hypothesis(list_hypothesis)
             
             # per-batch P1 for quick logging (optional)
             if WANDB_AVAILABLE:
@@ -344,23 +393,17 @@ if __name__ == '__main__':
 
         # backup files
         import shutil
-        if args.train:
-            file_name = os.path.basename(__file__)
-            shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
-            shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
-            # backup the selected model file dynamically based on args.model
-            model_src_path = os.path.join("model", f"{args.model}.py")
-            model_dst_name = f"{args.create_time}_{args.model}.py"
-            shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
-            shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-            if args.debug:
-                shutil.copyfile(src="run_FM_debug.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_debug.sh"))
-            else:
-                shutil.copyfile(src="run_FM.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM.sh"))
-
-        else: 
-            shutil.copyfile(src="run_FM_multi_hypothesis.sh", dst = os.path.join(args.checkpoint, args.create_time + "_run_FM_multi_hypothesis.sh"))
-            
+        file_name = os.path.basename(__file__)
+        shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
+        shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
+        if getattr(args, 'model_path', ''):
+            model_src_path = os.path.abspath(args.model_path)
+            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+        shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
+        shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
         
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
@@ -394,10 +437,7 @@ if __name__ == '__main__':
 
     if args.reload:
         model_dict = model['CFM'].state_dict()
-        # model_path = sorted(glob.glob(os.path.join(args.previous_dir, '*.pth')))[0]
-        # model_path = glob.glob(os.path.join(args.previous_dir, '*.pth'))[0]
         model_path = args.saved_model_path
-        # model_path = "./pre_trained_model/IGANet_8_4834.pth"
         print(model_path)
         pre_dict = torch.load(model_path)
         for name, key in model_dict.items():
@@ -422,37 +462,52 @@ if __name__ == '__main__':
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
                 
-        # parse hypotheses in one line from string like "1,3,5,7,9" or "1 3 5 7 9"
+        # parse hypotheses list and eval steps
         hypothesis_list = [int(x) for x in args.num_hypothesis_list.split(',')]
+        eval_steps_list = [int(s) for s in str(getattr(args, 'eval_sample_steps', '3')).split(',') if str(s).strip()]
 
-        for hypothesis_num in hypothesis_list:
-            print(f"Testing with {hypothesis_num} hypotheses")
-            logging.info(f"Testing with {hypothesis_num} hypotheses")
-            with torch.no_grad():
-                p1_per_step, p2_per_step = test_multi_hypothesis(args, actions, test_dataloader, model, hypothesis_num=hypothesis_num)
-        
-            best_step = min(p1_per_step, key=p1_per_step.get)
-            p1 = p1_per_step[best_step]
-            p2 = p2_per_step[best_step]
+        # track global best across all (step, hypothesis) for training save logic
+        best_global_p1 = None
+        best_global_p2 = None
+        best_global_pair = None  # (step, hypothesis)
 
-            if args.train:
-                data_threshold = p1
-                saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
-                if data_threshold < args.previous_best_threshold:
-                    args.previous_best_threshold = data_threshold
-                    args.previous_name = saved_path
-                    best_epoch = epoch
-                steps_sorted = sorted(p1_per_step.keys())
-                step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-                print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-                logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-            else:
-                steps_sorted = sorted(p1_per_step.keys())
-                step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-                print('hyp: %d, p1: %.4f, p2: %.4f | %s' % (hypothesis_num, p1, p2, ' | '.join(step_strs)))
-                logging.info('hyp: %d, p1: %.4f, p2: %.4f | %s' % (hypothesis_num, p1, p2, ' | '.join(step_strs)))
-            
-        break
+        for s_eval in eval_steps_list:
+            p1_by_hyp = {}
+            p2_by_hyp = {}
+            for hypothesis_num in hypothesis_list:
+                print(f"Evaluating step {s_eval} with {hypothesis_num} hypotheses")
+                logging.info(f"Evaluating step {s_eval} with {hypothesis_num} hypotheses")
+                with torch.no_grad():
+                    p1_per_step, p2_per_step = test_multi_hypothesis(args, actions, test_dataloader, model, hypothesis_num=hypothesis_num, steps=s_eval)
+
+                p1 = p1_per_step[int(s_eval)]
+                p2 = p2_per_step[int(s_eval)]
+                p1_by_hyp[int(hypothesis_num)] = float(p1)
+                p2_by_hyp[int(hypothesis_num)] = float(p2)
+
+                if best_global_p1 is None or float(p1) < best_global_p1:
+                    best_global_p1 = float(p1)
+                    best_global_p2 = float(p2)
+                    best_global_pair = (int(s_eval), int(hypothesis_num))
+
+            # print one line per step with all hypotheses results
+            hyp_sorted = sorted(p1_by_hyp.keys())
+            hyp_strs = [f"h{h}_p1: {p1_by_hyp[h]:.4f}, h{h}_p2: {p2_by_hyp[h]:.4f}" for h in hyp_sorted]
+            print('step: %d | %s' % (s_eval, ' | '.join(hyp_strs)))
+            logging.info('step: %d | %s' % (s_eval, ' | '.join(hyp_strs)))
+
+        # training summary and checkpointing using best across all (step, hypothesis)
+        if args.train and best_global_p1 is not None:
+            data_threshold = best_global_p1
+            saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
+            if data_threshold < args.previous_best_threshold:
+                args.previous_best_threshold = data_threshold
+                args.previous_name = saved_path
+                best_epoch = epoch
+            print('e: %d, lr: %.7f, loss: %.4f, best_p1: %.4f, best_p2: %.4f, best_pair: step %d, hyp %d' % (epoch, lr, loss, best_global_p1, best_global_p2, best_global_pair[0], best_global_pair[1]))
+            logging.info('epoch: %d, lr: %.7f, loss: %.4f, best_p1: %.4f, best_p2: %.4f, best_pair: step %d, hyp %d' % (epoch, lr, loss, best_global_p1, best_global_p2, best_global_pair[0], best_global_pair[1]))
+        elif not args.train:
+            break
     
         if epoch % args.large_decay_epoch == 0: 
             for param_group in optimizer.param_groups:
