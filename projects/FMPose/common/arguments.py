@@ -26,6 +26,8 @@ class opts():
         self.parser.add_argument('--data_augmentation', type=bool, default=True)
         self.parser.add_argument('--reverse_augmentation', type=bool, default=False)
         self.parser.add_argument('--test_augmentation', type=str2bool, default=True)
+        self.parser.add_argument('--test_augmentation_flip_hypothesis', type=str2bool, default=False)
+        self.parser.add_argument('--test_augmentation_FlowAug', type=str2bool, default=False)
         self.parser.add_argument('--crop_uv', type=int, default=0)
         self.parser.add_argument('--root_path', type=str, default='dataset/')
         self.parser.add_argument('-a', '--actions', default='*', type=str)
@@ -101,6 +103,7 @@ class opts():
         self.parser.add_argument('--topk', type=int, default=3)
         self.parser.add_argument('--weight_softmax_tau', type=float, default=1.0)
         self.parser.add_argument('--exp_temp', type=float, default=0.002)
+        self.parser.add_argument('--mode', type=str, default='exp')
     def parse(self):
         self.init()
         
