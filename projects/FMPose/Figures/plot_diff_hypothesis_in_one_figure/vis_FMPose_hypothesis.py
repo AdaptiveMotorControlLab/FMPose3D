@@ -416,17 +416,14 @@ def show_frame():
                 _ = save3Dpose(i_data, list_v_s[i], out_target, ax1, (0.99, 0, 0), img_path, action[0], dpi_number=dpi_number)
                 plt.close(figx)
                 
-            if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13]
-                joints_right = [1, 2, 3, 14, 15, 16]
-                
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                y_s = (y_s + y_flip_s) / 2
+            # if args.test_augmentation:
+            #     y_flip = torch.randn_like(gt_3D)
+            #     y_flip[:, :, :, 0] *= -1
+            #     y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
+            #     y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
+            #     y_flip_s[:, :, :, 0] *= -1
+            #     y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
+            #     y_s = (y_s + y_flip_s) / 2
             
             # per-step metrics only; do not store per-sample outputs
             output_3D_s = y_s[:, args.pad].unsqueeze(1)
@@ -460,14 +457,6 @@ def show_frame():
     path = folder + "/" + str(i_data)
     if not os.path.exists(path):
         os.makedirs(path) 
-    # path_nonflip_PU_svg = path + '/' + "nonflip_PU_svg"
-    # path_nonflip_P = path + '/' + "nonflip_P"
-    # path_nonflip_PU = path + '/' + "nonflip_PU"
-    # # path_mix_z = path + '/' + "mix_z"
-    # path_list = [path_nonflip_P, path_nonflip_PU]
-    # for path1 in path_list:
-    #     if not os.path.exists(path1):
-    #         os.makedirs(path1)
    
     # show images
     out_dir = path + '/' + subject[0] + '_' + action[0] + camera_index + '_'
@@ -500,12 +489,12 @@ def show_frame():
           shade = 0.35 + 0.45 * (idx / (num_h - 1))
         else:
           shade = 0.6
-        show3Dpose(pose_np, ax1, color=(shade, shade, shade), world=False, linewidth=1.0)
+        show3Dpose(pose_np, ax1, color=(shade, shade, shade), world=False, linewidth=1.2)
 
       agg_vis = output_3D_s_last.clone()
       agg_vis[:, :, 0, :] = 0
       agg_np = agg_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_np, ax1, color=(0/255, 176/255, 240/255), world=False, linewidth=1.0)
+      show3Dpose(agg_np, ax1, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
 
       overlay_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_overlay.png')
       plt.savefig(overlay_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
