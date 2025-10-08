@@ -644,9 +644,10 @@ def show_frame():
     loss_mean = mpjpe_cal(output_3D_mean, out_target)*1000  
     loss_RPEA = mpjpe_cal(output_3D_RPEA, out_target)*1000  
     delta = loss_mean - loss_RPEA
-    print(f"loss_mean: {loss_mean.item():.2f}, loss_RPEA: {loss_RPEA.item():.2f}", f"delta: {delta.item():.2f}")
     if delta < 10 or loss_mean > 65:
       continue
+    print(f"loss_mean: {loss_mean.item():.2f}, loss_RPEA: {loss_RPEA.item():.2f}", f"delta: {delta.item():.2f}")
+    
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
     # pose 打印在image上
@@ -729,28 +730,90 @@ def show_frame():
       print(f"Saved {num_h} individual hypotheses to {hypothesis_folder}")
       
       # Save a figure with GT + all hypotheses (no aggregation)
-      fig_all_hypo = plt.figure(figsize=(figsize_x, figsize_y))
-      ax_all_hypo = plt.axes(projection='3d')
+      save_all_hypotheses_in_one_figure = True
+      if save_all_hypotheses_in_one_figure:
+        fig_all_hypo = plt.figure(figsize=(figsize_x, figsize_y))
+        ax_all_hypo = plt.axes(projection='3d') 
+        # Plot GT in red
+        show3Dpose_GT(gt_np, ax_all_hypo, world=False, linewidth=1.0)
+        
+        # Plot all hypotheses in gray
+        for idx, hypo in enumerate(list_hypothesis_last):
+          hypo_vis = hypo.clone()
+          hypo_vis[:, :, 0, :] = 0
+          pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+          if num_h > 1:
+            shade = 0.35 + 0.45 * (idx / (num_h - 1))
+          else:
+            shade = 0.6
+          show3Dpose(pose_np, ax_all_hypo, color=(shade, shade, shade), world=False, linewidth=1.2)
+        # Save all hypotheses figure
+        all_hypo_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_all_hypotheses.png')
+        plt.savefig(all_hypo_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+        plt.close(fig_all_hypo)
+        print(f"Saved all hypotheses: {all_hypo_path}")
       
-      # Plot GT in red
-      show3Dpose_GT(gt_np, ax_all_hypo, world=False, linewidth=1.0)
-      
-      # Plot all hypotheses in gray
-      for idx, hypo in enumerate(list_hypothesis_last):
-        hypo_vis = hypo.clone()
-        hypo_vis[:, :, 0, :] = 0
-        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
-        if num_h > 1:
-          shade = 0.35 + 0.45 * (idx / (num_h - 1))
-        else:
-          shade = 0.6
-        show3Dpose(pose_np, ax_all_hypo, color=(shade, shade, shade), world=False, linewidth=1.2)
-      
-      # Save all hypotheses figure
-      all_hypo_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_all_hypotheses.png')
-      plt.savefig(all_hypo_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-      plt.close(fig_all_hypo)
-      print(f"Saved all hypotheses: {all_hypo_path}")
+      # Figure for Mean aggregation
+      save_all_hypotheses_and_mean = True
+      if save_all_hypotheses_and_mean:
+        fig_mean = plt.figure(figsize=(figsize_x, figsize_y))
+        ax_mean = plt.axes(projection='3d')
+        # Plot GT in red
+        show3Dpose_GT(gt_np, ax_mean, world=False, linewidth=1.2)
+        
+        # Plot all hypotheses in gray
+        for idx, hypo in enumerate(list_hypothesis_last):
+          hypo_vis = hypo.clone()
+          hypo_vis[:, :, 0, :] = 0
+          pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+          if num_h > 1:
+            shade = 0.35 + 0.45 * (idx / (num_h - 1))
+          else:
+            shade = 0.6
+          show3Dpose(pose_np, ax_mean, color=(shade, shade, shade), world=False, linewidth=1.2)
+        
+        # Plot Mean aggregated result in blue
+        agg_mean_vis = output_3D_mean.clone()
+        agg_mean_vis[:, :, 0, :] = 0
+        agg_mean_np = agg_mean_vis[0, 0].cpu().detach().numpy()
+        show3Dpose(agg_mean_np, ax_mean, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
+        
+        # Save Mean aggregation figure
+        mean_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + 'loss_mean_' + f'{loss_mean.item():.1f}' + '_delta_' + f'{delta.item():.1f}' + '_mean.png')
+        plt.savefig(mean_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+        plt.close(fig_mean)
+        print(f"Saved Mean aggregation: {mean_path}")
+
+      # Figure for RPEA aggregation
+      save_all_hypotheses_and_rpea = True
+      if save_all_hypotheses_and_rpea:
+        fig_rpea = plt.figure(figsize=(figsize_x, figsize_y))
+        ax_rpea = plt.axes(projection='3d')
+        # Plot GT in red
+        show3Dpose_GT(gt_np, ax_rpea, world=False, linewidth=1.2)
+        
+        # Plot all hypotheses in gray
+        for idx, hypo in enumerate(list_hypothesis_last):
+          hypo_vis = hypo.clone()
+          hypo_vis[:, :, 0, :] = 0
+          pose_np = hypo_vis[0, 0].cpu().detach().numpy()
+          if num_h > 1:
+            shade = 0.35 + 0.45 * (idx / (num_h - 1))
+          else:
+            shade = 0.6
+          show3Dpose(pose_np, ax_rpea, color=(shade, shade, shade), world=False, linewidth=1.2)
+        
+        # Plot RPEA aggregated result in orange
+        agg_rpea_vis = output_3D_RPEA.clone()
+        agg_rpea_vis[:, :, 0, :] = 0
+        agg_rpea_np = agg_rpea_vis[0, 0].cpu().detach().numpy()
+        show3Dpose(agg_rpea_np, ax_rpea, color=(255/255, 140/255, 0/255), world=False, linewidth=1.2)  # Orange color
+        
+        # Save RPEA aggregation figure
+        rpea_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + 'loss_RPEA_' + f'{loss_RPEA.item():.1f}' + '_delta_' + f'{delta.item():.1f}' + '_rpea.png')
+        plt.savefig(rpea_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+        plt.close(fig_rpea)
+        print(f"Saved RPEA aggregation: {rpea_path}")
       
       # Single figure with both Mean and RPEA
       fig_compare = plt.figure(figsize=(figsize_x, figsize_y))
