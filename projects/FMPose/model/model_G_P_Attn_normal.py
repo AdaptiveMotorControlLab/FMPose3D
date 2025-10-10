@@ -2,42 +2,86 @@ import sys
 sys.path.append("..")
 import torch
 import torch.nn as nn
-import math
 from einops import rearrange
 from model.graph_frames import Graph
 from functools import partial
-from einops import rearrange, repeat
+from einops import rearrange
 from timm.models.layers import DropPath
 
-class TimeEmbedding(nn.Module):
-    # Continuous-time embedding with Gaussian Fourier features
-    def __init__(self, dim: int, hidden_dim: int = 64):
+class GCN(nn.Module):
+    def __init__(self, in_channels, out_channels, adj):
         super().__init__()
-        self.dim = dim
-        self.hidden_dim = hidden_dim
-        assert self.dim % 2 == 0, "TimeEmbedding.dim must be even"
-        # Gaussian Fourier features for continuous-time conditioning (Flow Matching friendly)
-        self.gaussian_std = 1.0
-        self.register_buffer('B', torch.randn(self.dim // 2) * self.gaussian_std, persistent=True)
-        self.proj = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, dim)
-        )
 
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        # t: (B,F,1,1) in [0,1)
-        b, f = t.shape[0], t.shape[1]
-        half_dim = self.dim // 2
+        self.adj = adj
+        self.kernel_size = adj.size(0)
+        #
+        self.conv1d = nn.Conv1d(in_channels, out_channels * self.kernel_size, kernel_size=1)
+    def forward(self, x):
+        # x.shape: b,c,1,j
+        # conv1d
+        x = self.conv1d(x)   # b,c*kernel_size,j=b,c*4,j
+        x = rearrange(x,"b ck j -> b ck 1 j")
+        n, kc, t, v = x.size()
+        x = x.view(n, self.kernel_size, kc//self.kernel_size, t, v) # b,k, kc/k, 1, j 
+        x = torch.einsum('nkctv, kvw->nctw', (x, self.adj)) # 
+        # x.shape b,c,1,j   [128,512,17,1]
+        return x.contiguous()
+
+class Mlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+        super().__init__()
         
-        # Gaussian Fourier features: sin(2π B t), cos(2π B t)
-        # t: (B,F,1,1) -> (B,F,1,1,1) -> broadcast with (1,1,1,1,half_dim)
-        angles = (2 * math.pi) * t.to(torch.float32).unsqueeze(-1) * self.B.view(1, 1, 1, 1, half_dim)
-        sin = torch.sin(angles)
-        cos = torch.cos(angles)
-        emb = torch.cat([sin, cos], dim=-1).reshape(b, f, self.dim).to(t.dtype)  # (B,F,dim)
-        emb = self.proj(emb)  # (B,F,dim)
-        return emb
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = nn.Linear(hidden_features, out_features)
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        # x = self.act(x)
+        x = self.drop(x)
+        return x
+
+class linear_block(nn.Module):
+    def __init__(self, ch_in, ch_out, drop=0.1):
+        super(linear_block,self).__init__()
+        self.linear = nn.Sequential(
+            nn.Linear(ch_in, ch_out),
+            nn.GELU(),
+            nn.Dropout(drop)
+        )
+    def forward(self,x):
+        x = self.linear(x)
+        return x
+
+
+class uMLP(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.): # zheli
+        super().__init__()
+
+        self.linear_down = linear_block(in_features,hidden_features,drop)
+        self.linear_mid = linear_block(hidden_features,hidden_features,drop) 
+        self.linear_up = linear_block(hidden_features,in_features,drop)
+
+    def forward(self, x):
+        # res_512 = x
+        # down  
+        x = self.linear_down(x)
+        res_mid = x 
+        # mid
+        x = self.linear_mid(x)
+        x = x + res_mid
+        # up
+        x = self.linear_up(x) 
+        return x
+
+
+
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -62,8 +106,7 @@ class GCN_V2(nn.Module):
     def __init__(self, in_channels, out_channels, adj):
         super().__init__()
 
-        # Register adj as buffer to follow module device automatically
-        self.register_buffer('adj', adj)
+        self.adj = adj # 4,17,17
         self.kernel_size = adj.size(0)
         #
         self.conv1d = nn.Conv1d(in_channels, out_channels * self.kernel_size, kernel_size=1)
@@ -129,8 +172,11 @@ class Block(nn.Module): # drop=0.1
         proj_drop = 0.25
         self.attn = Attention(
             dim, num_heads=self.num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=proj_drop) 
-        
+
+        # channel MLP
         self.norm_mlp = norm_layer(dim)
+        # self.channel_mlp = uMLP(in_features=dim, hidden_features=256, act_layer=act_layer, drop=0.1)
+        # spatial MLP
         self.mlp = Mlp(in_features=dim, hidden_features=1024, act_layer=act_layer, drop=drop)
 
     def forward(self, x):
@@ -156,7 +202,7 @@ class Block(nn.Module): # drop=0.1
         x = res2 + self.drop_path(x)
         return x
 
-class FMPose(nn.Module):
+class GCN_MLP(nn.Module):
     def __init__(self, depth, embed_dim, channels_dim, tokens_dim, adj, drop_rate=0.10, length=27):
         super().__init__()
         # depth = args.layers=3, embed_dim=args.channel=512, channels_dim=args.d_hid=1024, tokens_dim=args.token_dim=256(set by myself)
@@ -167,6 +213,7 @@ class FMPose(nn.Module):
         # stochastic depth decay rule
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
 
+        # depth_part = 2
         self.blocks = nn.ModuleList([
             Block(
                 length, embed_dim, tokens_dim, channels_dim, adj,
@@ -178,23 +225,22 @@ class FMPose(nn.Module):
     def forward(self, x):
         for blk in self.blocks:
             x = blk(x)
-        x = self.norm_mu(x)
-        return x
+        mu = x
+        mu = self.norm_mu(mu)
+        return mu
 
 class encoder(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
         
         self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = act_layer()
+        # self.act = act_layer()
         self.fc2 = nn.Linear(hidden_features, out_features)
-        self.drop = nn.Dropout(drop) if drop > 0 else nn.Identity()
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
         x = self.fc2(x)
+        # x = self.drop(x)
         return x
 
 class decoder(nn.Module): # 2,256,512
@@ -206,14 +252,10 @@ class decoder(nn.Module): # 2,256,512
         dim_out = out_features
         
         self.fc1 = nn.Linear(dim_in, dim_hid)
-        self.act = act_layer()
-        self.drop = nn.Dropout(drop) if drop > 0 else nn.Identity()
         self.fc5 = nn.Linear(dim_hid, dim_out)
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
         x = self.fc5(x)
         return x
 
@@ -223,51 +265,26 @@ class Model(nn.Module):
 
         ## GCN
         self.graph = Graph('hm36_gt', 'spatial', pad=1)
-        # Register as buffer (not parameter) to follow module device automatically
-        self.register_buffer('A', torch.tensor(self.graph.A, dtype=torch.float32))
+        # follow module device; store as buffer to avoid hard binding to cuda(0)
+        self.A = nn.Parameter(torch.tensor(self.graph.A, dtype=torch.float32), requires_grad=False).cuda(0)
 
-        # ✅ Direct regression (no Flow Matching)
-        # Only encode 2D pose, directly predict 3D pose
-        self.encoder_pose_2d = encoder(2, args.channel//2, args.channel)
-        
-        self.FMPose = FMPose(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints)
-        self.pred_3d = decoder(args.channel, args.channel//2, 3)
+        # encoder maps x2d(2) to args.channel
+        self.encoder = encoder(2, args.channel//2, args.channel)
+        #  
+        self.GCN_MLP = GCN_MLP(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints) # 256
+        self.pred_mu = decoder(args.channel, args.channel//2, 3)
 
-    def forward(self, pose_2d):
-        # pose_2d: (B,F,J,2)
-        b, f, j, _ = pose_2d.shape
+    def forward(self, x):
+        # x: (B,F,J,2) - 2D pose input
+        b, f, j, _ = x.shape
         
-        # Encode 2D pose
-        pose_2d_emb = self.encoder_pose_2d(pose_2d)  # (B,F,J,channel)
+        # reshape for processing
+        x_in = rearrange(x, 'b f j c -> (b f) j c').contiguous() # (B*F,J,2)
         
-        # Reshape for batch processing
-        in_emb = rearrange(pose_2d_emb, 'b f j c -> (b f) j c').contiguous()  # (B*F,J,channel)
-
-        # encoder -> model -> regression head
-        h = self.FMPose(in_emb)
-        pred_3d = self.pred_3d(h)  # (B*F,J,3)
+        # encoder -> GCN_MLP -> regression head
+        h = self.encoder(x_in)
+        h = self.GCN_MLP(h)
+        out = self.pred_mu(h) # (B*F,J,3)
         
-        pred_3d = rearrange(pred_3d, '(b f) j c -> b f j c', b=b, f=f).contiguous()  # (B,F,J,3)
-        return pred_3d
-    
-if __name__ == "__main__":
-    class Args:
-        pass
-    args = Args()
-    args.channel = 512
-    args.d_hid = 1024
-    args.token_dim = 256
-    args.layers = 5
-    args.n_joints = 17
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Model(args).to(device)
-    # Print model architecture and parameter counts
-    print(model)
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total params: {total_params:,} | Trainable: {trainable_params:,}")
-    # Test forward pass (no Flow Matching)
-    x = torch.randn(2, 9, 17, 2, device=device)  # (B,F,J,2)
-    pred_3d = model(x)
-    print(f"Input shape: {x.shape}")
-    print(f"Output shape: {pred_3d.shape}")  # Should be (2,9,17,3) 
+        out = rearrange(out, '(b f) j c -> b f j c', b=b, f=f).contiguous() # (B,F,J,3)
+        return out 
