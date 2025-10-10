@@ -9,10 +9,9 @@ large_decay_epoch=5
 lr_decay_large=0.8
 epochs=100
 num_saved_models=3
-frames=1
 model_path='model/model_G_P_Attn_normal.py'
-sh_file='run_FM_noiseX.sh'
-folder_name=FM_GPA_1GCN_P_Attn_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
+sh_file='run_main_woFM.sh'
+folder_name=Normal_GPA_1GCN_P_Attn_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
 
 # Read WANDB_API_KEY from file if not provided via env
 key_file="$(dirname "$0")/wandb_api_key.txt"
@@ -29,7 +28,6 @@ fi
 python3 main_pose.py \
   --train \
   --dataset h36m \
-  --frames ${frames} \
   --model_path ${model_path} \
   --gpu ${gpu_id} \
   --batch_size ${batch_size} \
