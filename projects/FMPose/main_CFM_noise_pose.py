@@ -58,11 +58,13 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
         if split =='train':
+            B, F, J, C = input_2D.shape
             
             # gt_3D[:, :, 0] = 0
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
-            x0_noise = torch.randn_like(gt_3D)
+            # x0_noise = torch.randn_like(gt_3D)
+            x0_noise = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
             x0 = x0_noise
             
             B = gt_3D.size(0)
@@ -88,6 +90,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # For now, use the first view to keep shapes consistent with the model
             input_2D_nonflip = input_2D[:, 0]
             input_2D_flip = input_2D[:, 1]
+            B, F, J, C = input_2D_nonflip.shape
             out_target = gt_3D.clone()
             out_target[:, :, 0] = 0
 
@@ -101,12 +104,15 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
                 return y_local
             
             # start from noise as in original variant
-            y = torch.randn_like(gt_3D)
+            # y = torch.randn_like(gt_3D)
+            y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
+            
             y_s = euler_sample(input_2D_nonflip, y, steps_to_use)
             if args.test_augmentation:
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
+                # y_flip = torch.randn_like(gt_3D)
+                y_flip = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
+                # y_flip[:, :, :, 0] *= -1
+                # y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
                 y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
                 y_flip_s = y_flip_s.clone()
                 y_flip_s[:, :, :, 0] *= -1
