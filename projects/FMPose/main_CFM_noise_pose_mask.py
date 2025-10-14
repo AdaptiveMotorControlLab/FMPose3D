@@ -44,6 +44,16 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
     loss_all = {'loss': AccumLoss()}
     action_error_sum = define_error_list(actions)
     
+    # Track masked joint errors separately
+    masked_joints = [int(j) for j in getattr(args, 'masked_joints', '12,13').split(',')]  # left-elbow, left-wrist
+    masked_error_sum = AccumLoss()
+    unmasked_error_sum = AccumLoss()
+    
+    # Create joint mask matrix for efficient masking (shape: [J,])
+    n_joints = 17  # H36M has 17 joints
+    joint_mask = torch.ones(n_joints, dtype=torch.float32)
+    joint_mask[masked_joints] = 0  # Set masked joints to 0
+    
     model_3d = model['CFM']
     if split == 'train':
         model_3d.train()
@@ -57,12 +67,23 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
         
+        # Conditional Flow Matching training
         if split =='train':
-            B, F, J, C = input_2D.shape
             
-            # gt_3D[:, :, 0] = 0
-            # Conditional Flow Matching training
-            # gt_3D, input_2D shape: (B,F,J,C)
+            B, F, J, C = input_2D.shape
+            # Randomly mask left elbow and wrist joints using matrix operations
+            mask_prob = getattr(args, 'mask_prob', None)  # default 50% masking probability
+            batch_mask = torch.rand(B, device=input_2D.device) < mask_prob  # (B,)
+            
+            # Create mask: (B,F,J,1) - samples with batch_mask=True will have masked joints set to 0
+            sample_joint_mask = joint_mask.to(input_2D.device).view(1, 1, J, 1) # (1,1,J,1)
+            # For samples where batch_mask=True, apply joint masking; otherwise keep all 1s
+            full_mask = torch.where(batch_mask.view(B, 1, 1, 1), 
+                                   sample_joint_mask.expand(B, F, J, 1),
+                                   torch.ones(1, device=input_2D.device))  # (B,F,J,1)
+            
+            input_2D_masked = input_2D * full_mask  # Element-wise multiplication
+            
             # x0_noise = torch.randn_like(gt_3D)
             x0_noise = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
             x0 = x0_noise
@@ -72,7 +93,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
             y_t = (1.0 - t) * x0 + t * gt_3D
             v_target = gt_3D - x0
-            v_pred = model_3d(input_2D, y_t, t)
+            v_pred = model_3d(input_2D_masked, y_t, t)
 
             loss = ((v_pred - v_target)**2).mean()            
             N = input_2D.size(0)
@@ -91,6 +112,16 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             input_2D_nonflip = input_2D[:, 0]
             input_2D_flip = input_2D[:, 1]
             B, F, J, C = input_2D_nonflip.shape
+            
+            # Mask the joints during testing using matrix operations
+            test_mask = joint_mask.to(input_2D.device).view(1, 1, J, 1)  # (1,1,J,1)
+            input_2D_nonflip_masked = input_2D_nonflip * test_mask  # (B,F,J,C) * (1,1,J,1)
+            # mask the fliped joints
+            input_2D_flip_masked = input_2D_flip.clone()
+            input_2D_flip_masked[:,:, args.joints_left + args.joints_right, :] = input_2D_flip_masked[:,:, args.joints_right + args.joints_left, :]
+            input_2D_flip_masked = input_2D_flip_masked * test_mask
+            input_2D_flip_masked[:,:, args.joints_left + args.joints_right, :] = input_2D_flip_masked[:,:, args.joints_right + args.joints_left, :]
+            
             out_target = gt_3D.clone()
             out_target[:, :, 0] = 0
 
@@ -107,19 +138,35 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # y = torch.randn_like(gt_3D)
             y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
             
-            y_s = euler_sample(input_2D_nonflip, y, steps_to_use)
+            y_s = euler_sample(input_2D_nonflip_masked, y, steps_to_use)
+            
             if args.test_augmentation:
                 # y_flip = torch.randn_like(gt_3D)
                 y_flip = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
                 # y_flip[:, :, :, 0] *= -1
                 # y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
-                y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
+                y_flip_s = euler_sample(input_2D_flip_masked, y_flip, steps_to_use)
                 y_flip_s = y_flip_s.clone()
                 y_flip_s[:, :, :, 0] *= -1
                 y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
             output_3D = y_s[:, args.pad].unsqueeze(1)
             output_3D[:, :, 0, :] = 0
+            
+            # Calculate errors for masked and unmasked joints separately
+            pred_masked = output_3D[:, :, masked_joints, :]
+            gt_masked = out_target[:, :, masked_joints, :]
+            error_masked = torch.mean(torch.norm(pred_masked - gt_masked, dim=-1))
+            masked_error_sum.update(error_masked.item() * B, B)
+            
+            # Calculate error for unmasked joints
+            all_joints = list(range(J))
+            unmasked_joint_indices = [j for j in all_joints if j not in masked_joints]
+            pred_unmasked = output_3D[:, :, unmasked_joint_indices, :]
+            gt_unmasked = out_target[:, :, unmasked_joint_indices, :]
+            error_unmasked = torch.mean(torch.norm(pred_unmasked - gt_unmasked, dim=-1))
+            unmasked_error_sum.update(error_unmasked.item() * B, B)
+            
             action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset, subject)
 
     if split == 'train':
@@ -128,9 +175,17 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
     elif split == 'test':
         # aggregate metrics for the single requested steps
         p1_s, p2_s = print_error(args.dataset, action_error_sum, args.train)
+        masked_mpjpe = masked_error_sum.avg
+        unmasked_mpjpe = unmasked_error_sum.avg
+        
         if WANDB_AVAILABLE and steps_to_use is not None:
-            wandb.log({f'test_p1_s{steps_to_use}': float(p1_s), f'test_p2_s{steps_to_use}': float(p2_s)})
-        return float(p1_s), float(p2_s)
+            wandb.log({
+                f'test_p1_s{steps_to_use}': float(p1_s), 
+                f'test_p2_s{steps_to_use}': float(p2_s),
+                f'test_masked_mpjpe_s{steps_to_use}': float(masked_mpjpe),
+                f'test_unmasked_mpjpe_s{steps_to_use}': float(unmasked_mpjpe)
+            })
+        return float(p1_s), float(p2_s), float(masked_mpjpe), float(unmasked_mpjpe)
 
 def get_parameter_number(net):
     total_num = sum(p.numel() for p in net.parameters())
@@ -140,7 +195,6 @@ def get_parameter_number(net):
 if __name__ == '__main__':
     manualSeed = 1
     random.seed(manualSeed)
-    torch.manual_seed(manualSeed)
     torch.manual_seed(manualSeed)
     np.random.seed(manualSeed)
     torch.cuda.manual_seed_all(manualSeed)
@@ -251,16 +305,22 @@ if __name__ == '__main__':
         # evaluate per step externally (single-step val per call)
         p1_per_step = {}
         p2_per_step = {}
+        masked_mpjpe_per_step = {}
+        unmasked_mpjpe_per_step = {}
         eval_steps_list = [int(s) for s in str(getattr(args, 'eval_sample_steps', '3')).split(',') if str(s).strip()]
         for s_eval in eval_steps_list:
-            p1_s, p2_s = val(args, actions, test_dataloader, model, steps=s_eval)
+            p1_s, p2_s, masked_s, unmasked_s = val(args, actions, test_dataloader, model, steps=s_eval)
             p1_per_step[s_eval] = float(p1_s)
             p2_per_step[s_eval] = float(p2_s)
+            masked_mpjpe_per_step[s_eval] = float(masked_s)
+            unmasked_mpjpe_per_step[s_eval] = float(unmasked_s)
         best_step = min(p1_per_step, key=p1_per_step.get)
         p1 = p1_per_step[best_step]
         p2 = p2_per_step[best_step]
+        masked_mpjpe = masked_mpjpe_per_step[best_step]
+        unmasked_mpjpe = unmasked_mpjpe_per_step[best_step]
         if WANDB_AVAILABLE:
-            log_data = {'test_p1': p1, 'epoch': epoch}
+            log_data = {'test_p1': p1, 'test_masked_mpjpe': masked_mpjpe, 'test_unmasked_mpjpe': unmasked_mpjpe, 'epoch': epoch}
             wandb.log(log_data)
         
         if args.train:
@@ -273,15 +333,15 @@ if __name__ == '__main__':
                 best_epoch = epoch
                 
             steps_sorted = sorted(p1_per_step.keys())
-            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-            print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-            logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
+            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}, {s}_masked: {masked_mpjpe_per_step[s]:.4f}, {s}_unmasked: {unmasked_mpjpe_per_step[s]:.4f}" for s in steps_sorted]
+            print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f, masked: %.4f, unmasked: %.4f | %s' % (epoch, lr, loss, p1, p2, masked_mpjpe, unmasked_mpjpe, ' | '.join(step_strs)))
+            logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f, masked: %.4f, unmasked: %.4f | %s' % (epoch, lr, loss, p1, p2, masked_mpjpe, unmasked_mpjpe, ' | '.join(step_strs)))
 
         else:
             steps_sorted = sorted(p1_per_step.keys())
-            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-            print('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
-            logging.info('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
+            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}, {s}_masked: {masked_mpjpe_per_step[s]:.4f}, {s}_unmasked: {unmasked_mpjpe_per_step[s]:.4f}" for s in steps_sorted]
+            print('p1: %.4f, p2: %.4f, masked: %.4f, unmasked: %.4f | %s' % (p1, p2, masked_mpjpe, unmasked_mpjpe, ' | '.join(step_strs)))
+            logging.info('p1: %.4f, p2: %.4f, masked: %.4f, unmasked: %.4f | %s' % (p1, p2, masked_mpjpe, unmasked_mpjpe, ' | '.join(step_strs)))
             break
                 
         if epoch % args.large_decay_epoch == 0: 

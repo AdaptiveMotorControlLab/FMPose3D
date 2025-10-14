@@ -10,9 +10,11 @@ lr_decay_large=0.8
 epochs=100
 num_saved_models=3
 frames=1
+mask_prob=0.2
+masked_joints='12,13'
 model_path='model/model_G_P_Attn.py'
-sh_file='run_FM_noiseX.sh'
-folder_name=FM_GPA_Noise_1GCN_P_Attn_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
+sh_file='run_FM_noiseX_mask.sh'
+folder_name=FM_GPA_Noise_MaskLhand_rate_${mask_prob}_1GCN_P_Attn_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
 
 # Read WANDB_API_KEY from file if not provided via env
 key_file="$(dirname "$0")/wandb_api_key.txt"
@@ -26,8 +28,10 @@ fi
 
 #--keypoints gt \
 # training
-python3 main_CFM_noise_pose.py \
+python3 main_CFM_noise_pose_mask.py \
   --train \
+  --mask_prob ${mask_prob} \
+  --masked_joints ${masked_joints} \
   --dataset h36m \
   --frames ${frames} \
   --model_path ${model_path} \

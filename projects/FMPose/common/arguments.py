@@ -104,6 +104,11 @@ class opts():
         self.parser.add_argument('--weight_softmax_tau', type=float, default=1.0)
         self.parser.add_argument('--exp_temp', type=float, default=0.002)
         self.parser.add_argument('--mode', type=str, default='exp')
+        
+        # mask joints
+        self.parser.add_argument('--mask_prob', type=float, default=0.5)
+        self.parser.add_argument('--masked_joints', type=str, default='12,13')
+        
     def parse(self):
         self.init()
         
