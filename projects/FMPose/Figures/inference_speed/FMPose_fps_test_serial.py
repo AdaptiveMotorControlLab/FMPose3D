@@ -96,17 +96,6 @@ def test_fps():
                     y = torch.randn_like(gt_3D)
                     y_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
                     
-                    if args.test_augmentation:
-                        joints_left = [4, 5, 6, 11, 12, 13]
-                        joints_right = [1, 2, 3, 14, 15, 16]
-                        y_flip = torch.randn_like(gt_3D)
-                        y_flip[:, :, :, 0] *= -1
-                        y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
-                        y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                        y_flip_s[:, :, :, 0] *= -1
-                        y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                        y_s = (y_s + y_flip_s) / 2
-                    
                     output_3D_s = y_s[:, args.pad].unsqueeze(1)
                     output_3D_s[:, :, 0, :] = 0
                     list_hypothesis.append(output_3D_s)
@@ -153,17 +142,6 @@ def test_fps():
                 for i in range(args.hypothesis_num):
                     y = torch.randn_like(gt_3D)
                     y_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-                    
-                    # if args.test_augmentation:
-                    #     joints_left = [4, 5, 6, 11, 12, 13]
-                    #     joints_right = [1, 2, 3, 14, 15, 16]
-                    #     y_flip = torch.randn_like(gt_3D)
-                    #     # # y_flip[:, :, :, 0] *= -1
-                    #     # y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
-                    #     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                    #     y_flip_s[:, :, :, 0] *= -1
-                    #     y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                    #     y_s = (y_s + y_flip_s) / 2
                     
                     output_3D_s = y_s[:, args.pad].unsqueeze(1)
                     output_3D_s[:, :, 0, :] = 0
