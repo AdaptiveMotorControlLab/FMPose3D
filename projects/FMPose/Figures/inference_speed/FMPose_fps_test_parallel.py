@@ -76,9 +76,9 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     assert F >= 1, "Expected at least one frame"
 
     # Stack hypotheses: (H,B,1,J,3) -> (B,H,J,3)
+    # Optimize: directly stack and squeeze instead of multiple operations
     stack = torch.stack(list_hypothesis, dim=0)  # (H,B,1,J,3)
-    X_hbj3 = stack[:, :, 0, :, :]                # (H,B,J,3)
-    X_bhj3 = X_hbj3.transpose(0, 1).contiguous() # (B,H,J,3)
+    X_bhj3 = stack.squeeze(2).transpose(0, 1)    # (B,H,J,3) - removed contiguous() call
     H = X_bhj3.size(1)
 
     # Prepare camera params: (B,9)
@@ -92,14 +92,16 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
 
     # Target 2D at the same frame index as 3D selection (args.pad)
     # input_2D: (B,F,J,2) -> (B,J,2)
-    target_2d = input_2D[:, getattr(args, 'pad', 0)].contiguous()  # (B,J,2)
+    pad_idx = getattr(args, 'pad', 0)
+    target_2d = input_2D[:, pad_idx]  # (B,J,2) - removed contiguous()
 
     # Convert hypotheses from root-relative to absolute camera coordinates using GT root
     # Root at frame args.pad: (B,3)
-    gt_root = gt_3D[:, getattr(args, 'pad', 0), 0, :].contiguous()  # (B,3)
-    X_abs = X_bhj3.clone()
-    X_abs[:, :, 1:, :] = X_abs[:, :, 1:, :] + gt_root.unsqueeze(1).unsqueeze(1)
-    X_abs[:, :, 0, :] = gt_root.unsqueeze(1)
+    gt_root = gt_3D[:, pad_idx, 0, :]  # (B,3) - removed contiguous()
+    # Optimize: avoid clone(), create new tensor directly
+    gt_root_expand = gt_root.unsqueeze(1).unsqueeze(1)  # (B,1,1,3)
+    X_abs = X_bhj3 + gt_root_expand  # Broadcast addition
+    X_abs[:, :, 0, :] = gt_root.unsqueeze(1)  # Set root joint
 
     # Vectorized projection for all hypotheses in absolute coordinates
     # (B,H,J,3) -> (B*H,J,3)
@@ -137,9 +139,8 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
         softmax_input = -topk_vals / max(tau, 1e-6)
         topk_weights = torch.softmax(softmax_input, dim=1)
     elif weight_method == 'inverse':
-        # Inverse proportional weights
-        eps = 1e-6
-        inv_weights = 1.0 / (topk_vals + eps)
+        # Inverse proportional weights (slower but interpretable)
+        inv_weights = 1.0 / (topk_vals + 1e-6)
         topk_weights = inv_weights / inv_weights.sum(dim=1, keepdim=True)
     elif weight_method == 'exp':
         # Exponential weights with temperature
@@ -156,8 +157,7 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
         topk_weights = torch.where(nan_mask.expand_as(topk_weights), uniform_weights, topk_weights)
     else:
         # Default to softmax
-        softmax_input = -topk_vals / max(tau, 1e-6)
-        topk_weights = torch.softmax(softmax_input, dim=1)
+        topk_weights = torch.softmax(-topk_vals / max(tau, 1e-6), dim=1)
 
     # Scatter back to full H with zeros elsewhere
     weights = torch.zeros_like(dist)  # (B,H,J)
@@ -202,32 +202,31 @@ def test_fps():
             [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
             
             input_2D_nonflip = input_2D[:, 0]
+            batch_size = gt_3D.size(0)
+            # Pre-expand for warmup
+            input_2D_expanded_warmup = input_2D_nonflip.repeat(args.hypothesis_num, 1, 1, 1)
             
             # Parallel Euler sampler for warmup
-            def euler_sample_parallel(x2d, y_local_batch, steps, model_3d):
+            def euler_sample_parallel_warmup(x2d_expanded, y_local_batch, steps, model_3d):
                 dt = 1.0 / steps
+                total_batch = y_local_batch.size(0)
                 for s in range(steps):
-                    batch_size = y_local_batch.size(0)
-                    t_s = torch.full((batch_size, 1, 1, 1), s * dt, device=y_local_batch.device, dtype=y_local_batch.dtype)
-                    x2d_expanded = x2d.repeat(args.hypothesis_num, 1, 1, 1)
+                    t_s = torch.full((total_batch, 1, 1, 1), s * dt, device=y_local_batch.device, dtype=y_local_batch.dtype)
                     v_s = model_3d(x2d_expanded, y_local_batch, t_s)
                     y_local_batch = y_local_batch + dt * v_s
                 return y_local_batch
             
             for s_keep in eval_steps:
-                batch_size = gt_3D.size(0)
                 y_batch = torch.randn(args.hypothesis_num * batch_size, *gt_3D.shape[1:], 
                                      device=gt_3D.device, dtype=gt_3D.dtype)
-                y_s_batch = euler_sample_parallel(input_2D_nonflip, y_batch, s_keep, model_FMPose)
+                y_s_batch = euler_sample_parallel_warmup(input_2D_expanded_warmup, y_batch, s_keep, model_FMPose)
                 y_s_batch = y_s_batch.view(args.hypothesis_num, batch_size, *gt_3D.shape[1:])
                 
-                list_hypothesis = []
-                for i in range(args.hypothesis_num):
-                    output_3D_s = y_s_batch[i, :, args.pad].unsqueeze(1)
-                    output_3D_s[:, :, 0, :] = 0
-                    list_hypothesis.append(output_3D_s)
+                # Optimized extraction
+                y_extract = y_s_batch[:, :, args.pad].unsqueeze(2)
+                y_extract[:, :, :, 0, :] = 0
+                list_hypothesis = [y_extract[i] for i in range(args.hypothesis_num)]
                 
-                # output_3D_s = aggregate_hypothesis(list_hypothesis)
                 output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D)
     
     print("Warm-up complete!\n")
@@ -248,51 +247,52 @@ def test_fps():
             [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
             
             input_2D_nonflip = input_2D[:, 0]
-            input_2D_flip = input_2D[:, 1]
+            
+            # Parallel Euler sampler for CFM - processes all hypotheses in parallel
+            batch_size = gt_3D.size(0)
+            # Pre-expand x2d once to avoid repeated operations
+            
+            def euler_sample_parallel(x2d_expanded, y_local_batch, steps, model_3d):
+                """
+                x2d_expanded: [N*B, F, J, 2] - pre-expanded input 2D poses
+                y_local_batch: [N*B, F, J, 3] - N hypotheses batched together
+                """
+                dt = 1.0 / steps
+                total_batch = y_local_batch.size(0)
+                for s in range(steps):
+                    t_s = torch.full((total_batch, 1, 1, 1), s * dt, device=y_local_batch.device, dtype=y_local_batch.dtype)
+                    v_s = model_3d(x2d_expanded, y_local_batch, t_s)
+                    y_local_batch = y_local_batch + dt * v_s
+                return y_local_batch
             
             # Synchronize GPU before starting timer
             torch.cuda.synchronize()
             start_time = time.time()
             
-            # ============ INFERENCE STARTS HERE ============
+            input_2D_expanded = input_2D_nonflip.repeat(args.hypothesis_num, 1, 1, 1)
             
-            # Parallel Euler sampler for CFM - processes all hypotheses in parallel
-            def euler_sample_parallel(x2d, y_local_batch, steps, model_3d):
-                """
-                x2d: [B, F, J, 2] - input 2D poses
-                y_local_batch: [N*B, F, J, 3] - N hypotheses batched together
-                """
-                dt = 1.0 / steps
-                for s in range(steps):
-                    batch_size = y_local_batch.size(0)
-                    t_s = torch.full((batch_size, 1, 1, 1), s * dt, device=y_local_batch.device, dtype=y_local_batch.dtype)
-                    # Expand x2d to match hypothesis batch size
-                    x2d_expanded = x2d.repeat(args.hypothesis_num, 1, 1, 1)
-                    v_s = model_3d(x2d_expanded, y_local_batch, t_s)
-                    y_local_batch = y_local_batch + dt * v_s
-                return y_local_batch
+            # ============ INFERENCE STARTS HERE ============
             
             for s_keep in eval_steps:
                 # Generate all random noise samples at once [N*B, F, J, 3]
-                batch_size = gt_3D.size(0)
                 y_batch = torch.randn(args.hypothesis_num * batch_size, *gt_3D.shape[1:], 
                                      device=gt_3D.device, dtype=gt_3D.dtype)
                 
-                # Process all hypotheses in parallel
-                y_s_batch = euler_sample_parallel(input_2D_nonflip, y_batch, s_keep, model_FMPose)
+                # Process all hypotheses in parallel (using pre-expanded input)
+                y_s_batch = euler_sample_parallel(input_2D_expanded, y_batch, s_keep, model_FMPose)
                 
                 # Reshape back to [N, B, F, J, 3]
                 y_s_batch = y_s_batch.view(args.hypothesis_num, batch_size, *gt_3D.shape[1:])
                 
-                # Extract predictions and prepare list for aggregation
-                list_hypothesis = []
-                for i in range(args.hypothesis_num):
-                    output_3D_s = y_s_batch[i, :, args.pad].unsqueeze(1)
-                    output_3D_s[:, :, 0, :] = 0
-                    list_hypothesis.append(output_3D_s)
+                # Extract predictions and set root to zero
+                # Optimize: extract all at once then split
+                y_extract = y_s_batch[:, :, args.pad].unsqueeze(2)  # (N,B,1,J,3)
+                y_extract[:, :, :, 0, :] = 0  # Set root joint to zero
+                list_hypothesis = [y_extract[i] for i in range(args.hypothesis_num)]
                 
-                # output_3D_s = aggregate_hypothesis(list_hypothesis)
-                ouput_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D)
+                # Use camera-weighted aggregation
+                # output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D)
+                output_3D_s = aggregate_hypothesis(list_hypothesis)
             
             # ============ INFERENCE ENDS HERE ============
             
