@@ -7,7 +7,7 @@ decay=0.95
 gpu_id=0
 eval_multi_steps=3
 batch_size=1
-hypothesis_num=5
+hypothesis_num=10
 
 sh_file='FMPose_fps_test_serial.sh'
 
@@ -29,7 +29,7 @@ python3 FMPose_fps_test_serial.py \
 --saved_model_path "${saved_model_path}" \
 --model_path "${model_path}" \
 --eval_sample_steps ${eval_multi_steps} \
---test_augmentation False \
+--test_augmentation True \
 --batch_size ${batch_size} \
 --layers ${layers} \
 --gpu ${gpu_id} \
@@ -38,4 +38,3 @@ python3 FMPose_fps_test_serial.py \
 
 echo ""
 echo "Serial FPS test completed!"
-
