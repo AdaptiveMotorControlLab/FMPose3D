@@ -1,0 +1,9 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+animal3d/
+control_animal3dlatest/
+*.zip
+*.npz
