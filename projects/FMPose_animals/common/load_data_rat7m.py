@@ -2,10 +2,9 @@
 import torch.utils.data as data
 import numpy as np
 import cv2
-
 from common.utils import deterministic_random
 from common.camera import normalize_screen_coordinates
-from common.generator import ChunkedGenerator
+from common.generator_rat7m import ChunkedGenerator
 
 class Rat7MFusion(data.Dataset):
     """Rat7M Fusion dataset for single-view 2D-to-3D lifting"""
@@ -57,7 +56,9 @@ class Rat7MFusion(data.Dataset):
                 kps_right=self.kps_right,
                 joints_left=self.joints_left,
                 joints_right=self.joints_right, 
-                out_all=opt.out_all
+                out_all=opt.out_all,
+                vis_3d=self.vis_train,  # Pass visibility for filtering
+                root_joint=self.root_joint  # Pass root joint index
             )
             print('INFO: Training on {} frames'.format(self.generator.num_frames()))
         else:
@@ -80,7 +81,9 @@ class Rat7MFusion(data.Dataset):
                 kps_left=self.kps_left,
                 kps_right=self.kps_right, 
                 joints_left=self.joints_left,
-                joints_right=self.joints_right
+                joints_right=self.joints_right,
+                vis_3d=self.vis_test,  # Pass visibility for filtering
+                root_joint=self.root_joint  # Pass root joint index
             )
             self.key_index = self.generator.saved_index
             print('INFO: Testing on {} frames'.format(self.generator.num_frames()))
@@ -123,28 +126,17 @@ class Rat7MFusion(data.Dataset):
                 actual_end_frame = min(int(end_frame), total_frames)
             actual_start_frame = max(int(start_frame), 0)
             
-            # Calculate visibility for all frames (check for nan values)
-            # vis_3d: [frames, joints, 1] - 1.0 for valid, 0.0 for nan
+            # Get positions for the frame range
             positions_subset = positions_world[actual_start_frame:actual_end_frame]
-            vis_3d = np.ones((positions_subset.shape[0], positions_subset.shape[1], 1), dtype='float32')
+            
+            # Calculate visibility for all frames (check for nan values in world coordinates)
+            # vis_3d: [frames, joints, 1] - 1.0 for valid, 0.0 for nan
+            vis_3d_world = np.ones((positions_subset.shape[0], positions_subset.shape[1], 1), dtype='float32')
             
             # Check for nan values along the coordinate axis (axis=2)
             # If any coordinate (x,y,z) is nan, mark joint as invisible
             nan_mask = np.isnan(np.sum(positions_subset, axis=2))  # [frames, joints]
-            vis_3d[nan_mask, 0] = 0.0
-            
-            # Filter out frames where root joint is not visible (following rat7m_dataset.py)
-            # Skip poses where root joint (SpineM, index 4) has nan values
-            root_joint_index = self.root_joint  # SpineM is the root joint for Rat7M
-            valid_frames_mask = vis_3d[:, root_joint_index, 0] == 1.0
-            
-            if not valid_frames_mask.any():
-                print(f"Warning: No valid frames for {subject} (all root joint have nan)")
-                continue
-            
-            # Apply valid frames filter
-            positions_subset = positions_subset[valid_frames_mask]
-            vis_3d = vis_3d[valid_frames_mask]
+            vis_3d_world[nan_mask, 0] = 0.0
             
             # Process each camera view
             for cam_idx in views:
@@ -162,21 +154,30 @@ class Rat7MFusion(data.Dataset):
                 pos_cam_reshaped = np.dot(pos_world_reshaped, cam['orientation'].T) + cam['translation']
                 pos_3d = pos_cam_reshaped.reshape(frames, joints, 3)  # [frames, joints, 3]
                 
-                # Make root-relative (subtract root joint from all joints)
-                # Following rat7m_dataset.py: use SpineM (index 4) as root
+                # Make root-relative (subtract root joint from all joints except root itself)
                 root_joint_idx = self.root_joint  # SpineM is the root joint for Rat7M
                 pos_3d_root = pos_3d[:, root_joint_idx:root_joint_idx+1, :].copy()  # Save root
-                pos_3d = pos_3d - pos_3d_root  # All joints relative to root
-                # Note: root joint itself is now [0, 0, 0] after subtraction
                 
-                # Replace nan with 0 after root-relative transformation
+                pos_3d = pos_3d - pos_3d_root  # All joints relative to root
+                pos_3d[:, root_joint_idx:root_joint_idx+1, :] = pos_3d_root  # Restore root to original position
+                # Note: root joint keeps its original position, other joints are relative to root
+                                
+                # Replace nan with 0 for non-root joints after root-relative transformation
                 pos_3d = np.nan_to_num(pos_3d, nan=0.0)
                 
                 # Project 3D to 2D using camera parameters
+                # Note: positions_subset may contain nan, which will propagate to pos_2d
                 pos_2d = self.project_to_2d(
                     positions_subset, 
                     cam
                 )
+                
+                # Replace nan in 2D projections with 0 (following rat7m_dataset.py line 171)
+                # This handles joints that had nan in world coordinates
+                pos_2d = np.nan_to_num(pos_2d, nan=0.0)
+                
+                # Use visibility from world coordinates for this camera
+                vis_3d = vis_3d_world.copy()
                 
                 # Store data with key (subject, 'rat_motion', cam_idx) to maintain compatibility
                 # Use 'rat_motion' as a placeholder action name for compatibility with generator
@@ -255,6 +256,7 @@ class Rat7MFusion(data.Dataset):
         return len(self.generator.pairs)
 
     def __getitem__(self, index):
+        
         seq_name, start_3d, end_3d, flip, reverse = self.generator.pairs[index]
         
         # Convert seq_name to tuple if it's a numpy array (for dictionary key)
@@ -268,6 +270,10 @@ class Rat7MFusion(data.Dataset):
         cam, gt_3D, input_2D, action, subject, cam_ind = self.generator.get_batch(
             seq_name, start_3d, end_3d, flip, reverse
         )
+        
+        # Verify root joint doesn't have nan (should be guaranteed by generator filtering)
+        if np.isnan(gt_3D[:, self.root_joint, :]).any():
+            raise ValueError(f"Root joint has NaN for {seq_name}, frames {start_3d}-{end_3d}. Generator filtering failed!")
         
         # Get visibility labels
         if self.train:
