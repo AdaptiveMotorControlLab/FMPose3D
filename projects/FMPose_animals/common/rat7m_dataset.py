@@ -19,7 +19,7 @@ from common.camera import normalize_screen_coordinates
 
 class Rat7MDataset(Dataset):
     def __init__(self, path, split, cam_names, t_pad=0, root_index = 4, use_2D_gt = True, aug_2D = False,
-                       joint_num = 20, sampling_gap = 100, frame_per_video = 3500, norm_rate = 100.0,
+                       joint_num = 20,  norm_rate = 100.0,
                        img_W = 1328, img_H = 1048, pose_2D_path = None, resize_2D_scale = 1.):
         self.cam_names = cam_names
         self.joint_num = joint_num
@@ -44,7 +44,7 @@ class Rat7MDataset(Dataset):
             self.start_frame = 50
             self.end_frame = np.inf
         elif split == 'Test':
-            self.subject_list = subject_index
+            self.subject_list = subject_index[-1]
             self.start_frame = 0
             self.end_frame = np.inf
         
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     cam_names = ['Camera1', 'Camera2', 'Camera3', 'Camera4', 'Camera5', 'Camera6']
     data_dir = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m/'
 
-    valid_dataset = Rat7MDataset(data_dir, 'Train', cam_names, 3)
+    valid_dataset = Rat7MDataset(data_dir, 'Train', cam_names)
 
     pose_3D, pose_root, pose_2D, vid_3D, rotation, sample_info = valid_dataset.getitem(1)
     # print(pose_3D.shape, pose_root.shape, pose_2D.shape, vid_3D.shape, sample_info)
