@@ -15,13 +15,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(sys.path[0]))
 
-from common.data_augmentation_multi_view import DataAug_numpy
-from scripts.utils import loadmat
-from scripts.auxfun_videos import VideoReader
 from common.camera import normalize_screen_coordinates
-from common.loss import get_rotation_numpy
 
-from common.lifter3d import load_camera_params, triangulate_3d, load_h5_keypoints, load_h5_keypoints_cspnext
+from common.lifter3d import load_camera_params, load_h5_keypoints
 
 class ArberDataset(Dataset):
     def __init__(self, cfg, path, split, cam_names, t_pad,
@@ -71,8 +67,6 @@ class ArberDataset(Dataset):
             self.start_frame = 0
             self.end_frame = 2000000
             
-        if self.arg_views>0:
-            self.view_aug = DataAug_numpy(self.arg_views,self.root_index)
         
         # prepare pose data    
         print("prepare the pose data...")
@@ -203,22 +197,14 @@ class ArberDataset(Dataset):
             # clip vid into 0,1
             # vid_2D = np.clip(vid_2D,0,1)
         
-        if self.cfg.NETWORK.USE_GT_TRANSFORM or self.cfg.TRAIN.USE_ROT_LOSS:
-            rotation = get_rotation_numpy(pose_3D, vid_3D, self.root_index)
-            ## Check correctness: yah, correct
-            # print("check correctness of rotation matrix:")
-            # print(np.dot(self.cam_para_list[2]['R'],np.linalg.inv(self.cam_para_list[1]['R'])), rotation[:,:,0,2,1])
-            # np.dot(self.cam_para_list[0]['Camera2']['R'], np.linalg.inv(self.cam_para_list[0]['Camera1']['R']))
-            # rotation[:,:,0,1,0]
-        else:
-            rotation = None
+
            
         pose_root = copy.deepcopy(pose_3D[:,self.root_index:self.root_index+1,:,:])
         pose_3D[:,self.root_index:self.root_index+1,:,:] = 0.0
         pose_3D = np.nan_to_num(pose_3D, nan=0)
         pose_2D = np.concatenate((pose_2D, vid_2D), axis=2)
 
-        return FN(pose_3D).float(), FN(pose_root).float(), FN(pose_2D).float(), FN(vid_3D).float(), FN(rotation).float(), FN(sample_info).float()
+        return FN(pose_3D).float(), FN(pose_root).float(), FN(pose_2D).float(), FN(vid_3D).float(), FN(sample_info).float()
  
 if __name__ == '__main__':
     from common.arguments import parse_args
