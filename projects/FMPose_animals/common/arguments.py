@@ -23,9 +23,9 @@ class opts():
         self.parser.add_argument('--d_hid', default=1024, type=int)
         self.parser.add_argument('--dataset', type=str, default='h36m')
         self.parser.add_argument('-k', '--keypoints', default='cpn_ft_h36m_dbb', type=str)
-        self.parser.add_argument('--data_augmentation', type=bool, default=True)
+        self.parser.add_argument('--data_augmentation', type=bool, default=False)
         self.parser.add_argument('--reverse_augmentation', type=bool, default=False)
-        self.parser.add_argument('--test_augmentation', type=str2bool, default=True)
+        self.parser.add_argument('--test_augmentation', type=str2bool, default=False)
         self.parser.add_argument('--test_augmentation_flip_hypothesis', type=str2bool, default=False)
         self.parser.add_argument('--test_augmentation_FlowAug', type=str2bool, default=False)
         self.parser.add_argument('--crop_uv', type=int, default=0)
@@ -67,8 +67,11 @@ class opts():
         self.parser.add_argument('--post_refine', action='store_true', help='if use post_refine model')
         self.parser.add_argument('-previous_post_refine_name', type=str, default='', help='save last saved model name')
         self.parser.add_argument('-norm', '--norm', default=0.01, type=float, metavar='N', help='constraint  of sparsity')
-        self.parser.add_argument('--train_views', type=int, nargs='+', default=[0,1,2,3])
-        self.parser.add_argument('--test_views', type=int, nargs='+', default=[0,1,2,3])
+        # self.parser.add_argument('--train_views', type=int, nargs='+', default=[0,1,2,3])
+        # self.parser.add_argument('--test_views', type=int, nargs='+', default=[0,1,2,3])
+        # debug mode--use only one view for training and testing
+        self.parser.add_argument('--train_views', type=int, nargs='+', default=[0])
+        self.parser.add_argument('--test_views', type=int, nargs='+', default=[0])
         
         self.parser.add_argument('--token_dim', type=int, default=256) # 
         self.parser.add_argument('--create_time', type=str, default='')
