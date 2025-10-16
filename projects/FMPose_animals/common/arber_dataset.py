@@ -20,19 +20,15 @@ from common.camera import normalize_screen_coordinates
 from common.lifter3d import load_camera_params, load_h5_keypoints
 
 class ArberDataset(Dataset):
-    def __init__(self, cfg, path, split, cam_names, t_pad,
-                 root_index = 12, use_2D_gt = True, aug_2D = False,
+    def __init__(self, cfg, path, split, cam_names,
+                 root_index = 12, 
                  joint_num = 23, sampling_gap = 100, frame_per_video = 9000, norm_rate = 50.0,
                  img_W = 2048, img_H=1536,arg_views=1,resize_2D_scale=0.5,visualize=False):
 
         self.cfg = cfg        
         self.cam_names = cam_names
         self.joint_num = joint_num
-        self.t_pad = t_pad
-        self.t_length = (t_pad*2) + 1
         self.root_index = root_index
-        self.use_2D_gt = use_2D_gt
-        self.aug_2D = aug_2D
         self.img_W = img_W * resize_2D_scale
         self.img_H = img_H * resize_2D_scale
         self.arg_views = arg_views
@@ -62,18 +58,11 @@ class ArberDataset(Dataset):
             self.subject_list = subject_index[:1]
             self.start_frame = 0
             self.end_frame = 2000000
-        elif split =='Get_Matrix':
-            self.subject_list = subject_index
-            self.start_frame = 0
-            self.end_frame = 2000000
-            
-        
+         
         # prepare pose data    
         print("prepare the pose data...")
         self.pose_3D_list = []
         self.pose_2D_list = []
-        self.vid2D_list = []
-        self.vid3D_list = []
         self.sample_info_list = []
         self.cam_para_list = []
     
@@ -189,7 +178,6 @@ class ArberDataset(Dataset):
         vid_2D = self.vid2D_list[index].copy()
         sample_info = self.sample_info_list[index]
         
-        # if self.use_2D_gt and self.aug_2D:
         if "TRAIN" in self.split.upper() and self.arg_views > 0:
             pose_3D, pose_2D = self.view_aug(pose_3D, pose_2D)
             tmp_vid = np.repeat(np.expand_dims(copy.deepcopy(vid_3D), axis=-1), self.arg_views, axis = -1)

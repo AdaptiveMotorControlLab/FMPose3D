@@ -14,7 +14,6 @@ import sys
 import os
 sys.path.append(os.path.dirname(sys.path[0]))
 
-from common.data_augmentation_multi_view import DataAug_numpy
 from scripts.utils import loadmat
 from scripts.auxfun_videos import VideoReader
 from common.camera import normalize_screen_coordinates
@@ -68,9 +67,6 @@ class Rat7MDataset(Dataset):
             self.subject_list = subject_index[5:]
             self.start_frame = 0
             self.end_frame = np.inf
-
-        if self.arg_views > 0:
-            self.view_aug = DataAug_numpy(self.arg_views, self.root_index)
         
         print('Prepare the pose data...')
         self.pose_3D_list = []
@@ -123,7 +119,7 @@ class Rat7MDataset(Dataset):
                 # if idx == 38600:
                 #     aa = 1
 
-                for joint_id, joint in enumerate(s_label_mat['mocap'].keys()):
+                for joint_id, joint in enumerate(s_label_mat['mocap'].keys()): # read 3d keypoints
                     joint_coor = s_label_mat['mocap'][joint][left_frame_id: right_frame_id]
                     tmp_vis3D[np.where(~np.isnan(np.sum(joint_coor, axis=1))), joint_id] = 1.0
                     tmp_3D_word[:, joint_id,:] = joint_coor / norm_rate
