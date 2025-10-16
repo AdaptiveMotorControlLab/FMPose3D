@@ -43,24 +43,8 @@ class Rat7MDataset(Dataset):
             self.subject_list = subject_index[:4]
             self.start_frame = 50
             self.end_frame = 54000
-        elif split == 'More_train':
-            self.subject_list = subject_index[:5]
-            self.start_frame = 50
-            self.end_frame = np.inf
-        elif split == 'In_valid':
-            self.subject_list = subject_index[:4]
-            self.start_frame = 54050
-            self.end_frame = np.inf
-        elif split == 'Out_valid':
-            self.subject_list = subject_index[5:]
-            self.start_frame = 0
-            self.end_frame = np.inf
-        elif split == 'Train_outvalid':
-            self.subject_list = subject_index[5:]
-            self.start_frame = 50
-            self.end_frame = np.inf
         elif split == 'Test':
-            self.subject_list = subject_index[5:]
+            self.subject_list = subject_index[:4]
             self.start_frame = 0
             self.end_frame = np.inf
         
@@ -99,7 +83,7 @@ class Rat7MDataset(Dataset):
 
             total_frame_num = s_label_mat['mocap']['HeadF'].shape[0]
             real_end_frame = min(self.end_frame, total_frame_num)
-            for idx in tqdm(range(self.start_frame, real_end_frame, sampling_gap)):
+            for idx in tqdm(range(self.start_frame, real_end_frame)):
                 idx = max(idx, self.t_pad)
                 idx = min(idx, real_end_frame - self.t_pad - 1)
                 left_frame_id = idx - self.t_pad
@@ -221,22 +205,11 @@ class Rat7MDataset(Dataset):
 
 
 if __name__ == '__main__':
-    # from common.arguments import parse_args
-    # from scripts.reset_config_rat7m import reset_config_rat7m
-    # from common.config import config as cfg
-    # from common.config import reset_config, update_config
-
     cam_names = ['Camera1', 'Camera2', 'Camera3', 'Camera4', 'Camera5', 'Camera6']
     data_dir = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m/'
-    # args = parse_args()
-    # update_config(args.cfg) ###config file->cfg
-    # reset_config(cfg, args) ###arg -> cfg
-    # reset_config_rat7m(cfg)
+
     valid_dataset = Rat7MDataset(data_dir, 'Train', cam_names, 3)
-    # train_dataset = Rat7MDataset(data_dir, 'Test', cam_names, 3, root_index = 4, 
-    #                          use_2D_gt = False, joint_num = 20, sampling_gap = 30, 
-    #                          pose_2D_path = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m',
-    #                         resize_2D_scale = 0.5)
+
     pose_3D, pose_root, pose_2D, vid_3D, rotation, sample_info = valid_dataset.getitem(1)
     # print(pose_3D.shape, pose_root.shape, pose_2D.shape, vid_3D.shape, sample_info)
     
