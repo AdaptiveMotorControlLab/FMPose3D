@@ -35,7 +35,6 @@ class Rat7MDataset(Dataset):
         self.pose_2D_path = pose_2D_path
 
         subject_index = os.listdir(path)
-        subject_index.remove('Rawdata')
         subject_index.remove('jesse_skeleton.mat')
         # subject_index.remove('s1d1')
         subject_index.sort()
@@ -222,26 +221,22 @@ class Rat7MDataset(Dataset):
 
 
 if __name__ == '__main__':
-    from common.arguments import parse_args
+    # from common.arguments import parse_args
     # from scripts.reset_config_rat7m import reset_config_rat7m
     # from common.config import config as cfg
     # from common.config import reset_config, update_config
 
     cam_names = ['Camera1', 'Camera2', 'Camera3', 'Camera4', 'Camera5', 'Camera6']
-    data_dir = '/media/data1/MausHaus_project/Rat7M_data'
-    args = parse_args()
+    data_dir = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m/'
+    # args = parse_args()
     # update_config(args.cfg) ###config file->cfg
     # reset_config(cfg, args) ###arg -> cfg
     # reset_config_rat7m(cfg)
-    # valid_dataset = Rat7MDataset(cfg, data_dir, 'Train', cam_names, 3)
-    train_dataset = Rat7MDataset(data_dir, 'Test', cam_names, 3, root_index = 4, 
-                             use_2D_gt = False, joint_num = 20, sampling_gap = 30, 
-                             pose_2D_path = '/media/data1/MausHaus_project/external_code/DLC-ModelZoo/all_videos_data/Rat_7M_all_resize',
-                            resize_2D_scale = 0.5)
-    pose_3D, pose_root, pose_2D, vid_3D, rotation, sample_info = train_dataset.getitem(250)
-    # valid_dataloader = torch.utils.data.DataLoader(
-    #         train_dataset, batch_size=360, shuffle=False, pin_memory=True)
-    # for i, data in enumerate(tqdm(valid_dataloader, 0)):
-    #     pose_3D, pose_2D, vid_2D, vid_3D, sample_info = data
-    #     pose_3D, pose_2D, vid_2D, vid_3D, sample_info = pose_3D.cuda(), pose_2D.cuda(), vid_2D.cuda(), vid_3D.cuda(), sample_info.cuda()
-    aa = 1
+    valid_dataset = Rat7MDataset(data_dir, 'Train', cam_names, 3)
+    # train_dataset = Rat7MDataset(data_dir, 'Test', cam_names, 3, root_index = 4, 
+    #                          use_2D_gt = False, joint_num = 20, sampling_gap = 30, 
+    #                          pose_2D_path = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m',
+    #                         resize_2D_scale = 0.5)
+    pose_3D, pose_root, pose_2D, vid_3D, rotation, sample_info = valid_dataset.getitem(1)
+    # print(pose_3D.shape, pose_root.shape, pose_2D.shape, vid_3D.shape, sample_info)
+    
