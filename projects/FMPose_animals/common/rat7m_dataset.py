@@ -44,7 +44,7 @@ class Rat7MDataset(Dataset):
             self.start_frame = 50
             self.end_frame = np.inf
         elif split == 'Test':
-            self.subject_list = subject_index[-1]
+            self.subject_list = subject_index[5:]
             self.start_frame = 0
             self.end_frame = np.inf
         
