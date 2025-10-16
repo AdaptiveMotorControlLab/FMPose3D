@@ -113,8 +113,19 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # Run sampling
             y_s = euler_sample(input_2D, y, steps_to_use)
             output_3D = y_s[:, args.pad].unsqueeze(1)
+            
+            
             output_3D[:, :, 0, :] = 0
-            action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset, subject)
+            
+            # Apply visibility mask for evaluation (only evaluate visible joints)
+            # vis_3D: [B, F, J, 1], expand to match output_3D: [B, F, J, 3]
+            vis_mask = vis_3D.expand(-1, -1, -1, 3)  # [B, F, J, 3]
+            
+            # Mask both prediction and target for fair comparison
+            output_3D_masked = output_3D * vis_mask
+            out_target_masked = out_target * vis_mask
+            
+            action_error_sum = test_calculation(output_3D_masked, out_target_masked, action, action_error_sum, args.dataset, subject, vis_mask)
 
     if split == 'train':
         return loss_all['loss'].avg
