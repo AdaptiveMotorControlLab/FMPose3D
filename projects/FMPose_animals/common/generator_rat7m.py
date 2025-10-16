@@ -151,8 +151,8 @@ class ChunkedGenerator:
             return self.state
 
     def get_batch(self, seq_i, start_3d, end_3d, flip, reverse):
-        subject,action,cam_index = seq_i
-        seq_name = (subject,action,int(cam_index))
+        subject, action, cam_index = seq_i
+        seq_name = (subject, action, int(cam_index))
         start_2d = start_3d - self.pad - self.causal_shift
         end_2d = end_3d + self.pad - self.causal_shift
 
@@ -185,6 +185,7 @@ class ChunkedGenerator:
                 high_3d = min(end_3d, seq_3d.shape[0])
                 pad_left_3d = low_3d - start_3d
                 pad_right_3d = end_3d - high_3d
+            
             if pad_left_3d != 0 or pad_right_3d != 0:
                 self.batch_3d = np.pad(seq_3d[low_3d:high_3d],
                                           ((pad_left_3d, pad_right_3d), (0, 0), (0, 0)), 'edge')
@@ -201,8 +202,8 @@ class ChunkedGenerator:
         if self.cameras is not None:
             self.batch_cam = self.cameras[seq_name].copy()
             if flip:
-                self.batch_cam[ 2] *= -1
-                self.batch_cam[ 7] *= -1
+                self.batch_cam[2] *= -1
+                self.batch_cam[7] *= -1
 
         if self.poses_3d is None and self.cameras is None:
             return None, None, self.batch_2d.copy(), action, subject, int(cam_index)
@@ -211,7 +212,7 @@ class ChunkedGenerator:
         elif self.poses_3d is None:
             return self.batch_cam, None, self.batch_2d.copy(),action, subject, int(cam_index)
         else:
-            return self.batch_cam, self.batch_3d.copy(), self.batch_2d.copy(),action, subject, int(cam_index)
+            return self.batch_cam, self.batch_3d.copy(), self.batch_2d.copy(), action, subject, int(cam_index)
 
 
 
