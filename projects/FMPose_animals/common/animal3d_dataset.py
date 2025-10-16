@@ -39,9 +39,10 @@ class TrainDataset(Dataset):
         ori_keypoint_2d = keypoint_2d.copy()
 
         item = {
-                'keypoints_2d': keypoint_2d,
+                'keypoints_2d': keypoint_2d, #
                 'keypoints_3d': keypoint_3d,
-                'orig_keypoints_2d': ori_keypoint_2d}
+                # 'orig_keypoints_2d': ori_keypoint_2d
+                }
         return item
     
 
@@ -70,7 +71,7 @@ class EvaluationDataset(Dataset):
         item = {
                 'keypoints_2d': keypoint_2d,
                 'keypoints_3d': keypoint_3d,
-                'orig_keypoints_2d': ori_keypoint_2d,
+                # 'orig_keypoints_2d': ori_keypoint_2d,
               }
         return item
 

@@ -1,0 +1,261 @@
+from torch.utils.data import Dataset
+import os
+import numpy as np
+import pandas as pd
+import random
+from torch import from_numpy as FN
+import copy
+import cv2
+import torch
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import glob
+import sys
+import os
+sys.path.append(os.path.dirname(sys.path[0]))
+
+from common.data_augmentation_multi_view import DataAug_numpy
+from scripts.utils import loadmat
+from scripts.auxfun_videos import VideoReader
+from common.camera import normalize_screen_coordinates
+from common.loss import get_rotation_numpy
+
+class Rat7MDataset(Dataset):
+    def __init__(self, cfg, path, split, cam_names, t_pad, root_index = 4, use_2D_gt = True, aug_2D = False,
+                       joint_num = 20, sampling_gap = 100, frame_per_video = 3500, norm_rate = 100.0,
+                       img_W = 1328, img_H = 1048, arg_views = 1, pose_2D_path = None, resize_2D_scale = 1.):
+        self.cfg = cfg
+        self.cam_names = cam_names
+        self.joint_num = joint_num
+        self.t_pad = t_pad
+        self.t_length = (t_pad*2) + 1
+        self.root_index = root_index
+        self.use_2D_gt = use_2D_gt
+        self.aug_2D = aug_2D
+        self.img_W = img_W * resize_2D_scale
+        self.img_H = img_H * resize_2D_scale
+        self.arg_views = arg_views
+        self.split = split
+        self.pose_2D_path = pose_2D_path
+
+        subject_index = os.listdir(path)
+        subject_index.remove('Rawdata')
+        subject_index.remove('jesse_skeleton.mat')
+        # subject_index.remove('s1d1')
+        subject_index.sort()
+
+        if split == 'Train':
+            self.subject_list = subject_index[:4]
+            self.start_frame = 50
+            self.end_frame = 54000
+        elif split == 'More_train':
+            self.subject_list = subject_index[:5]
+            self.start_frame = 50
+            self.end_frame = np.inf
+        elif split == 'In_valid':
+            self.subject_list = subject_index[:4]
+            self.start_frame = 54050
+            self.end_frame = np.inf
+        elif split == 'Out_valid':
+            self.subject_list = subject_index[5:]
+            self.start_frame = 0
+            self.end_frame = np.inf
+        elif split == 'Train_outvalid':
+            self.subject_list = subject_index[5:]
+            self.start_frame = 50
+            self.end_frame = np.inf
+        elif split == 'Test':
+            self.subject_list = subject_index[5:]
+            self.start_frame = 0
+            self.end_frame = np.inf
+
+        if self.arg_views > 0:
+            self.view_aug = DataAug_numpy(self.arg_views, self.root_index)
+        
+        print('Prepare the pose data...')
+        self.pose_3D_list = []
+        self.pose_2D_list = []
+        self.vid2D_list = []
+        self.vid3D_list = []
+        self.sample_info_list = []
+        self.cam_para_list = []
+        for sub_idx, subject_name in enumerate(self.subject_list):
+            print(subject_name)
+            subject_folder = os.path.join(path, subject_name)
+            s_label_path = os.path.join(subject_folder, 'mocap-{}.mat'.format(subject_name))
+            s_label_mat = loadmat(s_label_path)
+            if not use_2D_gt:
+                s_pose_2D_path = os.path.join(pose_2D_path, subject_name)
+                DLC_predictions = {}
+                for cam in cam_names:
+                    DLC_predictions[cam] = np.load(os.path.join(s_pose_2D_path, subject_name + '_' + cam.lower() + '_DLC_filtered.npy'))
+
+            tmp_cam_para = {}
+            for cam in cam_names:
+                tmp_cam_para[cam] = {}
+                tmp_cam_para[cam]['R'] = s_label_mat['cameras'][cam]['rotationMatrix'].T
+
+                tmp_cam_para[cam]['t'] = s_label_mat['cameras'][cam]['translationVector'] / norm_rate
+                K_tmp = s_label_mat['cameras'][cam]['IntrinsicMatrix']
+                K_tmp[1,0] = 0.0
+                tmp_cam_para[cam]['K'] = K_tmp.T
+                Distort = np.array([s_label_mat['cameras'][cam]['RadialDistortion'][0],
+                    s_label_mat['cameras'][cam]['RadialDistortion'][1],
+                    s_label_mat['cameras'][cam]['TangentialDistortion'][0],
+                    s_label_mat['cameras'][cam]['TangentialDistortion'][1]])
+                tmp_cam_para[cam]['Distort'] = Distort
+
+            total_frame_num = s_label_mat['mocap']['HeadF'].shape[0]
+            real_end_frame = min(self.end_frame, total_frame_num)
+            for idx in tqdm(range(self.start_frame, real_end_frame, sampling_gap)):
+                idx = max(idx, self.t_pad)
+                idx = min(idx, real_end_frame - self.t_pad - 1)
+                left_frame_id = idx - self.t_pad
+                right_frame_id = idx + self.t_pad + 1
+                tmp_3D = np.zeros((self.t_length, self.joint_num, 3, len(self.cam_names)))
+                tmp_3D_word = np.zeros((self.t_length, self.joint_num, 3))
+                tmp_vis2D = np.zeros((self.t_length, self.joint_num, 1, len(self.cam_names)))
+                tmp_vis3D = np.zeros((self.t_length, self.joint_num, 1))
+                tmp_info = np.zeros(2)
+                tmp_info[0] = sub_idx
+                tmp_info[1] = idx
+
+                # if idx == 38600:
+                #     aa = 1
+
+                for joint_id, joint in enumerate(s_label_mat['mocap'].keys()):
+                    joint_coor = s_label_mat['mocap'][joint][left_frame_id: right_frame_id]
+                    tmp_vis3D[np.where(~np.isnan(np.sum(joint_coor, axis=1))), joint_id] = 1.0
+                    tmp_3D_word[:, joint_id,:] = joint_coor / norm_rate
+                
+                if (tmp_vis3D[:, self.root_index] == 0).any():
+                    continue
+                
+                tmp_3D_word_reshaped = np.reshape(tmp_3D_word, (-1, 3))
+                for cam_idx, cam in enumerate(cam_names):
+                    tmp_3D_cam_reshaped = np.dot(tmp_3D_word_reshaped, tmp_cam_para[cam]['R'].T) + tmp_cam_para[cam]['t']
+                    tmp_3D[:,:,:, cam_idx] = np.reshape(tmp_3D_cam_reshaped, (self.t_length, self.joint_num, 3))
+                
+                tmp_2D = np.zeros((self.t_length, self.joint_num, 2, len(self.cam_names)))
+                if use_2D_gt:
+                    for j_cam, cam in enumerate(cam_names):
+                        tmp_vis2D[:,:,:,j_cam] = copy.deepcopy(tmp_vis3D)
+                        rvec, _ = cv2.Rodrigues(tmp_cam_para[cam]['R'])
+                        xy, _ = cv2.projectPoints(tmp_3D_word_reshaped, rvec, tmp_cam_para[cam]['t'], tmp_cam_para[cam]['K'], tmp_cam_para[cam]['Distort'])
+                        xy_reshaped = np.reshape(xy[:,0,:], (self.t_length, self.joint_num, 2))
+
+
+                        # cam_id = s_label_mat['cameras'][cam]['frame'][idx]
+                        # s_video_dir = os.path.join(subject_folder, subject_name + '_video')
+                        # s_c_video_path = os.path.join(s_video_dir, subject_name[:2] + '-' + subject_name[2:] + '-{}-{}.mp4'.format(cam.lower(), cam_id-cam_id%frame_per_video))
+                        # cap = VideoReader(s_c_video_path)
+                        # cap.set_to_frame(cam_id % frame_per_video)
+                        # view_image = cap.read_frame()
+                        # fig = plt.figure()
+                        # plt.imshow(view_image)
+                        # rvec, _ = cv2.Rodrigues(tmp_cam_para[cam]['R'])
+                        # s = plt.scatter(xy_reshaped[self.t_pad,:,0], xy_reshaped[self.t_pad,:,1], label=list(s_label_mat['mocap'].keys()), c=list(range(self.joint_num)), cmap='jet', s=3)
+                        # cbar = fig.colorbar(mappable=s, cmap='jet', ticks=list(range(len(list(s_label_mat['mocap'].keys())))))
+                        # cbar.ax.set_yticklabels(list(s_label_mat['mocap'].keys()))
+                        # plt.show()
+                        # plt.savefig('{}sd.png'.format(cam), dpi=400.0)
+                        # plt.close()
+                        # aa = 1
+
+
+                        tmp_2D[:,:,:,j_cam] = normalize_screen_coordinates(xy_reshaped, self.img_W, self.img_H)
+                else:
+                    for j_cam, cam in enumerate(cam_names):
+                        cam_ids = s_label_mat['cameras'][cam]['frame'][left_frame_id: right_frame_id]
+                        pose_2D_vis = copy.deepcopy(DLC_predictions[cam][cam_ids])
+
+                        # s_video_dir = os.path.join(subject_folder, subject_name + '_video')
+                        # s_c_video_path = os.path.join(s_video_dir, subject_name[:2] + '-' + subject_name[2:] + '-{}-{}.mp4'.format(cam.lower(), cam_ids[self.t_pad]-cam_ids[self.t_pad]%frame_per_video))
+                        # cap = VideoReader(s_c_video_path)
+                        # cap.set_to_frame(cam_ids[self.t_pad] % frame_per_video)
+                        # view_image = cap.read_frame()
+                        # fig = plt.figure()
+                        # plt.imshow(view_image)
+                        # pose_2D_vis_back_resize = pose_2D_vis.copy() * 2.0
+                        # plt.scatter(pose_2D_vis_back_resize[self.t_pad,:,0], pose_2D_vis_back_resize[self.t_pad,:,1], c=list(range(self.joint_num)), cmap='jet', s=3)
+                        # plt.savefig('{}sd_new.png'.format(cam), dpi=200.0)
+                        # plt.close()
+
+                        tmp_2D[:,:,:,j_cam] = normalize_screen_coordinates(copy.deepcopy(pose_2D_vis[:,:,:2]), self.img_W, self.img_H)
+                        tmp_vis2D[:,:,:,j_cam] = copy.deepcopy(pose_2D_vis[:,:,2:])
+                    aa = 1
+                
+                tmp_3D_root = copy.deepcopy(tmp_3D[:,self.root_index:self.root_index+1,:,:])
+                tmp_3D = tmp_3D - tmp_3D_root
+                tmp_3D[:,self.root_index:self.root_index+1,:,:] = tmp_3D_root
+            
+                
+                # self.pose_3D_list.append(np.nan_to_num(tmp_3D))
+                self.pose_3D_list.append(tmp_3D)
+                self.pose_2D_list.append(np.nan_to_num(tmp_2D))
+                self.vid2D_list.append(tmp_vis2D)
+                self.vid3D_list.append(tmp_vis3D)
+                self.sample_info_list.append(tmp_info)
+            self.cam_para_list.append(tmp_cam_para)
+        aa = 1
+
+    def __len__(self):
+        return len(self.vid3D_list)
+
+    def __getitem__(self, index):
+        return self.getitem(index)
+
+    def getitem(self, index):
+        pose_3D = copy.deepcopy(self.pose_3D_list[index])  # T,K,3,N
+        pose_2D = copy.deepcopy(self.pose_2D_list[index])  # T,K,2,N
+        vid_2D = copy.deepcopy(self.vid2D_list[index])     # T,K,1,N
+        vid_3D = copy.deepcopy(self.vid3D_list[index])     # T,K,1
+        sample_info = copy.deepcopy(self.sample_info_list[index])  # 2
+        
+        # if self.use_2D_gt and self.aug_2D:
+        if "TRAIN" in self.split.upper() and self.arg_views > 0:
+            pose_3D, pose_2D = self.view_aug(pose_3D, pose_2D)
+            tmp_vid = np.repeat(np.expand_dims(copy.deepcopy(vid_3D), axis=-1), self.arg_views, axis = -1)
+            vid_2D = np.concatenate((vid_2D, tmp_vid), axis = -1)
+        
+        if self.cfg.NETWORK.USE_GT_TRANSFORM or self.cfg.TRAIN.USE_ROT_LOSS:
+            rotation = get_rotation_numpy(pose_3D, vid_3D, self.root_index)
+            ## Check correctness:
+            # np.dot(self.cam_para_list[0]['Camera2']['R'], np.linalg.inv(self.cam_para_list[0]['Camera1']['R']))
+            # rotation[:,:,0,1,0]
+        else:
+            rotation = None
+
+        pose_root = copy.deepcopy(pose_3D[:,self.root_index:self.root_index+1,:,:])
+        pose_3D[:,self.root_index:self.root_index+1,:,:] = 0.0
+        pose_3D = np.nan_to_num(pose_3D, nan=0)
+        pose_2D = np.concatenate((pose_2D, vid_2D), axis=2)
+
+        return FN(pose_3D).float(), FN(pose_root).float(), FN(pose_2D).float(), FN(vid_3D).float(), FN(rotation).float(), FN(sample_info).float()
+
+
+
+if __name__ == '__main__':
+    from common.arguments import parse_args
+    from scripts.reset_config_rat7m import reset_config_rat7m
+    from common.config import config as cfg
+    from common.config import reset_config, update_config
+
+    cam_names = ['Camera1', 'Camera2', 'Camera3', 'Camera4', 'Camera5', 'Camera6']
+    data_dir = '/media/data1/MausHaus_project/Rat7M_data'
+    args = parse_args()
+    update_config(args.cfg) ###config file->cfg
+    reset_config(cfg, args) ###arg -> cfg
+    reset_config_rat7m(cfg)
+    # valid_dataset = Rat7MDataset(cfg, data_dir, 'Train', cam_names, 3)
+    train_dataset = Rat7MDataset(cfg, data_dir, 'Test', cam_names, 3, root_index = 4, 
+                             use_2D_gt = False, joint_num = 20, sampling_gap = 30, 
+                             pose_2D_path = '/media/data1/MausHaus_project/external_code/DLC-ModelZoo/all_videos_data/Rat_7M_all_resize',
+                            resize_2D_scale = 0.5)
+    pose_3D, pose_root, pose_2D, vid_3D, rotation, sample_info = train_dataset.getitem(250)
+    # valid_dataloader = torch.utils.data.DataLoader(
+    #         train_dataset, batch_size=360, shuffle=False, pin_memory=True)
+    # for i, data in enumerate(tqdm(valid_dataloader, 0)):
+    #     pose_3D, pose_2D, vid_2D, vid_3D, sample_info = data
+    #     pose_3D, pose_2D, vid_2D, vid_3D, sample_info = pose_3D.cuda(), pose_2D.cuda(), vid_2D.cuda(), vid_3D.cuda(), sample_info.cuda()
+    aa = 1
