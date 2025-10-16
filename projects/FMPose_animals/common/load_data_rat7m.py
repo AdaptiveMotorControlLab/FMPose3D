@@ -161,20 +161,15 @@ class Rat7MFusion(data.Dataset):
                 pos_3d = pos_3d - pos_3d_root  # All joints relative to root
                 pos_3d[:, root_joint_idx:root_joint_idx+1, :] = pos_3d_root  # Restore root to original position
                 # Note: root joint keeps its original position, other joints are relative to root
-                                
-                # Replace nan with 0 for non-root joints after root-relative transformation
-                pos_3d = np.nan_to_num(pos_3d, nan=0.0)
+                # Note: pos_3d may still contain nan in non-root joints (will be handled in __getitem__)
                 
                 # Project 3D to 2D using camera parameters
                 # Note: positions_subset may contain nan, which will propagate to pos_2d
-                pos_2d = self.project_to_2d(
-                    positions_subset, 
-                    cam
-                )
+                pos_2d = self.project_to_2d(positions_subset, cam)
                 
-                # Replace nan in 2D projections with 0 (following rat7m_dataset.py line 171)
-                # This handles joints that had nan in world coordinates
-                pos_2d = np.nan_to_num(pos_2d, nan=0.0)
+                # Normalize to [-1, 1] if crop_uv is 0
+                if self.crop_uv == 0:
+                    pts_2d = normalize_screen_coordinates(pts_2d, w=cam['res_w'], h=cam['res_h'])
                 
                 # Use visibility from world coordinates for this camera
                 vis_3d = vis_3d_world.copy()
@@ -246,10 +241,6 @@ class Rat7MFusion(data.Dataset):
         # Reshape back
         pts_2d = pts_2d.reshape(n_frames, n_joints, 2)
         
-        # Normalize to [-1, 1] if crop_uv is 0
-        if self.crop_uv == 0:
-            pts_2d = normalize_screen_coordinates(pts_2d, w=cam['res_w'], h=cam['res_h'])
-        
         return pts_2d
 
     def __len__(self):
@@ -275,6 +266,12 @@ class Rat7MFusion(data.Dataset):
         if np.isnan(gt_3D[:, self.root_joint, :]).any():
             raise ValueError(f"Root joint has NaN for {seq_name}, frames {start_3d}-{end_3d}. Generator filtering failed!")
         
+        # Replace nan with 0 for non-root joints (following rat7m_dataset.py line 200)
+        # Non-root joints may have nan if markers were missing, but visibility mask tracks this
+        gt_3D = np.nan_to_num(gt_3D, nan=0.0)
+        # Replace nan in 2D projections with 0 (following rat7m_dataset.py line 171)
+        input_2D = np.nan_to_num(input_2D, nan=0.0)        
+ 
         # Get visibility labels
         if self.train:
             vis_dict = self.vis_train
