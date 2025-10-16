@@ -29,7 +29,7 @@ class opts():
         self.parser.add_argument('--test_augmentation_flip_hypothesis', type=str2bool, default=False)
         self.parser.add_argument('--test_augmentation_FlowAug', type=str2bool, default=False)
         self.parser.add_argument('--crop_uv', type=int, default=0)
-        self.parser.add_argument('--root_path', type=str, default='dataset/')
+        self.parser.add_argument('--root_path', type=str, default='Rat7M_data/')  # Or use 'dataset/rat7m/' for old structure
         self.parser.add_argument('-a', '--actions', default='*', type=str)
         self.parser.add_argument('--downsample', default=1, type=int)
         self.parser.add_argument('--subset', default=1, type=float)
@@ -108,7 +108,44 @@ class opts():
         # mask joints
         self.parser.add_argument('--mask_prob', type=float, default=0.5)
         self.parser.add_argument('--masked_joints', type=str, default='12,13')
+
+        # General arguments for rat7m
+        self.parser.add_argument('--cfg', help="Specify the path of the path of the config(*.yaml)", default='./cfg/rat7m/t_7_dim_4.yaml')
+        self.parser.add_argument('--metric', help="eval metric", default='mpjpe') #['mpjpe', 'p_mpjpe', 'n_mpjpe']
+        self.parser.add_argument('--no_align_r', dest = 'align_r', action='store_false', help='align rotation(metric)')
+        self.parser.add_argument('--no_align_t', dest = 'align_t',action='store_false', help='align translatio(metric)n')
+        self.parser.add_argument('--no_align_s', dest = 'align_s', action='store_false', help='align scale(metric)')
+        self.parser.add_argument('--no_align_trj', dest = 'align_trj', action='store_false', help='align triangulation')
+        self.parser.add_argument('--no_trj_align_r', dest = 'trj_align_r', action='store_false', help='align rotation(triangulation)')
+        self.parser.add_argument('--trj_align_t', action='store_true', help='align translation(triangulation)')
+        self.parser.add_argument('--no_trj_align_s', dest = 'trj_align_s', action='store_false', help='align scale(triangulation)')
+        # Visualization
+        self.parser.add_argument('--vis_3d', action='store_true', help='if vis 3d pose')
+        self.parser.add_argument('--vis_complexity', action='store_true', help='if vis complexity')
+        self.parser.add_argument('--vis_debug', action='store_true', help='save vis fig')
+        self.parser.add_argument('--vis_grad', action='store_true', help='')
+        self.parser.add_argument('--vis_dataset', help="Specify the name of the vis datast", default='h36m')
         
+        # self.parser.add_argument('--rat7m', action='store_true', help='if use rat7m')
+        
+        # Rat7M dataset split
+        self.parser.add_argument('--train_list', type=str, nargs='+', 
+                                default=['s5d2'],
+                                help='List of subjects for training (Rat7M)')
+        self.parser.add_argument('--test_list', type=str, nargs='+',
+                                default=['s5d1'],
+                                help='List of subjects for testing (Rat7M)')
+        
+        self.parser.set_defaults(align_r=True)
+        self.parser.set_defaults(align_t=True)
+        self.parser.set_defaults(align_s=True)
+        self.parser.set_defaults(align_trj=True)
+        self.parser.set_defaults(trj_align_r=True)
+        self.parser.set_defaults(trj_align_s=True)
+        self.parser.set_defaults(test_flip=True)
+        self.parser.set_defaults(test_rot=True)
+
+ 
     def parse(self):
         self.init()
         
@@ -118,7 +155,9 @@ class opts():
         self.opt.subjects_train = 'S1,S5,S6,S7,S8'
         self.opt.subjects_test = 'S9,S11'
                 
-        self.opt.root_joint = 0
+        self.opt.root_joint = 4
+        
+        
         if self.opt.dataset == 'h36m':
             self.opt.subjects_train = 'S1,S5,S6,S7,S8'
             self.opt.subjects_test = 'S9,S11'
