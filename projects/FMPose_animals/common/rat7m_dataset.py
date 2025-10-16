@@ -14,16 +14,13 @@ import sys
 import os
 sys.path.append(os.path.dirname(sys.path[0]))
 
-from scripts.utils import loadmat
-from scripts.auxfun_videos import VideoReader
+from common.utils import loadmat
 from common.camera import normalize_screen_coordinates
-from common.loss import get_rotation_numpy
 
 class Rat7MDataset(Dataset):
-    def __init__(self, cfg, path, split, cam_names, t_pad, root_index = 4, use_2D_gt = True, aug_2D = False,
+    def __init__(self, path, split, cam_names, t_pad, root_index = 4, use_2D_gt = True, aug_2D = False,
                        joint_num = 20, sampling_gap = 100, frame_per_video = 3500, norm_rate = 100.0,
                        img_W = 1328, img_H = 1048, arg_views = 1, pose_2D_path = None, resize_2D_scale = 1.):
-        self.cfg = cfg
         self.cam_names = cam_names
         self.joint_num = joint_num
         self.t_pad = t_pad
@@ -214,37 +211,30 @@ class Rat7MDataset(Dataset):
             tmp_vid = np.repeat(np.expand_dims(copy.deepcopy(vid_3D), axis=-1), self.arg_views, axis = -1)
             vid_2D = np.concatenate((vid_2D, tmp_vid), axis = -1)
         
-        if self.cfg.NETWORK.USE_GT_TRANSFORM or self.cfg.TRAIN.USE_ROT_LOSS:
-            rotation = get_rotation_numpy(pose_3D, vid_3D, self.root_index)
-            ## Check correctness:
-            # np.dot(self.cam_para_list[0]['Camera2']['R'], np.linalg.inv(self.cam_para_list[0]['Camera1']['R']))
-            # rotation[:,:,0,1,0]
-        else:
-            rotation = None
 
         pose_root = copy.deepcopy(pose_3D[:,self.root_index:self.root_index+1,:,:])
         pose_3D[:,self.root_index:self.root_index+1,:,:] = 0.0
         pose_3D = np.nan_to_num(pose_3D, nan=0)
         pose_2D = np.concatenate((pose_2D, vid_2D), axis=2)
 
-        return FN(pose_3D).float(), FN(pose_root).float(), FN(pose_2D).float(), FN(vid_3D).float(), FN(rotation).float(), FN(sample_info).float()
+        return FN(pose_3D).float(), FN(pose_root).float(), FN(pose_2D).float(), FN(vid_3D).float(), FN(sample_info).float()
 
 
 
 if __name__ == '__main__':
     from common.arguments import parse_args
-    from scripts.reset_config_rat7m import reset_config_rat7m
-    from common.config import config as cfg
-    from common.config import reset_config, update_config
+    # from scripts.reset_config_rat7m import reset_config_rat7m
+    # from common.config import config as cfg
+    # from common.config import reset_config, update_config
 
     cam_names = ['Camera1', 'Camera2', 'Camera3', 'Camera4', 'Camera5', 'Camera6']
     data_dir = '/media/data1/MausHaus_project/Rat7M_data'
     args = parse_args()
-    update_config(args.cfg) ###config file->cfg
-    reset_config(cfg, args) ###arg -> cfg
-    reset_config_rat7m(cfg)
+    # update_config(args.cfg) ###config file->cfg
+    # reset_config(cfg, args) ###arg -> cfg
+    # reset_config_rat7m(cfg)
     # valid_dataset = Rat7MDataset(cfg, data_dir, 'Train', cam_names, 3)
-    train_dataset = Rat7MDataset(cfg, data_dir, 'Test', cam_names, 3, root_index = 4, 
+    train_dataset = Rat7MDataset(data_dir, 'Test', cam_names, 3, root_index = 4, 
                              use_2D_gt = False, joint_num = 20, sampling_gap = 30, 
                              pose_2D_path = '/media/data1/MausHaus_project/external_code/DLC-ModelZoo/all_videos_data/Rat_7M_all_resize',
                             resize_2D_scale = 0.5)
