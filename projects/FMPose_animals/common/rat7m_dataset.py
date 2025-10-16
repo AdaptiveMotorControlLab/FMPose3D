@@ -18,9 +18,9 @@ from common.utils import loadmat
 from common.camera import normalize_screen_coordinates
 
 class Rat7MDataset(Dataset):
-    def __init__(self, path, split, cam_names, t_pad, root_index = 4, use_2D_gt = True, aug_2D = False,
+    def __init__(self, path, split, cam_names, t_pad=0, root_index = 4, use_2D_gt = True, aug_2D = False,
                        joint_num = 20, sampling_gap = 100, frame_per_video = 3500, norm_rate = 100.0,
-                       img_W = 1328, img_H = 1048, arg_views = 1, pose_2D_path = None, resize_2D_scale = 1.):
+                       img_W = 1328, img_H = 1048, pose_2D_path = None, resize_2D_scale = 1.):
         self.cam_names = cam_names
         self.joint_num = joint_num
         self.t_pad = t_pad
@@ -30,7 +30,7 @@ class Rat7MDataset(Dataset):
         self.aug_2D = aug_2D
         self.img_W = img_W * resize_2D_scale
         self.img_H = img_H * resize_2D_scale
-        self.arg_views = arg_views
+        # self.arg_views = arg_views
         self.split = split
         self.pose_2D_path = pose_2D_path
 
@@ -40,11 +40,11 @@ class Rat7MDataset(Dataset):
         subject_index.sort()
 
         if split == 'Train':
-            self.subject_list = subject_index[:4]
+            self.subject_list = subject_index[:4] # split train and test dataset by subject
             self.start_frame = 50
-            self.end_frame = 54000
+            self.end_frame = np.inf
         elif split == 'Test':
-            self.subject_list = subject_index[:4]
+            self.subject_list = subject_index
             self.start_frame = 0
             self.end_frame = np.inf
         
@@ -188,11 +188,11 @@ class Rat7MDataset(Dataset):
         vid_3D = copy.deepcopy(self.vid3D_list[index])     # T,K,1
         sample_info = copy.deepcopy(self.sample_info_list[index])  # 2
         
-        # if self.use_2D_gt and self.aug_2D:
-        if "TRAIN" in self.split.upper() and self.arg_views > 0:
-            pose_3D, pose_2D = self.view_aug(pose_3D, pose_2D)
-            tmp_vid = np.repeat(np.expand_dims(copy.deepcopy(vid_3D), axis=-1), self.arg_views, axis = -1)
-            vid_2D = np.concatenate((vid_2D, tmp_vid), axis = -1)
+        # # if self.use_2D_gt and self.aug_2D:
+        # if "TRAIN" in self.split.upper() and self.arg_views > 0:
+        #     pose_3D, pose_2D = self.view_aug(pose_3D, pose_2D)
+        #     tmp_vid = np.repeat(np.expand_dims(copy.deepcopy(vid_3D), axis=-1), self.arg_views, axis = -1)
+        #     vid_2D = np.concatenate((vid_2D, tmp_vid), axis = -1)
         
 
         pose_root = copy.deepcopy(pose_3D[:,self.root_index:self.root_index+1,:,:])
