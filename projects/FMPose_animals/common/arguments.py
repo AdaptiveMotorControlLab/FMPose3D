@@ -67,13 +67,9 @@ class opts():
         self.parser.add_argument('--post_refine', action='store_true', help='if use post_refine model')
         self.parser.add_argument('-previous_post_refine_name', type=str, default='', help='save last saved model name')
         self.parser.add_argument('-norm', '--norm', default=0.01, type=float, metavar='N', help='constraint  of sparsity')
-        # self.parser.add_argument('--train_views', type=int, nargs='+', default=[0,1,2,3])
-        # self.parser.add_argument('--test_views', type=int, nargs='+', default=[0,1,2,3])
-        # debug mode--use only one view for training and testing
-        self.parser.add_argument('--train_views', type=int, nargs='+', default=[0])
-        self.parser.add_argument('--test_views', type=int, nargs='+', default=[0])
-        
-        self.parser.add_argument('--token_dim', type=int, default=256) # 
+        self.parser.add_argument('--train_views', type=int, nargs='+', default=[0,1,2,3,4,5])
+        self.parser.add_argument('--test_views', type=int, nargs='+', default=[0,1,2,3,4,5])
+        self.parser.add_argument('--token_dim', type=int, default=256)
         self.parser.add_argument('--create_time', type=str, default='')
         self.parser.add_argument('--filename', type=str, default='')
         self.parser.add_argument('--single', action='store_true')
@@ -92,7 +88,6 @@ class opts():
         
         self.parser.add_argument('--sample_steps', type=int, default=3)
         # evaluation: run multiple sample steps at test time
-        self.parser.add_argument('--eval_multi_steps', action='store_true')
         self.parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9')
         # allow multiple hypothesis counts, e.g. --num_hypothesis_list 1 3 5 7 9
         self.parser.add_argument('--num_hypothesis_list', type=str, default='1')
@@ -133,10 +128,10 @@ class opts():
         
         # Rat7M dataset split
         self.parser.add_argument('--train_list', type=str, nargs='+', 
-                                default=['s5d2'],
+                                default=['s1d1','s2d1','s2d2','s3d1','s4d1'],
                                 help='List of subjects for training (Rat7M)')
         self.parser.add_argument('--test_list', type=str, nargs='+',
-                                default=['s5d1'],
+                                default=['s5d1','s5d2'],
                                 help='List of subjects for testing (Rat7M)')
         
         self.parser.set_defaults(align_r=True)
