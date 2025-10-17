@@ -209,29 +209,22 @@ if __name__ == '__main__':
             opt_file.write('==> Args:\n')
 
     root_path = args.root_path
-    
-    # Load Rat7M dataset (path should point to the Rat7M folder with s1d1, s2d1, etc.)
-    # e.g., root_path = 'dataset/rat7m/'
     dataset_path = root_path  # Directly use root_path for Rat7M
     
-    # Update args for Rat7M
-    args.n_joints = 20
-    args.out_joints = 20
-    args.dataset = 'rat7m'
-    args.joints_left = [8, 10, 11, 17, 18]  # HipL, ElbowL, ArmL, KneeL, ShinL
-    args.joints_right = [9, 14, 15, 16, 19]  # HipR, ElbowR, ArmR, KneeR, ShinR
-    
-    # Set train/test views - use all 6 cameras
-    args.train_views = [0, 1, 2, 3, 4, 5]
-    args.test_views = [0, 1, 2, 3, 4, 5]
+    # All Rat7M dataset configurations (n_joints, joints_left, joints_right, etc.) 
+    # are set in arguments.py based on --dataset rat7m parameter
 
     dataset = Rat7MDataset(dataset_path, args)
+    
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
     
-    # Verify dataset split
+    # Verify dataset configuration
+    print(f"Dataset: {args.dataset}")
     print(f"Train subjects: {dataset.train_list}")
     print(f"Test subjects: {dataset.test_list}")
+    print(f"Train views: {args.train_views}")
+    print(f"Test views: {args.test_views}")
 
     if args.train:
         train_data = Rat7MFusion(opt=args, train=True, dataset=dataset, root_path=root_path)
