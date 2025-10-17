@@ -80,7 +80,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             masked_loss = ((v_pred - v_target)**2) * vis_mask
             
             # Compute mean only over valid (visible) elements
-            num_valid = vis_mask.sum() + 1e-8  # Avoid division by zero
+            num_valid = vis_mask.sum()  # Avoid division by zero
             loss = masked_loss.sum() / num_valid
             
             N = input_2D.size(0)
@@ -183,18 +183,18 @@ if __name__ == '__main__':
 
         # backup files
         import shutil
-        # file_name = os.path.basename(__file__)
-        # shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
-        # shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
-        # # backup the selected model file (from --model_path if provided)
-        # if getattr(args, 'model_path', ''):
-        #     model_src_path = os.path.abspath(args.model_path)
-        #     model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-        #     shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
+        file_name = os.path.basename(__file__)
+        shutil.copyfile(src=file_name, dst = os.path.join( args.checkpoint, args.create_time + "_" + file_name))
+        shutil.copyfile(src="common/arguments.py", dst = os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
+        # backup the selected model file (from --model_path if provided)
+        if getattr(args, 'model_path', ''):
+            model_src_path = os.path.abspath(args.model_path)
+            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+            shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
         # shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        # sh_base = os.path.basename(args.sh_file)
-        # dst_name = f"{args.create_time}_" + sh_base
-        # shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
@@ -272,6 +272,7 @@ if __name__ == '__main__':
             loss = train(args, actions, train_dataloader, model, optimizer, epoch)
             if WANDB_AVAILABLE:
                 wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
+        
         # evaluate per step externally (single-step val per call)
         p1_per_step = {}
         p2_per_step = {}
