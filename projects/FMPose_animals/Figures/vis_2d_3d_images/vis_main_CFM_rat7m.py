@@ -12,7 +12,11 @@ from common.load_data_rat7m import Rat7MFusion
 from common.rat7m_dataset_ti import Rat7MDataset
 from common.animal_visualization import save_absolute_3Dpose
 import time
-
+from interactive_3d_viewer_rat7m import (
+    load_rat7m_skeleton, 
+    visualize_rat7m_pose,
+    create_interactive_3d_pose_rat7m
+)
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
@@ -46,7 +50,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
     # determine steps for single-step evaluation per call
     steps_to_use = steps
-    skeleton_mat = loadmat('/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m/jesse_skeleton.mat')
+    skeleton_mat = loadmat('jesse_skeleton.mat')
     print("skeleton_mat:",skeleton_mat.keys(),skeleton_mat['joint_names'])
     skeleton = np.array(skeleton_mat['joints_idx'])-1
     print("skeleton:",skeleton.shape, skeleton)
@@ -57,6 +61,41 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
         # Print frame range for tracking
         print(f"Batch {i}, subject: {subject[0]}, cam: {int(cam_ind[0])}, frame: {int(start_3d[0])}")
+        # print("**********check gt_3d shape:", gt_3D.shape,gt_3D)  [1, 1, 20, 3]
+        # break
+        # if i <=5:
+        #     vis_savepath = args.checkpoint + f"/gt_3d_{i}.png"
+        #     save_absolute_3Dpose(gt_3D[0,0,:,:].cpu().numpy(), skeleton , vis_savepath)
+        
+        # Visualize first few samples using interactive 3D viewer
+        if i <= 5:
+            # Extract single pose: gt_3D shape is [B, F, J, 3], take first batch and frame
+            pose_3d_np = gt_3D[0, 0, :, :].cpu().numpy()  # Shape: (20, 3)
+            
+            # Check for invalid coordinates and print warnings
+            joint_names_list = skeleton_mat['joint_names']
+            for j in range(len(pose_3d_np)):
+                x, y, z = pose_3d_np[j]
+                magnitude = np.linalg.norm(pose_3d_np[j])
+                joint_name = str(joint_names_list[j][0][0]) if j < len(joint_names_list) else f'Joint_{j}'
+                
+                if np.isnan(magnitude) or np.isinf(magnitude):
+                    print(f"  ⚠️ Invalid coordinate at {joint_name} (index {j}): NaN or Inf")
+                elif magnitude > 10000:
+                    print(f"  ⚠️ Abnormal coordinate at {joint_name} (index {j}): magnitude={magnitude:.2f} mm")
+            
+            # Create HTML visualization with interactive viewer
+            html_savepath = args.checkpoint + f"/gt_3d_{i}_interactive.html"
+            title = f"GT 3D Pose - Batch {i} | Subject: {subject[0]} | Cam: {int(cam_ind[0])} | Frame: {int(start_3d[0])}"
+            
+            visualize_rat7m_pose(
+                pose_3d_np,
+                skeleton_file='jesse_skeleton.mat',
+                output_html=html_savepath,
+                title=title,
+                auto_open=False
+            )
+            print(f"  ✓ Saved interactive visualization: {html_savepath}")
         
         
         # No test augmentation - use input_2D directly
@@ -70,6 +109,10 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         abs_3D += root_joint_abs
         abs_3D[:, :, args.root_joint] = root_joint_abs
         # now abs_3D is the absolute 3D GT in camera coordinate system
+
+        # if i <=5:
+            # vis_savepath = args.checkpoint + f"/gt_3d_{i}.png"
+            # save_absolute_3Dpose(abs_3D[0,0,:,:].cpu().numpy(), skeleton , vis_savepath)
         
         
         out_target[:, :, args.root_joint] = 0
