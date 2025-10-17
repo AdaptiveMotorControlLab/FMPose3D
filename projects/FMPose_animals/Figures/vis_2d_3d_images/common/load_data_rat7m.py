@@ -300,5 +300,5 @@ class Rat7MFusion(data.Dataset):
         bb_box = np.array([0, 0, 1, 1])
         scale = 1.0
         
-        return cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind, vis_3D
+        return cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d
 
