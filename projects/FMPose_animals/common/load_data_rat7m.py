@@ -169,7 +169,7 @@ class Rat7MFusion(data.Dataset):
                 
                 # Normalize to [-1, 1] if crop_uv is 0
                 if self.crop_uv == 0:
-                    pts_2d = normalize_screen_coordinates(pts_2d, w=cam['res_w'], h=cam['res_h'])
+                    pos_2d = normalize_screen_coordinates(pos_2d, w=cam['res_w'], h=cam['res_h'])
                 
                 # Use visibility from world coordinates for this camera
                 vis_3d = vis_3d_world.copy()
