@@ -15,16 +15,33 @@ def mpjpe_cal(predicted, target):
     assert predicted.shape == target.shape
     return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
 
-def test_calculation(predicted, target, action, error_sum, data_type, subject):
-    error_sum = mpjpe_by_action_p1(predicted, target, action, error_sum)
-    error_sum = mpjpe_by_action_p2(predicted, target, action, error_sum)
+def test_calculation(predicted, target, action, error_sum, data_type, subject, vis_mask):
+    error_sum = mpjpe_by_action_p1(predicted, target, action, error_sum, vis_mask)
+    error_sum = mpjpe_by_action_p2(predicted, target, action, error_sum, vis_mask)
     return error_sum
 
 
-def mpjpe_by_action_p1(predicted, target, action, action_error_sum):
+def mpjpe_by_action_p1(predicted, target, action, action_error_sum, vis_mask=None):
     assert predicted.shape == target.shape
     num = predicted.size(0)
-    dist = torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1), dim=len(target.shape) - 2)
+    
+    # Compute per-joint error: [B, F, J]
+    per_joint_error = torch.norm(predicted - target, dim=len(target.shape) - 1)  # [B, F, J]
+    
+    if vis_mask is not None:
+        # vis_mask: [B, F, J, 3], reduce to [B, F, J]
+        vis_mask_reduced = vis_mask[..., 0]  # [B, F, J]
+        
+        # Only compute error on visible joints
+        num_visible = vis_mask_reduced.sum(dim=-1)  # [B, F]
+        masked_error = per_joint_error * vis_mask_reduced  # [B, F, J]
+        dist = masked_error.sum(dim=-1) / (num_visible + 1e-8)  # [B, F]
+        dist = dist.mean(dim=-1)  # [B]
+    else:
+        # Original behavior
+        dist = torch.mean(per_joint_error, dim=len(target.shape) - 2)  # average over joints
+        if len(dist.shape) > 1:
+            dist = dist.mean(dim=-1)  # average over frames
     if len(set(list(action))) == 1:
         end_index = action[0].find(' ')
         if end_index != -1:
@@ -45,17 +62,32 @@ def mpjpe_by_action_p1(predicted, target, action, action_error_sum):
             
     return action_error_sum
 
-def p_mpjpe(predicted, target):  # p2, Procrustes analysis MPJPE
+def p_mpjpe(predicted, target, mask=None):  # p2, Procrustes analysis MPJPE
     assert predicted.shape == target.shape
 
-    muX = np.mean(target, axis=1, keepdims=True) # B,1,3
-    muY = np.mean(predicted, axis=1, keepdims=True) # B,1,3
+    if mask is not None:
+        # mask: [B, J], 1.0 for visible, 0.0 for invisible
+        mask_expanded = mask[:, :, np.newaxis]  # [B, J, 1]
+        
+        # Compute weighted mean for visible joints only
+        num_visible = mask.sum(axis=1, keepdims=True)  # [B, 1]
+        muX = np.sum(target * mask_expanded, axis=1, keepdims=True) / (num_visible[:, :, np.newaxis] + 1e-8)  # B,1,3
+        muY = np.sum(predicted * mask_expanded, axis=1, keepdims=True) / (num_visible[:, :, np.newaxis] + 1e-8)  # B,1,3
 
-    X0 = target - muX
-    Y0 = predicted - muY
+        X0 = (target - muX) * mask_expanded
+        Y0 = (predicted - muY) * mask_expanded
 
-    normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True)) # B,1,1
-    normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
+        normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True)) # B,1,1
+        normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
+    else:
+        muX = np.mean(target, axis=1, keepdims=True) # B,1,3
+        muY = np.mean(predicted, axis=1, keepdims=True) # B,1,3
+
+        X0 = target - muX
+        Y0 = predicted - muY
+
+        normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True)) # B,1,1
+        normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
 
     X0 /= normX
     Y0 /= normY
@@ -77,14 +109,30 @@ def p_mpjpe(predicted, target):  # p2, Procrustes analysis MPJPE
 
     predicted_aligned = a * np.matmul(predicted, R) + t
 
-    return np.mean(np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1), axis=len(target.shape) - 2)
+    # Compute error
+    error = np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1)  # [B, J]
     
-def mpjpe_by_action_p2(predicted, target, action, action_error_sum):
+    if mask is not None:
+        # Only compute error on visible joints
+        masked_error = error * mask  # [B, J]
+        dist = masked_error.sum(axis=1) / (num_visible.flatten() + 1e-8)  # [B]
+    else:
+        dist = np.mean(error, axis=len(target.shape) - 2)  # [B]
+    
+    return dist
+    
+def mpjpe_by_action_p2(predicted, target, action, action_error_sum, vis_mask=None):
     assert predicted.shape == target.shape
     num = predicted.size(0)
     pred = predicted.detach().cpu().numpy().reshape(-1, predicted.shape[-2], predicted.shape[-1]) # B,17,3
     gt = target.detach().cpu().numpy().reshape(-1, target.shape[-2], target.shape[-1]) # # B,17,3
-    dist = p_mpjpe(pred, gt)
+    
+    if vis_mask is not None:
+        # Convert mask to numpy and reshape to [B, J]
+        mask = vis_mask[..., 0].detach().cpu().numpy().reshape(-1, vis_mask.shape[-2])  # [B, J]
+        dist = p_mpjpe(pred, gt, mask)
+    else:
+        dist = p_mpjpe(pred, gt)
 
     if len(set(list(action))) == 1:
         end_index = action[0].find(' ')
