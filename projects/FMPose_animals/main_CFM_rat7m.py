@@ -60,6 +60,10 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         if split =='train':
             B, F, J, C = input_2D.shape
             
+            # Ensure root joint is zero in ground truth (should already be, but enforce it)
+            gt_3D = gt_3D.clone()
+            gt_3D[:, :, args.root_joint] = 0
+            
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
             # vis_3D shape: (B,F,J,1) - visibility mask
@@ -76,12 +80,21 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
             # Apply visibility mask to loss (only compute loss on visible joints)
             # vis_3D: [B, F, J, 1], expand to match v_pred: [B, F, J, 3]
-            vis_mask = vis_3D.expand(-1, -1, -1, 3)  # [B, F, J, 3]
+            vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
+            
+            # Optionally exclude root joint from loss (since it's always 0)
+            # This can help the model focus on learning relative positions
+            vis_mask[:, :, args.root_joint, :] = 0
+            
             masked_loss = ((v_pred - v_target)**2) * vis_mask
             
             # Compute mean only over valid (visible) elements
-            num_valid = vis_mask.sum()  # Avoid division by zero
-            loss = masked_loss.sum() / num_valid
+            num_valid = vis_mask.sum()  # Count visible elements
+            if num_valid > 0:
+                loss = masked_loss.sum() / num_valid
+            else:
+                # Fallback: if no visible joints (shouldn't happen), compute full loss
+                loss = ((v_pred - v_target)**2).mean()
             
             N = input_2D.size(0)
             loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
@@ -96,7 +109,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # No test augmentation - use input_2D directly
             B, F, J, C = input_2D.shape
             out_target = gt_3D.clone()
-            out_target[:, :, 0] = 0
+            out_target[:, :, args.root_joint] = 0
 
             # Simple Euler sampler for CFM at test time
             def euler_sample(x2d, y_local, steps_local):
@@ -115,7 +128,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             output_3D = y_s[:, args.pad].unsqueeze(1)
             
             
-            output_3D[:, :, 0, :] = 0
+            output_3D[:, :, args.root_joint, :] = 0
             
             # Apply visibility mask for evaluation (only evaluate visible joints)
             # vis_3D: [B, F, J, 1], expand to match output_3D: [B, F, J, 3]
