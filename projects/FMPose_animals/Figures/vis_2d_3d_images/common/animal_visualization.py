@@ -58,13 +58,13 @@ def save_absolute_3Dpose(pre_pose, skeleton, figure_name):
     ax1.scatter(pre_pose[:, 0], pre_pose[:, 2], -pre_pose[:,1], c=list(range(pre_pose.shape[0])), cmap='jet')
     for i in range(skeleton.shape[0]):
         ax1.plot([pre_pose[skeleton[i,0], 0], pre_pose[skeleton[i, 1], 0]], 
-                 [pre_pose[skeleton[i,0], 2], pre_pose[skeleton[i, 1], 2]], 
-                 [-pre_pose[skeleton[i,0], 1], -pre_pose[skeleton[i, 1], 1]], 
-                 c = 'black')
-    ax1.set_xlim([-3,3])
-    ax1.set_zlim([-1.5,3])
-    ax1.set_ylim([12,20])
-    ax1.title.set_text('Prediction')
+                [pre_pose[skeleton[i,0], 2], pre_pose[skeleton[i, 1], 2]], 
+                [-pre_pose[skeleton[i,0], 1], -pre_pose[skeleton[i, 1], 1]], 
+                c = 'black')
+    ax1.set_xlim([-2,2])
+    ax1.set_zlim([-2,2])
+    ax1.set_ylim([-2,2])
+    ax1.title.set_text('gt')
     plt.show()
     plt.savefig(figure_name, dpi=200.0)
     plt.close()

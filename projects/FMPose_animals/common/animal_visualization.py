@@ -61,10 +61,10 @@ def save_absolute_3Dpose(pre_pose, skeleton, figure_name):
                  [pre_pose[skeleton[i,0], 2], pre_pose[skeleton[i, 1], 2]], 
                  [-pre_pose[skeleton[i,0], 1], -pre_pose[skeleton[i, 1], 1]], 
                  c = 'black')
-    ax1.set_xlim([-3,3])
-    ax1.set_zlim([-1.5,3])
-    ax1.set_ylim([12,20])
-    ax1.title.set_text('Prediction')
+    ax1.set_xlim([-1,1])
+    ax1.set_zlim([-1,1])
+    ax1.set_ylim([-1,1])
+    ax1.title.set_text('gt')
     plt.show()
     plt.savefig(figure_name, dpi=200.0)
     plt.close()

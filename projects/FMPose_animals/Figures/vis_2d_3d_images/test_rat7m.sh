@@ -16,7 +16,7 @@ test_list='s1d1'
 train_views='0'
 test_views='0'
 # Root path to dataset
-root_path="/media/ti/datasets/Rat7M_data"
+root_path="/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/Rat7M_data/"
 
 # Test pretrained model
 python3 vis_main_CFM_rat7m.py \

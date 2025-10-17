@@ -10,6 +10,7 @@ from common.arguments import opts as parse_args
 from common.utils import *
 from common.load_data_rat7m import Rat7MFusion
 from common.rat7m_dataset_ti import Rat7MDataset
+from common.animal_visualization import save_absolute_3Dpose
 import time
 
 args = parse_args().parse()
@@ -45,10 +46,21 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
     # determine steps for single-step evaluation per call
     steps_to_use = steps
+    skeleton_mat = loadmat('/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/rat7m/jesse_skeleton.mat')
+    print("skeleton_mat:",skeleton_mat.keys(),skeleton_mat['joint_names'])
+    skeleton = np.array(skeleton_mat['joints_idx'])-1
+    print("skeleton:",skeleton.shape, skeleton)
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind, vis_3D = data
         [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D])
+        
+        # print("**********check gt_3d shape:", gt_3D.shape,gt_3D)  [1, 1, 20, 3]
+        # break
+        if i <=10:
+            vis_savepath = args.checkpoint + f"/gt_3d_{i}.png"
+            save_absolute_3Dpose(gt_3D[0,0,:,:].cpu().numpy(), skeleton , vis_savepath)
+        
         
         # No test augmentation - use input_2D directly
         B, F, J, C = input_2D.shape
