@@ -52,8 +52,11 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
     print("skeleton:",skeleton.shape, skeleton)
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
-        batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind, vis_3D = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D])
+        batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
+        [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
+        
+        # Print frame range for tracking
+        print(f"Batch {i}, subject: {subject[0]}, cam: {int(cam_ind[0])}, frame: {int(start_3d[0])}")
         
         # print("**********check gt_3d shape:", gt_3D.shape,gt_3D)  [1, 1, 20, 3]
         # break
