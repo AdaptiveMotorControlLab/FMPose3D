@@ -58,16 +58,20 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         # Print frame range for tracking
         print(f"Batch {i}, subject: {subject[0]}, cam: {int(cam_ind[0])}, frame: {int(start_3d[0])}")
         
-        # print("**********check gt_3d shape:", gt_3D.shape,gt_3D)  [1, 1, 20, 3]
-        # break
-        if i <=10:
-            vis_savepath = args.checkpoint + f"/gt_3d_{i}.png"
-            save_absolute_3Dpose(gt_3D[0,0,:,:].cpu().numpy(), skeleton , vis_savepath)
-        
         
         # No test augmentation - use input_2D directly
         B, F, J, C = input_2D.shape
         out_target = gt_3D.clone()
+        
+        # Recover the relative 3D GT to absolute coordinates
+        # gt_3D: all joints are relative to root, root joint contains absolute position
+        abs_3D = gt_3D.clone()
+        root_joint_abs = gt_3D[:, :, args.root_joint:args.root_joint+1, :]
+        abs_3D += root_joint_abs
+        abs_3D[:, :, args.root_joint] = root_joint_abs
+        # now abs_3D is the absolute 3D GT in camera coordinate system
+        
+        
         out_target[:, :, args.root_joint] = 0
 
         # Simple Euler sampler for CFM at test time
