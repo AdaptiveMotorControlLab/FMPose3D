@@ -29,7 +29,7 @@ class opts():
         self.parser.add_argument('--test_augmentation_flip_hypothesis', type=str2bool, default=False)
         self.parser.add_argument('--test_augmentation_FlowAug', type=str2bool, default=False)
         self.parser.add_argument('--crop_uv', type=int, default=0)
-        self.parser.add_argument('--root_path', type=str, default='Rat7M_data/')  # Or use 'dataset/rat7m/' for old structure
+        self.parser.add_argument('--root_path', type=str, default='Rat7M_data/')
         self.parser.add_argument('-a', '--actions', default='*', type=str)
         self.parser.add_argument('--downsample', default=1, type=int)
         self.parser.add_argument('--subset', default=1, type=float)
@@ -123,9 +123,7 @@ class opts():
         self.parser.add_argument('--vis_debug', action='store_true', help='save vis fig')
         self.parser.add_argument('--vis_grad', action='store_true', help='')
         self.parser.add_argument('--vis_dataset', help="Specify the name of the vis datast", default='h36m')
-        
-        # self.parser.add_argument('--rat7m', action='store_true', help='if use rat7m')
-        
+                
         # Rat7M dataset split
         self.parser.add_argument('--train_list', type=str, nargs='+', 
                                 default=['s1d1','s2d1','s2d2','s3d1','s4d1'],
@@ -153,9 +151,8 @@ class opts():
         self.opt.subjects_train = 'S1,S5,S6,S7,S8'
         self.opt.subjects_test = 'S9,S11'
                 
-        self.opt.root_joint = 4
         
-        
+    
         if self.opt.dataset == 'h36m':
             self.opt.subjects_train = 'S1,S5,S6,S7,S8'
             self.opt.subjects_test = 'S9,S11'
@@ -172,5 +169,13 @@ class opts():
 
                 self.opt.joints_left = [4, 5, 6, 11, 12, 13]  # 左侧
                 self.opt.joints_right = [1, 2, 3, 14, 15, 16]
-                       
+        
+        elif self.opt.dataset == 'rat7m':
+            # Rat7M dataset configuration
+            self.opt.n_joints = 20
+            self.opt.out_joints = 20
+            self.opt.joints_left = [8, 10, 11, 17, 18]  # HipL, ElbowL, ArmL, KneeL, ShinL
+            self.opt.joints_right = [9, 14, 15, 16, 19]  # HipR, ElbowR, ArmR, KneeR, ShinR
+            self.opt.root_joint = 4
+                
         return self.opt
