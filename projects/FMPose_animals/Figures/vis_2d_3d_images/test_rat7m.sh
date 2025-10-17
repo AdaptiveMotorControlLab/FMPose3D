@@ -6,7 +6,7 @@ eval_sample_steps=3
 sh_file='test_rat7m.sh'
 # Paths to pretrained model and model definition
 model_path='./model/model_G_P_Attn_rat.py'
-saved_model_path='./pretrained_models/CFM_4_8221_best.pth'
+saved_model_path='./pretrained_models/test_GCN_model/CFM_4_8221_best.pth'
 
 gpu_id=0
 
