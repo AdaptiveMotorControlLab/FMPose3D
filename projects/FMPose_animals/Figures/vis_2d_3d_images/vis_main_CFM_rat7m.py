@@ -27,13 +27,6 @@ if getattr(args, 'model_path', ''):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     CFM = getattr(module, 'Model')
-    
-# wandb logging (assumed available)
-import wandb
-WANDB_AVAILABLE = False
-
-def train(opt, actions, train_loader, model, optimizer, epoch):
-    return step('train', opt, actions, train_loader, model, optimizer, epoch)
 
 def val(opt, actions, val_loader, model, steps=None):
     with torch.no_grad():
@@ -57,101 +50,46 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind, vis_3D = data
         [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box, vis_3D])
         
-        if split =='train':
-            B, F, J, C = input_2D.shape
-            
-            # Ensure root joint is zero in ground truth (should already be, but enforce it)
-            gt_3D = gt_3D.clone()
-            gt_3D[:, :, args.root_joint] = 0
-            
-            # Conditional Flow Matching training
-            # gt_3D, input_2D shape: (B,F,J,C)
-            # vis_3D shape: (B,F,J,1) - visibility mask
-            # x0_noise = torch.randn_like(gt_3D)
-            x0_noise = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
-            x0 = x0_noise
-            
-            B = gt_3D.size(0)
-            # t on correct device/dtype and broadcastable: (B,1,1,1)
-            t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
-            y_t = (1.0 - t) * x0 + t * gt_3D
-            v_target = gt_3D - x0
-            v_pred = model_3d(input_2D, y_t, t)
+        # No test augmentation - use input_2D directly
+        B, F, J, C = input_2D.shape
+        out_target = gt_3D.clone()
+        out_target[:, :, args.root_joint] = 0
 
-            # Apply visibility mask to loss (only compute loss on visible joints)
-            # vis_3D: [B, F, J, 1], expand to match v_pred: [B, F, J, 3]
-            vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
-            
-            # Exclude root joint from loss (user preference + focus on relative positions)
-            # Root has absolute camera position which is hard to predict from 2D alone
-            vis_mask[:, :, args.root_joint, :] = 0
-            
-            masked_loss = ((v_pred - v_target)**2) * vis_mask
-            
-            # Compute mean only over valid (visible) elements
-            num_valid = vis_mask.sum()  # Count visible elements
-            if num_valid > 0:
-                loss = masked_loss.sum() / num_valid
-            else:
-                # Fallback: if no visible joints (shouldn't happen), compute full loss
-                loss = ((v_pred - v_target)**2).mean()
-            
-            N = input_2D.size(0)
-            loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
-            if WANDB_AVAILABLE:
-                # log per-batch training loss
-                wandb.log({'train_loss': float(loss.detach().cpu().item()), 'epoch': epoch if epoch is not None else -1})
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        # Simple Euler sampler for CFM at test time
+        def euler_sample(x2d, y_local, steps_local):
+            dt = 1.0 / steps_local
+            for s in range(steps_local):
+                t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                v_s = model_3d(x2d, y_local, t_s)
+                y_local = y_local + dt * v_s
+            return y_local
+        
+        # Start from noise
+        y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
+        
+        # Run sampling
+        y_s = euler_sample(input_2D, y, steps_to_use)
+        output_3D = y_s[:, args.pad].unsqueeze(1)
+        
+        output_3D[:, :, args.root_joint, :] = 0
+        
+        # Apply visibility mask for evaluation (only evaluate visible joints)
+        # vis_3D: [B, F, J, 1], expand to match output_3D: [B, F, J, 3]
+        vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
+        
+        # Exclude root joint from evaluation (consistent with training)
+        # Since root is always 0, no need to evaluate it
+        vis_mask[:, :, args.root_joint, :] = 0
+        
+        # Mask both prediction and target for fair comparison
+        output_3D_masked = output_3D * vis_mask
+        out_target_masked = out_target * vis_mask
+        
+        action_error_sum = test_calculation(output_3D_masked, out_target_masked, action, action_error_sum, args.dataset, subject, vis_mask)
 
-        else:
-            # No test augmentation - use input_2D directly
-            B, F, J, C = input_2D.shape
-            out_target = gt_3D.clone()
-            out_target[:, :, args.root_joint] = 0
-
-            # Simple Euler sampler for CFM at test time
-            def euler_sample(x2d, y_local, steps_local):
-                dt = 1.0 / steps_local
-                for s in range(steps_local):
-                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-                    v_s = model_3d(x2d, y_local, t_s)
-                    y_local = y_local + dt * v_s
-                return y_local
-            
-            # Start from noise
-            y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
-            
-            # Run sampling
-            y_s = euler_sample(input_2D, y, steps_to_use)
-            output_3D = y_s[:, args.pad].unsqueeze(1)
-            
-            
-            output_3D[:, :, args.root_joint, :] = 0
-            
-            # Apply visibility mask for evaluation (only evaluate visible joints)
-            # vis_3D: [B, F, J, 1], expand to match output_3D: [B, F, J, 3]
-            vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
-            
-            # Exclude root joint from evaluation (consistent with training)
-            # Since root is always 0, no need to evaluate it
-            vis_mask[:, :, args.root_joint, :] = 0
-            
-            # Mask both prediction and target for fair comparison
-            output_3D_masked = output_3D * vis_mask
-            out_target_masked = out_target * vis_mask
-            
-            action_error_sum = test_calculation(output_3D_masked, out_target_masked, action, action_error_sum, args.dataset, subject, vis_mask)
-
-    if split == 'train':
-        return loss_all['loss'].avg
-
-    elif split == 'test':
+    if split == 'test':
         # aggregate metrics for the single requested steps
         p1_s, p2_s = print_error(args.dataset, action_error_sum, args.train)
-        if WANDB_AVAILABLE and steps_to_use is not None:
-            wandb.log({f'test_p1_s{steps_to_use}': float(p1_s), f'test_p2_s{steps_to_use}': float(p2_s)})
         return float(p1_s), float(p2_s)
 
 def get_parameter_number(net):
@@ -177,18 +115,11 @@ if __name__ == '__main__':
         folder_name = args.folder_name
     else:
         folder_name = logtime
-    
-    if WANDB_AVAILABLE:
-        wandb.init(project=getattr(args, 'wandb_project', 'Pose3DCFM'),
-                   name=f"CFM_Rat7M_{folder_name}",
-                   config={k: getattr(args, k) for k in dir(args) if not k.startswith('_')})
      
     if args.create_file:
         # create backup folder
         if args.debug:
             args.checkpoint = './debug/' + folder_name
-        elif args.train:
-            args.checkpoint = './checkpoint/' + folder_name
 
         if args.train==False:
             # create a new folder for the test results
@@ -278,10 +209,6 @@ if __name__ == '__main__':
     best_epoch = 0
     
     for epoch in range(1, args.nepoch):
-        if args.train:
-            loss = train(args, actions, train_dataloader, model, optimizer, epoch)
-            if WANDB_AVAILABLE:
-                wandb.log({'train_loss_epoch': float(loss), 'epoch': epoch})
         
         # evaluate per step externally (single-step val per call)
         p1_per_step = {}
@@ -294,51 +221,9 @@ if __name__ == '__main__':
         best_step = min(p1_per_step, key=p1_per_step.get)
         p1 = p1_per_step[best_step]
         p2 = p2_per_step[best_step]
-        if WANDB_AVAILABLE:
-            log_data = {'test_p1': p1, 'epoch': epoch}
-            wandb.log(log_data)
         
-        if args.train:
-            data_threshold = p1
-            saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
-            # update best tracker
-            if data_threshold < args.previous_best_threshold:
-                args.previous_best_threshold = data_threshold
-                args.previous_name = saved_path
-                best_epoch = epoch
-                
-            steps_sorted = sorted(p1_per_step.keys())
-            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-            print('e: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-            logging.info('epoch: %d, lr: %.7f, loss: %.4f, p1: %.4f, p2: %.4f | %s' % (epoch, lr, loss, p1, p2, ' | '.join(step_strs)))
-
-        else:
-            steps_sorted = sorted(p1_per_step.keys())
-            step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
-            print('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
-            logging.info('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
-            break
-                
-        if epoch % args.large_decay_epoch == 0: 
-            for param_group in optimizer.param_groups:
-                param_group['lr'] *= args.lr_decay_large
-                lr *= args.lr_decay_large
-        else:
-            for param_group in optimizer.param_groups:
-                param_group['lr'] *= args.lr_decay
-    
-    endtime = datetime.datetime.now()   
-    a = (endtime - starttime).seconds
-    h = a//3600
-    mins = (a-3600*h)//60
-    s = a-3600*h-mins*60
-    
-    print("best epoch:{}, best result(mpjpe):{}".format(best_epoch, args.previous_best_threshold))
-    logging.info("best epoch:{}, best result(mpjpe):{}".format(best_epoch, args.previous_best_threshold))
-    print(h,"h",mins,"mins", s,"s")
-    logging.info('training time: %dh,%dmin%ds' % (h, mins, s))
-    print(args.checkpoint)
-    logging.info(args.checkpoint)
-    if WANDB_AVAILABLE:
-        wandb.finish()
-
+        steps_sorted = sorted(p1_per_step.keys())
+        step_strs = [f"{s}_p1: {p1_per_step[s]:.4f}, {s}_p2: {p2_per_step[s]:.4f}" for s in steps_sorted]
+        print('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
+        logging.info('p1: %.4f, p2: %.4f | %s' % (p1, p2, ' | '.join(step_strs)))
+        break
