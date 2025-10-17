@@ -21,7 +21,7 @@ class opts():
         self.parser.add_argument('--layers', default=3, type=int)
         self.parser.add_argument('--channel', default=512, type=int)
         self.parser.add_argument('--d_hid', default=1024, type=int)
-        self.parser.add_argument('--dataset', type=str, default='h36m')
+        self.parser.add_argument('--dataset', type=str, default='rat7m')
         self.parser.add_argument('-k', '--keypoints', default='cpn_ft_h36m_dbb', type=str)
         self.parser.add_argument('--data_augmentation', type=bool, default=False)
         self.parser.add_argument('--reverse_augmentation', type=bool, default=False)
