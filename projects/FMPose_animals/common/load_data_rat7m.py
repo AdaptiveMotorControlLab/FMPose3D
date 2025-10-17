@@ -160,7 +160,8 @@ class Rat7MFusion(data.Dataset):
                 
                 pos_3d = pos_3d - pos_3d_root  # All joints relative to root
                 pos_3d[:, root_joint_idx:root_joint_idx+1, :] = pos_3d_root  # Restore root to original position
-                # Note: root joint keeps its original position, other joints are relative to root
+                # Note: Following H36M convention - root keeps its camera coordinate position
+                # Other joints are relative to root
                 # Note: pos_3d may still contain nan in non-root joints (will be handled in __getitem__)
                 
                 # Project 3D to 2D using camera parameters
@@ -269,7 +270,6 @@ class Rat7MFusion(data.Dataset):
         # Replace nan with 0 for non-root joints (following rat7m_dataset.py line 200)
         # Non-root joints may have nan if markers were missing, but visibility mask tracks this
         gt_3D = np.nan_to_num(gt_3D, nan=0.0)
-        # Replace nan in 2D projections with 0 (following rat7m_dataset.py line 171)
         input_2D = np.nan_to_num(input_2D, nan=0.0)        
  
         # Get visibility labels
@@ -300,5 +300,5 @@ class Rat7MFusion(data.Dataset):
         bb_box = np.array([0, 0, 1, 1])
         scale = 1.0
         
-        return cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind, vis_3D
+        return cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d
 
