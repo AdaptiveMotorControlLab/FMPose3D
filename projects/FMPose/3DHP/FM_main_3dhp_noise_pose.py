@@ -25,7 +25,22 @@ import numpy as np
 args = parse_args()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-exec('from model.' + args.model + ' import Model')
+
+# Support loading the model class from a specific file path if provided
+Model = None
+if getattr(args, 'model_path', ''):
+    import importlib.util
+    import pathlib
+    model_abspath = os.path.abspath(args.model_path)
+    module_name = pathlib.Path(model_abspath).stem
+    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    Model = getattr(module, 'Model')
+else:
+    # Fallback to original method if no model_path is provided
+    exec('from model.' + args.model + ' import Model')
 
 def train(dataloader, model, model_refine, optimizer):
     model.train()
