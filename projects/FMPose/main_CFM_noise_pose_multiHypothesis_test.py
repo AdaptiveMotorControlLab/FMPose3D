@@ -125,10 +125,11 @@ def aggregate_hypothesis_camera(list_hypothesis, batch_cam, input_2D, gt_3D):
     cam_rep = cam_b9.repeat_interleave(H, dim=0)  # (B*H,9)
 
     # project_to_2d expects last dim=3 and cam (N,9)
-    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2)
+    # Returns normalized coordinates (when crop_uv=0) because camera params are normalized
+    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2) normalized coordinates
     proj2d_bhj = proj2d_flat.view(B, H, J, 2)
 
-    # Per-hypothesis per-joint 2D error
+    # Per-hypothesis per-joint 2D error (both in normalized coordinates)
     diff = proj2d_bhj - target_2d.unsqueeze(1)    # (B,H,J,2)
     dist = torch.norm(diff, dim=-1)               # (B,H,J)
 
@@ -204,10 +205,11 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     cam_rep = cam_b9.repeat_interleave(H, dim=0)  # (B*H,9)
 
     # project_to_2d expects last dim=3 and cam (N,9)
-    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2)
+    # Returns normalized coordinates (when crop_uv=0) because camera params are normalized
+    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2) normalized coordinates
     proj2d_bhj = proj2d_flat.view(B, H, J, 2)
 
-    # Per-hypothesis per-joint 2D error
+    # Per-hypothesis per-joint 2D error (both in normalized coordinates)
     diff = proj2d_bhj - target_2d.unsqueeze(1)    # (B,H,J,2)
     dist = torch.norm(diff, dim=-1) # (B,H,J)
 
@@ -381,7 +383,7 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
         else:
             eval_steps = [int(steps)]
     action_error_sum_multi = {s: define_error_list(actions) for s in eval_steps}
-
+    
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
         [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(split, [input_2D, gt_3D, batch_cam, scale, bb_box])
@@ -401,42 +403,60 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
         def euler_sample(x2d, y_local, steps):
             dt = 1.0 / steps
             for s in range(steps):
-                t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                t_s = torch.full((y_local.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
                 v_s = model_3d(x2d, y_local, t_s)
                 y_local = y_local + dt * v_s
             return y_local
         
         for s_keep in eval_steps:
             list_hypothesis = []
-            for i in range(hypothesis_num):
+            
+            # Parallel hypothesis generation: generate N hypotheses at once
+            B, F, J, C = gt_3D.shape
+            N = hypothesis_num
+            
+            # Generate all N normal noise samples at once: (B*N, F, J, 3)
+            y_batch = torch.randn(B * N, F, J, C, device=gt_3D.device, dtype=gt_3D.dtype)
+            
+            # Expand input_2D N times: (B, F, J, 2) -> (B*N, F, J, 2)
+            input_2D_nonflip_expanded = input_2D_nonflip.repeat(N, 1, 1, 1)
+            
+            # Batch process all N normal hypotheses
+            y_s_batch = euler_sample(input_2D_nonflip_expanded, y_batch, s_keep)
+            
+            # Extract center frame and reshape: (B*N, F, J, 3) -> (B*N, 1, J, 3) -> (N, B, 1, J, 3)
+            output_3D_batch = y_s_batch[:, args.pad].unsqueeze(1)  # (B*N, 1, J, 3)
+            output_3D_batch[:, :, 0, :] = 0
+            output_3D_batch = output_3D_batch.view(N, B, 1, J, 3)
+            
+            # Handle flip hypotheses if needed
+            if args.test_augmentation_flip_hypothesis:
+                # Generate all N flip noise samples at once
+                y_flip_batch = torch.randn(B * N, F, J, C, device=gt_3D.device, dtype=gt_3D.dtype)
                 
-                y = torch.randn_like(gt_3D)
-                y_s = euler_sample(input_2D_nonflip, y, s_keep)
+                # Expand flip input_2D N times
+                input_2D_flip_expanded = input_2D_flip.repeat(N, 1, 1, 1)
                 
-                # if args.test_augmentation:
-                #     y_flip = torch.randn_like(gt_3D)
-                #     y_flip[:, :, :, 0] *= -1
-                #     y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
-                #     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
-                #     y_flip_s[:, :, :, 0] *= -1
-                #     y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
-                #     y_s = (y_s + y_flip_s) / 2
+                # Batch process all N flip hypotheses
+                y_flip_s_batch = euler_sample(input_2D_flip_expanded, y_flip_batch, s_keep)
                 
-                if args.test_augmentation_flip_hypothesis:
-                    y_flip = torch.randn_like(gt_3D)
-                    # y_flip[:, :, :, 0] *= -1
-                    # y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
-                    y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
-                    y_flip_s[:, :, :, 0] *= -1
-                    y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
-                    y_flip_s = y_flip_s[:, args.pad].unsqueeze(1)
-                    y_flip_s[:, :, 0, :] = 0
-                    list_hypothesis.append(y_flip_s)
+                # Flip back
+                y_flip_s_batch[:, :, :, 0] *= -1
+                y_flip_s_batch[:, :, args.joints_left + args.joints_right, :] = y_flip_s_batch[:, :, args.joints_right + args.joints_left, :]
                 
-                # per-step metrics only; do not store per-sample outputs
-                output_3D_s = y_s[:, args.pad].unsqueeze(1)
-                output_3D_s[:, :, 0, :] = 0
-                list_hypothesis.append(output_3D_s)
+                # Extract center frame and reshape: (B*N, F, J, 3) -> (N, B, 1, J, 3)
+                output_3D_flip_batch = y_flip_s_batch[:, args.pad].unsqueeze(1)  # (B*N, 1, J, 3)
+                output_3D_flip_batch[:, :, 0, :] = 0
+                output_3D_flip_batch = output_3D_flip_batch.view(N, B, 1, J, 3)
+                
+                # Add to list in original order: flip first, then normal
+                for i in range(N):
+                    list_hypothesis.append(output_3D_flip_batch[i])
+                    list_hypothesis.append(output_3D_batch[i])
+            else:
+                # Only normal hypotheses
+                for i in range(N):
+                    list_hypothesis.append(output_3D_batch[i])
             
             # output_3D_s = aggregate_hypothesis(list_hypothesis)
             # uncertainty-aware aggregation across hypotheses
