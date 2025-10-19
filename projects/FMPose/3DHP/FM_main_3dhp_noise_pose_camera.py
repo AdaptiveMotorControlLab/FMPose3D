@@ -28,14 +28,18 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 def cam_mm_to_pix(cam, cam_data):
     """
-    Convert camera parameters from mm to pixels.
+    Convert camera parameters from mm to normalized coordinates (for projection).
+    
+    This normalization follows the same convention as H36M dataset:
+    - focal length: f_norm = f_mm / sensorSize * 2
+    - principal point: c_norm = (c_mm / sensorSize) * 2
     
     Args:
         cam: [fx, fy, cx, cy, k1, k2, p1, p2, k3] in mm (torch.Tensor or list)
         cam_data: [width, height, sensorSize_x, sensorSize_y]
         
     Returns:
-        cam: [fx, fy, cx, cy, k1, k2, p1, p2, k3] in pixels
+        cam: [fx, fy, cx, cy, k1, k2, p1, p2, k3] in normalized coordinates
     """
     # Convert to tensor if it's a list
     if isinstance(cam, list):
@@ -43,118 +47,131 @@ def cam_mm_to_pix(cam, cam_data):
     else:
         cam = cam.clone()
     
-    # Calculate scaling factors (pixels per mm)
-    mx = cam_data[0] / cam_data[2]  # width / sensorSize_x
-    my = cam_data[1] / cam_data[3]  # height / sensorSize_y
+    width, height, sensor_w, sensor_h = cam_data
     
-    # Convert focal lengths
-    cam[0] = cam[0] * mx  # fx in pixels
-    cam[1] = cam[1] * my  # fy in pixels
+    # Normalize focal lengths: f / sensor_size * 2
+    cam[0] = cam[0] / sensor_w * 2  # fx normalized
+    cam[1] = cam[1] / sensor_h * 2  # fy normalized
     
-    # Convert principal point (add image center offset)
-    cam[2] = cam[2] * mx + cam_data[0] / 2  # cx in pixels
-    cam[3] = cam[3] * my + cam_data[1] / 2  # cy in pixels
+    # Normalize principal point: (c / sensor_size) * 2
+    cam[2] = cam[2] / sensor_w * 2  # cx normalized
+    cam[3] = cam[3] / sensor_h * 2  # cy normalized
     
     # Distortion coefficients remain unchanged (dimensionless)
     # cam[4:9] stay the same
     
     return cam
 
-def aggregate_hypothesis_camera_weight_3dhp(list_hypothesis, input_2D, gt_3D, cam_mm, cam_data, width, height, topk=3):
+def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D, topk=3):
     """
-    Camera-guided weighted aggregation for 3DHP with manual camera parameters.
-    
+    Select per-joint 3D from the hypothesis whose 2D projection yields minimal L2 error.
+
     Args:
-        list_hypothesis: list of (B,1,J,3) tensors (root-relative 3D poses)
-        input_2D: (B, F, J, 2) 2D joints in normalized coordinates
-        gt_3D: (B, F, J, 3) GT 3D for shape and root position
-        cam_mm: camera parameters in mm
-        cam_data: [width, height, sensorSize_x, sensorSize_y]
-        width, height: image resolution
-        topk: number of top hypotheses to aggregate
-        
+        list_hypothesis: list of (B,1,J,3) tensors
+        batch_cam: (B, 9) or (B, 1, 9) intrinsics [f(2), c(2), k(3), p(2)]
+        input_2D: (B, F, J, 2) 2D joints in image coordinates
+        gt_3D: (B, F, J, 3) used for shape metadata only
     Returns:
-        (B,1,J,3) aggregated 3D pose with root at origin
+        (B,1,J,3) aggregated 3D pose with joint 0 set to 0
     """
     if len(list_hypothesis) == 0:
         raise ValueError("list_hypothesis is empty")
-    
+
     device = list_hypothesis[0].device
     dtype = list_hypothesis[0].dtype
-    
+
     # Shapes
     B = gt_3D.size(0)
     J = gt_3D.size(2)
     F = gt_3D.size(1)
     assert F >= 1, "Expected at least one frame"
-    
+
     # Stack hypotheses: (H,B,1,J,3) -> (B,H,J,3)
     stack = torch.stack(list_hypothesis, dim=0)  # (H,B,1,J,3)
     X_hbj3 = stack[:, :, 0, :, :]                # (H,B,J,3)
     X_bhj3 = X_hbj3.transpose(0, 1).contiguous() # (B,H,J,3)
     H = X_bhj3.size(1)
-    
-    # Convert camera params from mm to pixels
-    cam_params_pix = cam_mm_to_pix(cam_mm, cam_data)
-    cam_params_batch = cam_params_pix.unsqueeze(0).repeat(B, 1).to(device)
-    
-    # Target 2D at the same frame index as 3D (args.pad)
-    target_2d_norm = input_2D[:, getattr(args, 'pad', 0)].contiguous()  # (B,J,2) normalized
-    
-    # Convert hypotheses from root-relative to absolute coordinates using GT root
+
+    # Prepare camera params: (B,9)
+    if batch_cam.dim() == 3 and batch_cam.size(1) == 1:
+        cam_b9 = batch_cam[:, 0, :].contiguous()
+    elif batch_cam.dim() == 2 and batch_cam.size(1) == 9:
+        cam_b9 = batch_cam
+    else:
+        cam_b9 = batch_cam.view(B, -1)
+    assert cam_b9.size(1) == 9, f"camera params should be 9-dim, got {cam_b9.size()}"
+
+    # Target 2D at the same frame index as 3D selection (args.pad)
+    # input_2D: (B,F,J,2) -> (B,J,2)
+    target_2d = input_2D[:, getattr(args, 'pad', 0)].contiguous()  # (B,J,2)
+
+    # Convert hypotheses from root-relative to absolute camera coordinates using GT root
+    # Root at frame args.pad: (B,3)
     gt_root = gt_3D[:, getattr(args, 'pad', 0), 0, :].contiguous()  # (B,3)
     X_abs = X_bhj3.clone()
     X_abs[:, :, 1:, :] = X_abs[:, :, 1:, :] + gt_root.unsqueeze(1).unsqueeze(1)
     X_abs[:, :, 0, :] = gt_root.unsqueeze(1)
-    
-    # Vectorized projection for all hypotheses
+
+    # Vectorized projection for all hypotheses in absolute coordinates
     # (B,H,J,3) -> (B*H,J,3)
     X_flat = X_abs.view(B * H, J, 3)
-    cam_rep = cam_params_batch.repeat_interleave(H, dim=0)  # (B*H,9)
-    
-    # Project to 2D (pixel coordinates)
-    proj2d_flat_pix = project_to_2d(X_flat, cam_rep)  # (B*H,J,2) in pixels
-    
-    # Normalize projected 2D to match input_2D coordinate space
-    offset = torch.tensor([1, height / width], device=proj2d_flat_pix.device, dtype=proj2d_flat_pix.dtype)
-    proj2d_flat_norm = proj2d_flat_pix / width * 2 - offset  # (B*H,J,2) normalized
-    
-    proj2d_bhj = proj2d_flat_norm.view(B, H, J, 2)
-    
-    # Per-hypothesis per-joint 2D error (both in normalized coordinates)
-    diff = proj2d_bhj - target_2d_norm.unsqueeze(1)    # (B,H,J,2)
-    dist = torch.norm(diff, dim=-1)                    # (B,H,J)
-    
-    # For root joint (0), set equal distances (we set root to 0 later anyway)
+    cam_rep = cam_b9.repeat_interleave(H, dim=0)  # (B*H,9)
+
+    # project_to_2d expects last dim=3 and cam (N,9)
+    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2)
+    proj2d_bhj = proj2d_flat.view(B, H, J, 2)
+
+    # Per-hypothesis per-joint 2D error
+    diff = proj2d_bhj - target_2d.unsqueeze(1)    # (B,H,J,2)
+    dist = torch.norm(diff, dim=-1) # (B,H,J)
+
+    # For root joint (0), avoid NaNs in softmax by setting equal distances
+    # This yields uniform weights at the root (we set root to 0 later anyway)
     dist[:, :, 0] = 0.0
-    
-    # Convert 2D losses to weights using exponential over top-k hypotheses
-    k = max(1, min(topk, H))
-    
+
+    # Convert 2D losses to weights using softmax over top-k hypotheses per joint
+    tau = float(getattr(args, 'weight_softmax_tau', 1.0))
+    H = dist.size(1)
+    k = int(getattr(args, 'topk', None))
+    # print("k:", k)
+    # k = int(H//2)+1
+    k = max(1, min(k, H))
+
     # top-k smallest distances along hypothesis dim
     topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
     
-    # Exponential weighting
-    temp = args.exp_temp
-    max_safe_val = temp * 20
-    topk_vals_clipped = torch.clamp(topk_vals, max=max_safe_val)
-    exp_vals = torch.exp(-topk_vals_clipped / temp)
-    exp_sum = exp_vals.sum(dim=1, keepdim=True)
-    topk_weights = exp_vals / torch.clamp(exp_sum, min=1e-10)
+    # Weight calculation method
+    weight_method = 'exp'
     
-    # Handle NaN
-    nan_mask = torch.isnan(topk_weights).any(dim=1, keepdim=True)
-    uniform_weights = torch.ones_like(topk_weights) / k
-    topk_weights = torch.where(nan_mask.expand_as(topk_weights), uniform_weights, topk_weights)
-    
-    # Scatter back to full H with zeros elsewhere
+    if weight_method == 'softmax':
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+    elif weight_method == 'inverse':
+        eps = 1e-6
+        inv_weights = 1.0 / (topk_vals + eps)
+        topk_weights = inv_weights / inv_weights.sum(dim=1, keepdim=True)
+    elif weight_method == 'exp':
+        temp = args.exp_temp
+        max_safe_val = temp * 20
+        topk_vals_clipped = torch.clamp(topk_vals, max=max_safe_val)
+        exp_vals = torch.exp(-topk_vals_clipped / temp)
+        exp_sum = exp_vals.sum(dim=1, keepdim=True)
+        topk_weights = exp_vals / torch.clamp(exp_sum, min=1e-10)
+        nan_mask = torch.isnan(topk_weights).any(dim=1, keepdim=True)
+        uniform_weights = torch.ones_like(topk_weights) / k
+        topk_weights = torch.where(nan_mask.expand_as(topk_weights), uniform_weights, topk_weights)
+    else:
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+
+    # scatter back to full H with zeros elsewhere
     weights = torch.zeros_like(dist)  # (B,H,J)
     weights.scatter_(1, topk_idx, topk_weights)
-    
+
     # Weighted sum of root-relative 3D hypotheses per joint
     weights_exp = weights.unsqueeze(-1)                     # (B,H,J,1)
     weighted_bj3 = torch.sum(X_bhj3 * weights_exp, dim=1)   # (B,J,3)
-    
+
     # Assemble output (B,1,J,3) and enforce root at origin
     agg = weighted_bj3.unsqueeze(1).to(dtype=dtype)
     agg[:, :, 0, :] = 0
@@ -204,49 +221,40 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
         # TS1-TS4 are indoor sequences using Camera 1
         if subject[0] == 'TS5' or subject[0] == 'TS6':
             # Camera 2: Outdoor (1920x1080, 16:9)
-            cam_mm = [8.770747185, 8.770747185, -0.104908645, 0.104899704, 
-                      -0.276859611, 0.131125256, -0.000360494, -0.001149441, -0.049318332]
-            cam_data = [1920, 1080, 10, 5.625]  # [width, height, sensorSize_x, sensorSize_y]
+            # Original: fx=fy=1683.9835, cx=939.3575, cy=559.6408
+            # Normalized following H36M convention:
+            # focal_length = f / width * 2
+            # center = (c / (width/2)) - 1 for cx, (c / (height/2)) - 1 for cy
+            # Format: [fx, fy, cx, cy, k1, k2, p1, p2, k3] (9 parameters)
+            cam_params = [
+                1.7541499137878418,  # fx_norm = 1683.9835 / 1920 * 2
+                1.7541499137878418,  # fy_norm = 1683.9835 / 1920 * 2  
+                -0.021919310092926025,  # cx_norm = (939.3575 / 960) - 1
+                0.03637138195435747,  # cy_norm = (559.6408 / 540) - 1
+                0.0, 0.0, 0.0, 0.0, 0.0  # k1, k2, p1, p2, k3 (no distortion)
+            ]
             width, height = 1920, 1080
         else:
             # Camera 1: Indoor (2048x2048, 1:1)
-            cam_mm = [7.32506, 7.32506, -0.0322884, 0.0929296, 0, 0, 0, 0, 0]
-            cam_data = [2048, 2048, 10, 10]  # [width, height, sensorSize_x, sensorSize_y]
+            # Original: fx=fy=1500.1722, cx=1016.8873, cy=1042.5320
+            # Normalized following H36M convention:
+            # focal_length = f / width * 2
+            # center = (c / (width/2)) - 1 for cx, (c / (height/2)) - 1 for cy
+            # Format: [fx, fy, cx, cy, k1, k2, p1, p2, k3] (9 parameters)
+            cam_params = [
+                1.4649337530136108,  # fx_norm = 1500.1722 / 2048 * 2
+                1.4649337530136108,  # fy_norm = 1500.1722 / 2048 * 2
+                -0.007354736328125,  # cx_norm = (1016.8873 / 1024) - 1
+                0.018066406249999996,  # cy_norm = (1042.5320 / 1024) - 1
+                0.0, 0.0, 0.0, 0.0, 0.0  # k1, k2, p1, p2, k3 (no distortion)
+            ]
             width, height = 2048, 2048
         
         # Convert camera parameters from mm to pixels (for projection)
-        cam_params_pix = cam_mm_to_pix(cam_mm, cam_data)
         
         # Prepare camera params tensor for batched projection
         # project_to_2d expects shape (N, 9)
         N = input_2D.size(0)
-        cam_params_batch = cam_params_pix.unsqueeze(0).repeat(N, 1).to(gt_3D.device)
-        
-        # Optional: Test projection (only for first batch to verify camera setup)
-        if i == 0:
-            print(f"\n=== Projection Test (Batch {i}) ===")
-            print(f"Resolution: {width}x{height}, Camera: {'2 (Outdoor)' if subject[0] in ['TS5', 'TS6'] else '1 (Indoor)'}")
-            
-            # Test: Project GT 3D to 2D and compare with input 2D
-            proj_gt_3D = gt_3D.clone()
-            output_3D_nonflip_test = gt_3D.clone()
-            output_3D_nonflip_test[:,:,1:] += proj_gt_3D[:,:,:1]
-            output_3D_nonflip_test[:,:,:1] = proj_gt_3D[:,:,:1]
-            
-            output_3D_flat = output_3D_nonflip_test.reshape(-1, output_3D_nonflip_test.shape[-2], 3)
-            cam_params_flat = cam_params_batch.unsqueeze(1).repeat(1, output_3D_nonflip_test.shape[1], 1).reshape(-1, 9)
-            
-            proj_nonflip_2d_pix = project_to_2d(output_3D_flat, cam_params_flat)
-            offset = torch.tensor([1, height / width], device=proj_nonflip_2d_pix.device, dtype=proj_nonflip_2d_pix.dtype)
-            proj_nonflip_2d_norm = proj_nonflip_2d_pix / width * 2 - offset
-            
-            proj_nonflip_2d_norm = proj_nonflip_2d_norm.reshape(N, output_3D_nonflip_test.shape[1], -1, 2)
-            input_2D_nonflip_reshaped = input_2D_nonflip.reshape(N, output_3D_nonflip_test.shape[1], -1, 2)
-            
-            loss_nonflip_proj = eval_cal.mpjpe(proj_nonflip_2d_norm, input_2D_nonflip_reshaped)
-            print(f"Reprojection Error (normalized): {loss_nonflip_proj.item():.6f}")
-            print("="*60 + "\n")
-        
 
         out_target = gt_3D.clone()
         out_target[:, :, args.root_joint] = 0
@@ -289,9 +297,13 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
                 list_hypothesis.append(y_s_frame)
             
             # Aggregate using camera-guided weighting
-            output_3D_s = aggregate_hypothesis_camera_weight_3dhp(
-                list_hypothesis, input_2D_nonflip, gt_3D, 
-                cam_mm, cam_data, width, height, args.topk
+            # Convert cam_params list to tensor with shape (B, 9)
+            batch_size = gt_3D.size(0)
+            cam_tensor = torch.tensor(cam_params, dtype=torch.float32, device=gt_3D.device)
+            cam_tensor = cam_tensor.unsqueeze(0).expand(batch_size, -1)  # (B, 9)
+            
+            output_3D_s = aggregate_hypothesis_camera_weight(
+                list_hypothesis, cam_tensor, input_2D_nonflip, gt_3D, topk=args.topk
             )
 
             # accumulate by action across the entire test set
