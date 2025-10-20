@@ -177,6 +177,10 @@ def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_
     agg[:, :, 0, :] = 0
     return agg
 
+def aggregate_hypothesis_mean(list_hypothesis):
+    return torch.mean(torch.stack(list_hypothesis), dim=0)
+
+
 # Support loading the model class from a specific file path if provided
 Model = None
 if getattr(args, 'model_path', ''):
@@ -233,6 +237,7 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
                 0.03637138195435747,  # cy_norm = (559.6408 / 540) - 1
                 0.0, 0.0, 0.0, 0.0, 0.0  # k1, k2, p1, p2, k3 (no distortion)
             ]
+            
             width, height = 1920, 1080
         else:
             # Camera 1: Indoor (2048x2048, 1:1)
@@ -283,6 +288,10 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
                 # Add flip augmentation hypothesis if enabled
                 if args.test_augmentation_flip_hypothesis:
                     y_flip = torch.randn_like(gt_3D)
+                    # y_flip = y_s
+                    y_flip[:, :, :, 0] *= -1
+                    y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
+                    
                     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model)
                     y_flip_s[:, :, :, 0] *= -1
                     y_flip_s[:, :, args.joints_left + args.joints_right, :] = \
@@ -301,10 +310,11 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
             batch_size = gt_3D.size(0)
             cam_tensor = torch.tensor(cam_params, dtype=torch.float32, device=gt_3D.device)
             cam_tensor = cam_tensor.unsqueeze(0).expand(batch_size, -1)  # (B, 9)
+           
+
+            # output_3D_s = aggregate_hypothesis_mean(list_hypothesis)            
             
-            output_3D_s = aggregate_hypothesis_camera_weight(
-                list_hypothesis, cam_tensor, input_2D_nonflip, gt_3D, topk=args.topk
-            )
+            output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, cam_tensor, input_2D_nonflip, gt_3D, topk=args.topk)
 
             # accumulate by action across the entire test set
             action_error_sum_multi[s_keep] = eval_cal.test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
@@ -435,7 +445,7 @@ if __name__ == '__main__':
     else:
         folder_name = logtime
     
-    args.filename = 'V1.1.1.1_trainview7_trainS1_testS1_' + args.create_time
+    args.filename = '_' + args.create_time
 
     if args.create_file:
         # create backup folder
@@ -458,13 +468,15 @@ if __name__ == '__main__':
         shutil.copyfile(src="common/arguments.py", dst = os.path.join( args.checkpoint, args.create_time + "_arguments.py"))
         # shutil.copyfile(src="model/model_Gaussian.py", dst = os.path.join( args.checkpoint, args.create_time + "_model_Gaussian.py"))
         shutil.copyfile(src="common/utils.py", dst = os.path.join( args.checkpoint, args.create_time + "_utils.py"))
-        shutil.copyfile(src="test_3dhp.sh", dst = os.path.join( args.checkpoint, args.filename + "_test_3dhp.sh"))
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
         
-        logging.info("Starting the record")
-        logging.info("ALL: TS1-TS6")
+        # logging.info("Starting the record")
+        # logging.info("ALL: TS1-TS6")
         # Then, change to a format without timestamp
         logging.root.handlers[0].setFormatter(logging.Formatter('%(message)s'))
 
