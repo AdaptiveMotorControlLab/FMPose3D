@@ -5,15 +5,6 @@ import os
 import time
 import hashlib
 
-def gaussian_loss(M, S, target): 
-    # M:mu, S:s;  M.shape,s.shape:[B,1,17,3] 
-    # target:Ground Truth 3D
-    assert M.shape == target.shape
-    # return torch.mean((torch.norm(target - M, p=2, dim=-1) * torch.exp(-S) + S))
-    S = S.squeeze(-1)
-    S = torch.clamp(S, -3)
-    return torch.mean(torch.norm(target - M, p=2, dim=-1)*torch.exp(-S) + S)
-
 class AccumLoss(object):
     """
     for initialize and accumulate loss/err
@@ -298,17 +289,7 @@ def gettime():
     minute = int(time.strftime("%M", time_now))
 
     return month, day, hour, minute
-
-def gaussian_loss_opt(M, S, target): 
-    # M:mu, S:s;  M.shape,s.shape:[B,1,17,3]
-    # target:Ground Truth 3D
-    assert M.shape == target.shape
-    S = S.squeeze(-1)
-    S = torch.clamp(S, -3)
-    # return torch.mean((torch.norm(target - M, p=2, dim=-1) * torch.exp(S)))
-    return torch.mean(torch.norm(target - M, p=2, dim=-1) * torch.exp(-S))
-
-    
+  
 def project_to_2d(X, camera_params):
     """
     Project 3D points to 2D using the Human3.6M camera projection function.
