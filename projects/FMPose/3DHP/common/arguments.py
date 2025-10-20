@@ -76,8 +76,18 @@ def parse_args():
     parser.add_argument('--test_views', type=int, nargs='+', default=[0,1,2,3,4,5,6,7])
     parser.add_argument('--create_time', type=str, default='')
    
-    parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9') 
+    parser.add_argument('--eval_sample_steps', type=str, default='1,3,5,7,9')
     
+    # Multi-hypothesis parameters
+    parser.add_argument('--num_hypothesis_list', type=str, default='1', help='comma-separated list of hypothesis counts')
+    parser.add_argument('--topk', type=int, default=3, help='top-k hypotheses for weighted aggregation')
+    parser.add_argument('--exp_temp', type=float, default=0.005, help='temperature for exponential weighting')
+    parser.add_argument('--weight_softmax_tau', type=float, default=1.0, help='tau for softmax weighting')
+    parser.add_argument('--folder_name', type=str, default='', help='custom folder name for results')
+    parser.add_argument('--test_augmentation_flip_hypothesis', type=bool, default=False, help='use flip augmentation for hypotheses')
+    parser.add_argument('--sh_file', type=str, default='') 
+    parser.add_argument('--subjects_test', type=str, default='', help='override test subjects, e.g., TS1,TS2 or TS5,TS6')
+ 
     args = parser.parse_args()
 
     if args.test:
@@ -121,13 +131,13 @@ def parse_args():
         args.subjects_train = 'S1,S2,S3,S4,S5,S6,S7,S8'    # all      
         # args.subjects_train = 'S1,S2,S3,S4,S5,S6'
         # args.subjects_train = 'S1'
-        args.subjects_test = 'TS1,TS2,TS3,TS4,TS5,TS6' # all
+        # args.subjects_test = 'TS1,TS2,TS3,TS4,TS5,TS6' # all
         # args.subjects_test = 'TS1,TS2,TS3,TS4' #
         # args.subjects_test = 'TS1'
         # args.subjects_test = 'TS1,TS2' # GS
         # args.subjects_test = 'TS3,TS4' # no GS
-        args.subjects_test = 'TS5,TS6' # Outdoor
-        print(args.subjects_test)
+        # args.subjects_test = 'TS5,TS6' # Outdoor
+        print(f'Test subjects: {args.subjects_test}')
                  
         if args.keypoints.startswith('gt_14'):
             args.n_joints, args.out_joints = 14, 14
