@@ -41,7 +41,6 @@ def val(opt, actions, val_loader, model, steps=None):
 def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, steps=None):
 
     loss_all = {'loss': AccumLoss()}
-    action_error_sum = define_error_list(actions)
     
     model_3d = model['CFM']
     if split == 'train':
@@ -51,16 +50,21 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
     # determine steps for single-step evaluation per call
     steps_to_use = steps
-    action_error_sum = 0.
+    p1_error_sum = 0.
+    p2_error_sum = 0.
+    
     data_lent = 0
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         
         # batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
         input_2D, gt_3D = data['keypoints_2d'], data['keypoints_3d'] 
+        # print(input_2D.shape,input_2D)
+        # print(gt_3D)
         #  input_2D shape: torch.Size([256, 26, 3]) gt_3D shape: torch.Size([256, 26, 4])
-        input_2D = input_2D[:,:,:2]  # only use x,y for 2D input
+        # input_2D = input_2D[:,:,:2]  # only use x,y for 2D input
         gt_3D = gt_3D[:,:,:3]  # only use x,y,z for 3D ground truth
+        
         # [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
         
         # unsqueeze frame dimension
@@ -68,8 +72,10 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         gt_3D = gt_3D.unsqueeze(1)  # (B,F,J,C)
         
         device = next(model_3d.parameters()).device
-        input_2D = input_2D.to(device)
-        gt_3D = gt_3D.to(device)
+
+        model_dtype = next(model_3d.parameters()).dtype
+        input_2D = input_2D.to(device=device, dtype=model_dtype)
+        gt_3D = gt_3D.to(device=device, dtype=model_dtype)
         
         B = input_2D.shape[0]
         data_lent  += B
@@ -86,12 +92,12 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # gt_3D, input_2D shape: (B,F,J,C)
             # vis_3D shape: (B,F,J,1) - visibility mask
             # x0_noise = torch.randn_like(gt_3D)
-            x0_noise = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
+            x0_noise = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=model_dtype)
             x0 = x0_noise
             
             B = gt_3D.size(0)
             # t on correct device/dtype and broadcastable: (B,1,1,1)
-            t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=gt_3D.dtype)
+            t = torch.rand(B, 1, 1, 1, device=gt_3D.device, dtype=model_dtype)
             y_t = (1.0 - t) * x0 + t * gt_3D
             v_target = gt_3D - x0
             v_pred = model_3d(input_2D, y_t, t)
@@ -118,13 +124,13 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             def euler_sample(x2d, y_local, steps_local):
                 dt = 1.0 / steps_local
                 for s in range(steps_local):
-                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                    t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=model_dtype)
                     v_s = model_3d(x2d, y_local, t_s)
                     y_local = y_local + dt * v_s
                 return y_local
             
             # Start from noise
-            y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=gt_3D.dtype)
+            y = torch.randn(B, F, J, 3, device=gt_3D.device, dtype=model_dtype)
             
             # Run sampling
             y_s = euler_sample(input_2D, y, steps_to_use)
@@ -132,12 +138,20 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             
             
             output_3D[:, :, args.root_joint, :] = 0
-
-
             
-            action_error_sum = mpjpe_cal(predicted = output_3D, target = out_target)
-            action_error_sum += action_error_sum * B
+            p1 = mpjpe_cal(predicted = output_3D, target = out_target)
+            # print("p1_error", p1)
+            predicted = output_3D
+            output_3D = predicted.detach().cpu().numpy().reshape(-1, predicted.shape[-2], predicted.shape[-1]) # B,17,3
+            target = out_target            
+            out_target = target.detach().cpu().numpy().reshape(-1, target.shape[-2], target.shape[-1]) # # B,17,3
             
+            p2 = p_mpjpe(predicted = output_3D, target = out_target)
+            p2 = np.mean(p2)
+            # print("p2_error_sum", p2)
+            
+            p1_error_sum += p1 * B
+            p2_error_sum += p2 * B
 
     if split == 'train':
         return loss_all['loss'].avg
@@ -145,11 +159,13 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
     elif split == 'test':
         # aggregate metrics for the single requested steps
         # p1_s, p2_s = print_error(args.dataset, action_error_sum, args.train)
-        p1_s = action_error_sum / data_lent * 1000.0  # in mm
+        p1_s = p1_error_sum / data_lent * 1000.0  # in mm
+        p2_s = p2_error_sum / data_lent * 1000.0  # in mm
         
         print("mpjpe: {:.4f} mm".format(p1_s))
+        print("p-mpjpe: {:.4f} mm".format(p2_s))
 
-        return float(p1_s), 0 
+        return float(p1_s), float(p2_s)
 
 def get_parameter_number(net):
     total_num = sum(p.numel() for p in net.parameters())
@@ -241,7 +257,7 @@ if __name__ == '__main__':
         train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
                                                        shuffle=True, num_workers=int(args.workers), pin_memory=True)
     if args.test:
-        test_data = EvaluationDataset(json_file=test_path)
+        test_data = TrainDataset(is_train= False, json_file=train_path)
         test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
                                                       shuffle=False, num_workers=int(args.workers), pin_memory=True)    
 

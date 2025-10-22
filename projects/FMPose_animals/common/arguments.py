@@ -42,7 +42,7 @@ class opts():
         self.parser.add_argument('--batch_size', type=int, default=128, help='can be changed depending on your machine') # default 128
         self.parser.add_argument('--lr', type=float, default=1e-3)
         self.parser.add_argument('--lr_decay_large', type=float, default=0.5)
-        self.parser.add_argument('--large_decay_epoch', type=int, default=5)
+        self.parser.add_argument('--large_decay_epoch', type=int, default=20)
         self.parser.add_argument('--workers', type=int, default=8)
         self.parser.add_argument('-lrd', '--lr_decay', default=0.95, type=float)
         self.parser.add_argument('--frames', type=int, default=1)  #
@@ -57,8 +57,8 @@ class opts():
         self.parser.add_argument('--previous_dir', type=str, default='./pre_trained_model/pretrained')
         self.parser.add_argument('--saved_model_path', type=str, default='')
         
-        self.parser.add_argument('--n_joints', type=int, default=17)
-        self.parser.add_argument('--out_joints', type=int, default=17)
+        self.parser.add_argument('--n_joints', type=int, default=26)
+        self.parser.add_argument('--out_joints', type=int, default=26)
         self.parser.add_argument('--out_all', type=int, default=1)
         self.parser.add_argument('--in_channels', type=int, default=2)
         self.parser.add_argument('--out_channels', type=int, default=3)

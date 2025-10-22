@@ -3,13 +3,17 @@
 # Model: model/model_attn.py (Conditional Flow Matching with Attention)
 
 layers=5
-batch_size=1024
+batch_size=32
 lr=1e-3
 gpu_id=0
 eval_sample_steps=3
 num_saved_models=3
 frames=1
-epochs=100
+large_decay_epoch=20
+lr_decay_large=0.75
+n_joints=26
+out_joints=26
+epochs=800
 # model_path='model/model_G_P_Attn_rat.py'
 model_path='model/model_attn.py'
 
@@ -23,14 +27,17 @@ python main_CFM_animal3d.py \
   --dataset rat7m \
   --train \
   --test 1 \
-  --batch_size 256 \
-  --lr 1e-4 \
+  --batch_size ${batch_size} \
+  --lr ${lr} \
   --model_path ${model_path} \
   --folder_name ${folder_name} \
   --layers ${layers} \
-  --lr ${lr} \
   --gpu ${gpu_id} \
   --eval_sample_steps ${eval_sample_steps} \
   --num_saved_models ${num_saved_models} \
   --sh_file ${sh_file} \
-  --nepoch ${epochs}
+  --nepoch ${epochs} \
+  --large_decay_epoch ${large_decay_epoch} \
+  --lr_decay_large ${lr_decay_large} 
+  # --n_joints ${n_joints} \
+  # --out_joints ${out_joints} 

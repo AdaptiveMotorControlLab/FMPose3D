@@ -140,6 +140,7 @@ class FMPose(nn.Module):
         self.norm_mu = norm_layer(embed_dim)
         
         # Learnable positional embedding for joints
+        n_joints = 26
         self.pos_embed = nn.Parameter(torch.zeros(1, n_joints, embed_dim))
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
 
@@ -235,7 +236,7 @@ if __name__ == "__main__":
     args.d_hid = 1024
     args.token_dim = 256
     args.layers = 5
-    args.n_joints = 17
+    args.n_joints = 26
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(args).to(device)
     # Print model architecture and parameter counts
@@ -243,8 +244,8 @@ if __name__ == "__main__":
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total params: {total_params:,} | Trainable: {trainable_params:,}")
-    x = torch.randn(1, 17, 17, 2, device=device)
-    y_t = torch.randn(1, 17, 17, 3, device=device)
+    x = torch.randn(1, 1, args.n_joints, 2, device=device)
+    y_t = torch.randn(1, 1, args.n_joints, 3, device=device)
     t = torch.randn(1, 1, 1, 1, device=device)
     v = model(x, y_t, t)
     print(v.shape) 
