@@ -1,22 +1,31 @@
-#Train CFM
+# Test pretrained CFM model
 layers=5
 lr=1e-3
-decay=0.98
-sample_steps=3
+decay=0.95
 gpu_id=1
-model_name=model_CrossAttention
-folder_name=FM_CrossAttention_x0_noise_layers${layers}_lr${lr}_decay${decay}_sample${sample_steps}_$(date +%Y%m%d_%H%M)
+batch_size=4
+large_decay_epoch=5
+lr_decay_large=0.9
+epochs=100
+eval_multi_steps=3
+folder_name=debug_FM_projection
+model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/250916_1953_32_model_GAMLP.py'
+saved_model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
+sh_file='run_FM_debug.sh'
 
-# Read WANDB_API_KEY from file if not provided via env
-key_file="$(dirname "$0")/wandb_api_key.txt"
-if [ -z "$WANDB_API_KEY" ] && [ -f "$key_file" ]; then
-  WANDB_API_KEY="$(head -n1 "$key_file" | tr -d ' \n\r')"
-fi
-
-if [ -n "$WANDB_API_KEY" ]; then
-  wandb login --relogin "$WANDB_API_KEY" >/dev/null 2>&1 || true
-fi
-python3 main_CFM_T_pose.py --train --model ${model_name} --gpu ${gpu_id} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch 100 --sample_steps ${sample_steps} --folder_name $folder_name --debug
-#Test CFM
-# python3 main_CFM.py --reload --previous_dir "./debug/250908_1418_45" --model model_GUMLP --sample_steps 3 --test_augmentation True --layers 5 --gpu 0
-# python3 main_CFM_test_vis.py --reload --previous_dir "./debug/250906_2235_46" --model model_GUMLP --sample_steps 19 --batch_size 1 --test_augmentation True --layers 4 --gpu 0
+python3 main_CFM_noise_pose_debug.py \
+  --reload \
+  --test 1 \
+  --model_path ${model_path} \
+  --saved_model_path ${saved_model_path} \
+  --gpu ${gpu_id} \
+  --batch_size ${batch_size} \
+  --layers ${layers} \
+  --lr ${lr} \
+  --lr_decay ${decay} \
+  --nepoch 100 \
+  --eval_sample_steps ${eval_multi_steps} \
+  --test_augmentation True \
+  --debug \
+  --folder_name ${folder_name} \
+  --sh_file ${sh_file}
