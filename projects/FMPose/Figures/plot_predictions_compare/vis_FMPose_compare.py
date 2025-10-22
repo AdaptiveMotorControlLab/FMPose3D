@@ -626,6 +626,7 @@ def show_frame():
     
     # figure
     fig = plt.figure( figsize=(figsize_x, figsize_y) ) # 1280 * 720
+    fig.subplots_adjust(wspace=-0.1)  # Reduce horizontal spacing between subplots
     color=(0/255, 176/255, 240/255)
     linewidth=2.5
     # ax0 = fig.add_subplot(121)
@@ -647,7 +648,7 @@ def show_frame():
     fmpose_np = output_fmpose[0, 0].cpu().detach().numpy()
     show3Dpose_GT(gt_np, ax2, world=False, linewidth=linewidth)
     show3Dpose(fmpose_np, ax2, color, world = False, linewidth=linewidth)
-    plt.savefig(f'{out_dir}{index_image}_delta_{delta:.2f}_{fmpose_mpjpe:.2f}_FMPose.png', dpi=dpi_number, format='png', bbox_inches = 'tight')
+    plt.savefig(f'{out_dir}{index_image}_delta_{delta:.2f}_{fmpose_mpjpe:.2f}_FMPose.jpg', dpi=dpi_number, format='jpg', bbox_inches = 'tight')
     plt.clf ()
     plt.close () 
 
