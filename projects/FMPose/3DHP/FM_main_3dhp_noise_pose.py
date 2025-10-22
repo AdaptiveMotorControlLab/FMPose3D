@@ -49,7 +49,7 @@ def train(dataloader, model, model_refine, optimizer):
     for i, data in enumerate(tqdm(dataloader, 0)):
         batch_cam, gt_3D, input_2D, input_2D_GT, action, subject, cam_ind = data
         [input_2D, input_2D_GT, gt_3D, batch_cam] = get_varialbe('train', [input_2D, input_2D_GT, gt_3D, batch_cam])
-
+        
         output_3D = model(input_2D) # B F J 3
 
         out_target = gt_3D.clone() # B F J 3
@@ -104,6 +104,7 @@ def test(actions, dataloader, model, model_refine):
             return y_local
 
         # for each requested step count, run an independent sampling (no default output here)
+        print(f"eval_steps: {eval_steps}")
         for s_keep in eval_steps:
             # Initialize from pure Gaussian noise (no mean 3D pose)
             y = torch.randn_like(gt_3D)
@@ -113,8 +114,8 @@ def test(actions, dataloader, model, model_refine):
                 joints_right = [1, 2, 3, 14, 15, 16]
                 # Flip-start from noise as well
                 y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
+                # y_flip[:, :, :, 0] *= -1
+                # y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :]
                 y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep, model)
                 y_flip_s = y_flip_s.clone()
                 y_flip_s[:, :, :, 0] *= -1
