@@ -5,27 +5,18 @@
 layers=5
 batch_size=1024
 lr=1e-3
-gpu_id=1
+gpu_id=0
 eval_sample_steps=3
 num_saved_models=3
 frames=1
 epochs=100
 # model_path='model/model_G_P_Attn_rat.py'
 model_path='model/model_attn.py'
-# full datasets
-# train_list='s1d1 s2d1 s2d2 s3d1 s4d1'
-# test_list='s5d1 s5d2'
-# train_views='0 1 2 3 4 5'
-# test_views='0 1 2 3 4 5'
-# using small subjects and views for debug
-train_list='s1d1'
-test_list='s1d1'
-train_views='0'
-test_views='0'
+
 # root path denotes the path to the original dataset
 root_path="/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/animal3d/"
 folder_name="Rat7M_data_GCN_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
-sh_file='train_rat7m.sh'
+sh_file='train_animal3d.sh'
 
 python main_CFM_animal3d.py \
   --root_path ${root_path} \
@@ -41,10 +32,5 @@ python main_CFM_animal3d.py \
   --gpu ${gpu_id} \
   --eval_sample_steps ${eval_sample_steps} \
   --num_saved_models ${num_saved_models} \
-  --frames ${frames} \
-  --train_list ${train_list} \
-  --test_list ${test_list} \
-  --train_views ${train_views} \
-  --test_views ${test_views} \
   --sh_file ${sh_file} \
   --nepoch ${epochs}

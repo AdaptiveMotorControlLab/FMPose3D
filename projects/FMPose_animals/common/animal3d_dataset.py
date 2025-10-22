@@ -10,7 +10,6 @@ import json
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from typing import Optional, Tuple
-from .utils import get_example, expand_to_aspect_ratio
 
 
 class TrainDataset(Dataset):
@@ -53,7 +52,6 @@ class EvaluationDataset(Dataset):
         with open(json_file, 'r') as f:
             self.data = json.load(f)
 
-        self.is_train = False
 
     def __len__(self):
         return len(self.data['data'])

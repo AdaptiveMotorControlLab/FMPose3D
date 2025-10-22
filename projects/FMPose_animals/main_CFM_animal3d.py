@@ -54,8 +54,19 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         # batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
-        input_2D, gt_3D = data['keypoints_2d'], data['keypoints_3d']
+        input_2D, gt_3D = data['keypoints_2d'], data['keypoints_3d'] 
+        #  input_2D shape: torch.Size([256, 26, 3]) gt_3D shape: torch.Size([256, 26, 4])
+        input_2D = input_2D[:,:,:2]  # only use x,y for 2D input
+        gt_3D = gt_3D[:,:,:3]  # only use x,y,z for 3D ground truth
         # [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
+        
+        # unsqueeze frame dimension
+        input_2D = input_2D.unsqueeze(1)  # (B,F,J,C)
+        gt_3D = gt_3D.unsqueeze(1)  # (B,F,J,C)
+        
+        device = next(model_3d.parameters()).device
+        input_2D = input_2D.to(device)
+        gt_3D = gt_3D.to(device)
         
         if split =='train':
             B, F, J, C = input_2D.shape
@@ -63,6 +74,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # Ensure root joint is zero in ground truth (should already be, but enforce it)
             gt_3D = gt_3D.clone()
             gt_3D[:, :, args.root_joint] = 0
+            
             
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
@@ -78,15 +90,6 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             v_target = gt_3D - x0
             v_pred = model_3d(input_2D, y_t, t)
 
-            # Apply visibility mask to loss (only compute loss on visible joints)
-            # vis_3D: [B, F, J, 1], expand to match v_pred: [B, F, J, 3]
-            
-            # Exclude root joint from loss (user preference + focus on relative positions)
-            # Root has absolute camera position which is hard to predict from 2D alone
-            
-            # masked_loss = ((v_pred - v_target)**2) 
-            
-            # Compute mean only over valid (visible) elements
      
             loss = ((v_pred - v_target)**2).mean()
             
@@ -126,7 +129,8 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
 
             
-            action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset)
+            action_error_sum = test_calculation(predicted = output_3D, target = out_target , action= None, error_sum = action_error_sum, data_type= None, subject=None, vis_mask=None)
+            
 
     if split == 'train':
         return loss_all['loss'].avg
@@ -216,8 +220,8 @@ if __name__ == '__main__':
     # are set in arguments.py based on --dataset rat7m parameter
     
     
-    train_path = os.path.join(dataset_path, 'train_data.json')
-    test_path = os.path.join(dataset_path, 'test_data.json')
+    train_path = os.path.join(dataset_path, 'train.json')
+    test_path = os.path.join(dataset_path, 'test.json')
 
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
@@ -228,8 +232,8 @@ if __name__ == '__main__':
         train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
                                                        shuffle=True, num_workers=int(args.workers), pin_memory=True)
     if args.test:
-        test_data = EvaluationDataset(is_train = False, json_file=test_path)
-        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size,
+        test_data = EvaluationDataset(json_file=test_path)
+        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
                                                       shuffle=False, num_workers=int(args.workers), pin_memory=True)    
 
     model = {}
