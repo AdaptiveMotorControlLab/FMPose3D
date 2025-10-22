@@ -43,8 +43,8 @@ class Mlp(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = act_layer()
+        self.fc1 = nn.Linear(in_features, hidden_features) # 32 64
+        self.act = act_layer() # GELU
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
 
@@ -52,9 +52,10 @@ class Mlp(nn.Module):
         x = self.fc1(x)
         x = self.act(x)
         x = self.drop(x)
-        x = self.fc2(x)
+        x = self.fc2(x) # 64,32
         x = self.drop(x)
         return x
+
 
 
 class Attention(nn.Module):
@@ -65,11 +66,11 @@ class Attention(nn.Module):
         # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
         self.scale = qk_scale or head_dim ** -0.5
 
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias) # 
+        self.attn_drop = nn.Dropout(attn_drop) # p=0
         
         self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
+        self.proj_drop = nn.Dropout(proj_drop)  # 0
 
     def forward(self, x):
         B, N, C = x.shape # b,j,c
@@ -87,11 +88,11 @@ class Attention(nn.Module):
         return x
     
 class Block(nn.Module): # drop=0.1
-    def __init__(self, length, dim, tokens_dim, channels_dim, drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+    def __init__(self, dim, drop=0., drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
         super().__init__()
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         
+        # attention
         self.norm_att1=norm_layer(dim)
         self.num_heads = 8
         qkv_bias =  True
@@ -105,7 +106,10 @@ class Block(nn.Module): # drop=0.1
         self.mlp = Mlp(in_features=dim, hidden_features=1024, act_layer=act_layer, drop=drop)
 
     def forward(self, x):
-        res1 = x
+        # B,J,dim 
+        res1 = x # b,j,c
+        
+        # attention
         x_atten = x.clone()
         x_atten = self.norm_att1(x_atten)
         x_atten = self.attn(x_atten)
@@ -120,7 +124,7 @@ class Block(nn.Module): # drop=0.1
         return x
 
 class FMPose(nn.Module):
-    def __init__(self, depth, embed_dim, channels_dim, tokens_dim, drop_rate=0.10, length=27):
+    def __init__(self, depth, embed_dim, n_joints=17, drop_rate=0.10):
         super().__init__()
         
         drop_path_rate = 0.2
@@ -130,14 +134,19 @@ class FMPose(nn.Module):
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
 
         self.blocks = nn.ModuleList([
-            Block(
-                length, embed_dim, tokens_dim, channels_dim,
-                drop=drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
+            Block(embed_dim, drop=drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(depth)])
 
         self.norm_mu = norm_layer(embed_dim)
+        
+        # Learnable positional embedding for joints
+        self.pos_embed = nn.Parameter(torch.zeros(1, n_joints, embed_dim))
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
 
     def forward(self, x):
+        # Add positional embedding to input
+        x = x + self.pos_embed
+        
         for blk in self.blocks:
             x = blk(x)
         x = self.norm_mu(x)
@@ -184,12 +193,13 @@ class Model(nn.Module):
     def __init__(self, args):
         super().__init__()
 
+        # time embedding for t (CTM style conditioning)
         self.t_embed_dim = 32
         self.time_embed = TimeEmbedding(self.t_embed_dim, hidden_dim=64)
         self.encoder_pose_2d = encoder(2, args.channel//2, args.channel//2-self.t_embed_dim//2)
         self.encoder_y_t = encoder(3, args.channel//2, args.channel//2-self.t_embed_dim//2)
         
-        self.FMPose = FMPose(args.layers, args.channel, args.d_hid, args.token_dim, length=args.n_joints)
+        self.FMPose = FMPose(args.layers, args.channel, n_joints=args.n_joints)
         self.pred_mu = decoder(args.channel, args.channel//2, 3)
         
     def forward(self, pose_2d, y_t, t):
@@ -225,16 +235,16 @@ if __name__ == "__main__":
     args.d_hid = 1024
     args.token_dim = 256
     args.layers = 5
-    args.n_joints = 32
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    args.n_joints = 17
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(args).to(device)
     # Print model architecture and parameter counts
     print(model)
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total params: {total_params:,} | Trainable: {trainable_params:,}")
-    x = torch.randn(1, 1, args.n_joints, 2, device=device)
-    y_t = torch.randn(1, 1, args.n_joints, 3, device=device)
+    x = torch.randn(1, 17, 17, 2, device=device)
+    y_t = torch.randn(1, 17, 17, 3, device=device)
     t = torch.randn(1, 1, 1, 1, device=device)
     v = model(x, y_t, t)
     print(v.shape) 
