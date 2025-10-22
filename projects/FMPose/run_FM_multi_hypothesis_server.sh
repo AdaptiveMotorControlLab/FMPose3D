@@ -11,14 +11,14 @@ topk=8
 gpu_id=0
 mode='exp'
 exp_temp=0.005
-flipaug=False
-folder_name=Cam_noaug_s${eval_multi_steps}_Top${topk}_${mode}_temp${exp_temp}_h${num_hypothesis_list}_noflipforNoise_test_results_$(date +%Y%m%d_%H%M%S)
-job_name=fm-multi-hyp-19
+flipaug=True
+folder_name=exp_FlipAug_useSameNoiseforFlipedPose_Flip_y_sInit_s${eval_multi_steps}_Top${topk}_${mode}_temp${exp_temp}_h${num_hypothesis_list}_noflipforNoise_test_results_$(date +%Y%m%d_%H%M%S)
+job_name=fm-multi-hyp-29 
 
-# model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/250916_1953_32_model_GAMLP.py'
-# saved_model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
-model_path='pretrained_model/FM_GPA_Noise_1GCN_P_Attn_layers5_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20251012_163120/251012_1631_22_model_G_P_Attn.py'
-saved_model_path='pretrained_model/FM_GPA_Noise_1GCN_P_Attn_layers5_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20251012_163120/CFM_23_4969_best.pth'
+model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/250916_1953_32_model_GAMLP.py'
+saved_model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
+# model_path='pretrained_model/FM_GPA_Noise_1GCN_P_Attn_layers5_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20251012_163120/251012_1631_22_model_G_P_Attn.py'
+# saved_model_path='pretrained_model/FM_GPA_Noise_1GCN_P_Attn_layers5_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20251012_163120/CFM_23_4969_best.pth'
 
 # Build the Python command
 PYTHON_CMD="cd /data/ti/Ti_workspace/projects/FMPose && python3 main_CFM_noise_pose_multiHypothesis_test.py \
