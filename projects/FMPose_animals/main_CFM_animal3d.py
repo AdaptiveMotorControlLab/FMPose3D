@@ -129,7 +129,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
 
             
-            action_error_sum = test_calculation(predicted = output_3D, target = out_target , action= None, error_sum = action_error_sum, data_type= None, subject=None, vis_mask=None)
+            action_error_sum = mpjpe_cal(predicted = output_3D, target = out_target)
             
 
     if split == 'train':
