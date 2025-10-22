@@ -51,8 +51,11 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         
     # determine steps for single-step evaluation per call
     steps_to_use = steps
+    action_error_sum = 0.
+    data_lent = 0
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
+        
         # batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
         input_2D, gt_3D = data['keypoints_2d'], data['keypoints_3d'] 
         #  input_2D shape: torch.Size([256, 26, 3]) gt_3D shape: torch.Size([256, 26, 4])
@@ -67,6 +70,9 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         device = next(model_3d.parameters()).device
         input_2D = input_2D.to(device)
         gt_3D = gt_3D.to(device)
+        
+        B = input_2D.shape[0]
+        data_lent  += B
         
         if split =='train':
             B, F, J, C = input_2D.shape
@@ -130,6 +136,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
             
             action_error_sum = mpjpe_cal(predicted = output_3D, target = out_target)
+            action_error_sum += action_error_sum * B
             
 
     if split == 'train':
@@ -137,10 +144,12 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
     elif split == 'test':
         # aggregate metrics for the single requested steps
-        p1_s, p2_s = print_error(args.dataset, action_error_sum, args.train)
-        if WANDB_AVAILABLE and steps_to_use is not None:
-            wandb.log({f'test_p1_s{steps_to_use}': float(p1_s), f'test_p2_s{steps_to_use}': float(p2_s)})
-        return float(p1_s), float(p2_s)
+        # p1_s, p2_s = print_error(args.dataset, action_error_sum, args.train)
+        p1_s = action_error_sum / data_lent * 1000.0  # in mm
+        
+        print("mpjpe: {:.4f} mm".format(p1_s))
+
+        return float(p1_s), 0 
 
 def get_parameter_number(net):
     total_num = sum(p.numel() for p in net.parameters())
