@@ -105,6 +105,8 @@ class opts():
         self.parser.add_argument('--exp_temp', type=float, default=0.002)
         self.parser.add_argument('--mode', type=str, default='exp')
         
+        self.parser.add_argument('--opt_steps', type=int, default=2)
+        
         # mask joints
         self.parser.add_argument('--mask_prob', type=float, default=0.5)
         self.parser.add_argument('--masked_joints', type=str, default='12,13')
