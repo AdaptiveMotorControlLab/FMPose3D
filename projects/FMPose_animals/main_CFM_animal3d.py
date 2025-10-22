@@ -53,8 +53,9 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
     steps_to_use = steps
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
-        batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
-        [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
+        # batch_cam, gt_3D, input_2D, action, subject, cam_ind, vis_3D, start_3d, end_3d = data
+        input_2D, gt_3D = data['keypoints_2d'], data['keypoints_3d']
+        # [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
         
         if split =='train':
             B, F, J, C = input_2D.shape
@@ -79,21 +80,15 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
 
             # Apply visibility mask to loss (only compute loss on visible joints)
             # vis_3D: [B, F, J, 1], expand to match v_pred: [B, F, J, 3]
-            vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
             
             # Exclude root joint from loss (user preference + focus on relative positions)
             # Root has absolute camera position which is hard to predict from 2D alone
-            vis_mask[:, :, args.root_joint, :] = 0
             
-            masked_loss = ((v_pred - v_target)**2) * vis_mask
+            # masked_loss = ((v_pred - v_target)**2) 
             
             # Compute mean only over valid (visible) elements
-            num_valid = vis_mask.sum()  # Count visible elements
-            if num_valid > 0:
-                loss = masked_loss.sum() / num_valid
-            else:
-                # Fallback: if no visible joints (shouldn't happen), compute full loss
-                loss = ((v_pred - v_target)**2).mean()
+     
+            loss = ((v_pred - v_target)**2).mean()
             
             N = input_2D.size(0)
             loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
@@ -128,20 +123,10 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             
             
             output_3D[:, :, args.root_joint, :] = 0
+
+
             
-            # Apply visibility mask for evaluation (only evaluate visible joints)
-            # vis_3D: [B, F, J, 1], expand to match output_3D: [B, F, J, 3]
-            vis_mask = vis_3D.expand(-1, -1, -1, 3).clone()  # [B, F, J, 3]
-            
-            # Exclude root joint from evaluation (consistent with training)
-            # Since root is always 0, no need to evaluate it
-            vis_mask[:, :, args.root_joint, :] = 0
-            
-            # Mask both prediction and target for fair comparison
-            output_3D_masked = output_3D * vis_mask
-            out_target_masked = out_target * vis_mask
-            
-            action_error_sum = test_calculation(output_3D_masked, out_target_masked, action, action_error_sum, args.dataset, subject, vis_mask)
+            action_error_sum = test_calculation(output_3D, out_target, action, action_error_sum, args.dataset)
 
     if split == 'train':
         return loss_all['loss'].avg
@@ -231,7 +216,6 @@ if __name__ == '__main__':
     # are set in arguments.py based on --dataset rat7m parameter
     
     
-    dataset_path = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/animal3d/'
     train_path = os.path.join(dataset_path, 'train_data.json')
     test_path = os.path.join(dataset_path, 'test_data.json')
 
