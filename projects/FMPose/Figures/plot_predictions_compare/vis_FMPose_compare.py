@@ -336,8 +336,121 @@ def mpjpe_cal(predicted, target):
 
 def aggregate_hypothesis(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)
+  
+def aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D, gt_3D, topk=3):
+    """
+    Select per-joint 3D from the hypothesis whose 2D projection yields minimal L2 error.
 
+    Args:
+        list_hypothesis: list of (B,1,J,3) tensors
+        batch_cam: (B, 9) or (B, 1, 9) intrinsics [f(2), c(2), k(3), p(2)]
+        input_2D: (B, F, J, 2) 2D joints in image coordinates
+        gt_3D: (B, F, J, 3) used for shape metadata only
+    Returns:
+        (B,1,J,3) aggregated 3D pose with joint 0 set to 0
+    """
+    if len(list_hypothesis) == 0:
+        raise ValueError("list_hypothesis is empty")
 
+    device = list_hypothesis[0].device
+    dtype = list_hypothesis[0].dtype
+
+    # Shapes
+    B = gt_3D.size(0)
+    J = gt_3D.size(2)
+    F = gt_3D.size(1)
+    assert F >= 1, "Expected at least one frame"
+
+    # Stack hypotheses: (H,B,1,J,3) -> (B,H,J,3)
+    stack = torch.stack(list_hypothesis, dim=0)  # (H,B,1,J,3)
+    X_hbj3 = stack[:, :, 0, :, :]                # (H,B,J,3)
+    X_bhj3 = X_hbj3.transpose(0, 1).contiguous() # (B,H,J,3)
+    H = X_bhj3.size(1)
+
+    # Prepare camera params: (B,9)
+    if batch_cam.dim() == 3 and batch_cam.size(1) == 1:
+        cam_b9 = batch_cam[:, 0, :].contiguous()
+    elif batch_cam.dim() == 2 and batch_cam.size(1) == 9:
+        cam_b9 = batch_cam
+    else:
+        cam_b9 = batch_cam.view(B, -1)
+    assert cam_b9.size(1) == 9, f"camera params should be 9-dim, got {cam_b9.size()}"
+
+    # Target 2D at the same frame index as 3D selection (args.pad)
+    # input_2D: (B,F,J,2) -> (B,J,2)
+    target_2d = input_2D[:, getattr(args, 'pad', 0)].contiguous()  # (B,J,2)
+
+    # Convert hypotheses from root-relative to absolute camera coordinates using GT root
+    # Root at frame args.pad: (B,3)
+    gt_root = gt_3D[:, getattr(args, 'pad', 0), 0, :].contiguous()  # (B,3)
+    X_abs = X_bhj3.clone()
+    X_abs[:, :, 1:, :] = X_abs[:, :, 1:, :] + gt_root.unsqueeze(1).unsqueeze(1)
+    X_abs[:, :, 0, :] = gt_root.unsqueeze(1)
+
+    # Vectorized projection for all hypotheses in absolute coordinates
+    # (B,H,J,3) -> (B*H,J,3)
+    X_flat = X_abs.view(B * H, J, 3)
+    cam_rep = cam_b9.repeat_interleave(H, dim=0)  # (B*H,9)
+
+    # project_to_2d expects last dim=3 and cam (N,9)
+    proj2d_flat = project_to_2d(X_flat, cam_rep)  # (B*H,J,2)
+    proj2d_bhj = proj2d_flat.view(B, H, J, 2)
+
+    # Per-hypothesis per-joint 2D error
+    diff = proj2d_bhj - target_2d.unsqueeze(1)    # (B,H,J,2)
+    dist = torch.norm(diff, dim=-1) # (B,H,J)
+
+    # For root joint (0), avoid NaNs in softmax by setting equal distances
+    # This yields uniform weights at the root (we set root to 0 later anyway)
+    dist[:, :, 0] = 0.0
+
+    # Convert 2D losses to weights using softmax over top-k hypotheses per joint
+    tau = float(getattr(args, 'weight_softmax_tau', 1.0))
+    H = dist.size(1)
+    k = int(getattr(args, 'topk', None))
+    # print("k:", k)
+    # k = int(H//2)+1
+    k = max(1, min(k, H))
+
+    # top-k smallest distances along hypothesis dim
+    topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
+    
+    # Weight calculation method
+    weight_method = 'exp'
+    
+    if weight_method == 'softmax':
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+    elif weight_method == 'inverse':
+        eps = 1e-6
+        inv_weights = 1.0 / (topk_vals + eps)
+        topk_weights = inv_weights / inv_weights.sum(dim=1, keepdim=True)
+    elif weight_method == 'exp':
+        temp = args.exp_temp
+        max_safe_val = temp * 20
+        topk_vals_clipped = torch.clamp(topk_vals, max=max_safe_val)
+        exp_vals = torch.exp(-topk_vals_clipped / temp)
+        exp_sum = exp_vals.sum(dim=1, keepdim=True)
+        topk_weights = exp_vals / torch.clamp(exp_sum, min=1e-10)
+        nan_mask = torch.isnan(topk_weights).any(dim=1, keepdim=True)
+        uniform_weights = torch.ones_like(topk_weights) / k
+        topk_weights = torch.where(nan_mask.expand_as(topk_weights), uniform_weights, topk_weights)
+    else:
+        softmax_input = -topk_vals / max(tau, 1e-6)
+        topk_weights = torch.softmax(softmax_input, dim=1)
+
+    # scatter back to full H with zeros elsewhere
+    weights = torch.zeros_like(dist)  # (B,H,J)
+    weights.scatter_(1, topk_idx, topk_weights)
+
+    # Weighted sum of root-relative 3D hypotheses per joint
+    weights_exp = weights.unsqueeze(-1)                     # (B,H,J,1)
+    weighted_bj3 = torch.sum(X_bhj3 * weights_exp, dim=1)   # (B,J,3)
+
+    # Assemble output (B,1,J,3) and enforce root at origin
+    agg = weighted_bj3.unsqueeze(1).to(dtype=dtype)
+    agg[:, :, 0, :] = 0
+    return agg
 
 def show_frame():
   model_FMPose = model['CFM']
@@ -403,8 +516,8 @@ def show_frame():
     output_mgcn = model_mgcn(input_2D_nonflip)
     output_mgcn[:, :, args.root_joint, :] = 0
   
-    mgcn_mpjpe = mpjpe_cal(output_mgcn, out_target) * 1000
-    print("mgcn_mpjpe:", mgcn_mpjpe)
+    # mgcn_mpjpe = mpjpe_cal(output_mgcn, out_target) * 1000
+    # print("mgcn_mpjpe:", mgcn_mpjpe)
     
     if refine:
         # model_refine.eval()
@@ -412,8 +525,8 @@ def show_frame():
         root_pos = refined_output[:, :, 0, :].clone()
         refined_output[:, :, :, :] -= root_pos.unsqueeze(2)
         refined_output[:, :, 0, :] = 0
-        refined_mpjpe = mpjpe_cal(refined_output, out_target) * 1000
-        print("refined_mpjpe:", refined_mpjpe)
+        # refined_mpjpe = mpjpe_cal(refined_output, out_target) * 1000
+        # print("refined_mpjpe:", refined_mpjpe)
         
     # continue
     # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
@@ -466,17 +579,20 @@ def show_frame():
             
             list_hypothesis.append(output_3D_s)
         
-        output_3D_s = aggregate_hypothesis(list_hypothesis)
+        # output_3D_s = aggregate_hypothesis(list_hypothesis)
+        output_fmpose = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
+        
         list_hypothesis_last = list_hypothesis
-        output_3D_s_last = output_3D_s
                 
-    output_fmpose = output_3D_s_last
     output_fmpose[:, :, 0, :] = 0
     
-    fmpose_mpjpe = mpjpe_cal(output_fmpose, out_target) * 1000
-    print("fmpose_mpjpe:", fmpose_mpjpe)
+    fmpose_mpjpe = (mpjpe_cal(output_fmpose, out_target) * 1000).item()
+    mgcn_refined_mpjpe = (mpjpe_cal(refined_output, out_target) * 1000).item()
     
-    continue
+    # print("mgcn_refined_mpjpe:", mgcn_refined_mpjpe)
+    delta = mgcn_refined_mpjpe - fmpose_mpjpe
+    if not (delta > 8 and fmpose_mpjpe < 60):
+      continue    
 
     input_2D_no  = input_2D_no[0, 0].cpu().detach().numpy()
     # pose 打印在image上
@@ -491,7 +607,7 @@ def show_frame():
     elif cam_ind == 3:
       camera_index = '.60457274'
 
-    figsize_x = 6.4*2
+    figsize_x = 6.0*2
     figsize_y = 3.6*2
     dpi_number = 1000
     
@@ -499,14 +615,6 @@ def show_frame():
     path = folder + "/" + str(i_data)
     if not os.path.exists(path):
         os.makedirs(path) 
-    # path_nonflip_PU_svg = path + '/' + "nonflip_PU_svg"
-    # path_nonflip_P = path + '/' + "nonflip_P"
-    # path_nonflip_PU = path + '/' + "nonflip_PU"
-    # # path_mix_z = path + '/' + "mix_z"
-    # path_list = [path_nonflip_P, path_nonflip_PU]
-    # for path1 in path_list:
-    #     if not os.path.exists(path1):
-    #         os.makedirs(path1)
    
     # show images
     out_dir = path + '/' + subject[0] + '_' + action[0] + camera_index + '_'
@@ -515,105 +623,34 @@ def show_frame():
     image = cv2.imread(image_path)
     image = drawskeleton(input_2D_no, image)
     cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
-
-
+    
     # figure
-    fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
-    ax1 = plt.axes(projection = '3d')  
+    fig = plt.figure( figsize=(figsize_x, figsize_y) ) # 1280 * 720
+    color=(0/255, 176/255, 240/255)
+    linewidth=2.5
+    # ax0 = fig.add_subplot(121)
+    # ax0.set_title("GT_2D")
+    # input_2D_GT_np = input_2D_GT[0, 0].cpu().detach().numpy()
+    # show2Dpose( input_2D_GT_np, ax0)
 
-    gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
-    gt_vis[:, :, 0, :] = 0
-    gt_np = gt_vis[0, 0].cpu().detach().numpy()
-    show3Dpose_GT(gt_np, ax1, world=False, linewidth=1.0)
-
-
-    # Overlay: all hypotheses (gray), aggregated (blue), GT (red)
-    if 'list_hypothesis_last' in locals() and 'output_3D_s_last' in locals():
-      print("list_hypothesis_last:", len(list_hypothesis_last))
-      num_h = len(list_hypothesis_last)
-      for idx, hypo in enumerate(list_hypothesis_last):
-        hypo_vis = hypo.clone()
-        hypo_vis[:, :, 0, :] = 0
-        pose_np = hypo_vis[0, 0].cpu().detach().numpy()
-        if num_h > 1:
-          shade = 0.35 + 0.45 * (idx / (num_h - 1))
-        else:
-          shade = 0.6
-        show3Dpose(pose_np, ax1, color=(shade, shade, shade), world=False, linewidth=1.2)
-
-      agg_vis = output_3D_s_last.clone()
-      agg_vis[:, :, 0, :] = 0
-      agg_np = agg_vis[0, 0].cpu().detach().numpy()
-      show3Dpose(agg_np, ax1, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
-
-      overlay_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_overlay.png')
-      plt.savefig(overlay_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-
-      # Create 360-degree rotation animation
-      rotation_frames_dir = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_rotation_frames')
-      os.makedirs(rotation_frames_dir, exist_ok=True)
-      
-      num_frames = 36  # 36 frames for 360 degrees (10 degrees per frame)
-      for frame_idx in range(num_frames):
-        angle = frame_idx * 10  # 10 degrees per frame
-        
-        fig_rot = plt.figure(figsize=(figsize_x, figsize_y))
-        ax_rot = plt.axes(projection='3d')
-        
-        # Plot all hypotheses
-        # for idx, hypo in enumerate(list_hypothesis_last):
-        #   hypo_vis = hypo.clone()
-        #   hypo_vis[:, :, 0, :] = 0
-        #   pose_np = hypo_vis[0, 0].cpu().detach().numpy()
-        #   if num_h > 1:
-        #     shade = 0.35 + 0.45 * (idx / (num_h - 1))
-        #   else:
-        #     shade = 0.6
-        #   show3Dpose(pose_np, ax_rot, color=(shade, shade, shade), world=False, linewidth=1.2)
-        
-        # Plot aggregated pose
-        agg_vis = output_3D_s_last.clone()
-        agg_vis[:, :, 0, :] = 0
-        agg_np = agg_vis[0, 0].cpu().detach().numpy()
-        show3Dpose(agg_np, ax_rot, color=(0/255, 176/255, 240/255), world=False, linewidth=1.2)
-        
-        # Plot GT
-        gt_vis = gt_3D[:, args.pad].unsqueeze(1).clone()
-        gt_vis[:, :, 0, :] = 0
-        gt_np = gt_vis[0, 0].cpu().detach().numpy()
-        show3Dpose_GT(gt_np, ax_rot, world=False, linewidth=1.0)
-        
-        # Keep the original 3D coordinate system for rotation visualization
-        
-        # Set the viewing angle
-        ax_rot.view_init(elev=15, azim=angle)
-        
-        # Save frame
-        frame_path = os.path.join(rotation_frames_dir, f'frame_{frame_idx:03d}.png')
-        plt.savefig(frame_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
-        plt.close(fig_rot)
-      
-      print(f"Saved {num_frames} rotation frames to {rotation_frames_dir}")
-      
-      # Create GIF from rotation frames
-      gif_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_rotation_360.gif')
-      frames_for_gif = []
-      for frame_idx in range(num_frames):
-        frame_path = os.path.join(rotation_frames_dir, f'frame_{frame_idx:03d}.png')
-        frames_for_gif.append(imageio.imread(frame_path))
-      imageio.mimsave(gif_path, frames_for_gif, 'GIF', duration=0.1)  # 0.1s per frame
-      print(f"Created 360-degree rotation GIF: {gif_path}")
+    gt_np = out_target[0, 0].cpu().detach().numpy()
     
-    # _ = save3Dpose(i_data, gt_3D.clone(), out_target, ax1, (0.99, 0, 0), path_nonflip_P, action[0], dpi_number=dpi_number)
-    
+    ax1 = fig.add_subplot(121, projection='3d')
+          # Plot GT in red
+    show3Dpose_GT(gt_np, ax1, world=False, linewidth=linewidth)
+    # ax1.set_title("GT_3D")
+    mgcn_refined_np = refined_output[0, 0].cpu().detach().numpy()
+    show3Dpose( mgcn_refined_np, ax1, color, world = False, linewidth=linewidth)
 
-    # # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(i_data)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_P, duration=0.3)
-    # # create_gif(path_mix_z + '/' + action[0] +"_idx" + str(i)+ "_iter" + str(iter_num) + '.gif', folder_path=path_mix_z, duration=0.25)
-    # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(index_image)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_PU, duration=0.3)
-        
-    plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
+    ax2 = fig.add_subplot(122, projection='3d')
+    # ax2.set_title("Output_3D")
+    fmpose_np = output_fmpose[0, 0].cpu().detach().numpy()
+    show3Dpose_GT(gt_np, ax2, world=False, linewidth=linewidth)
+    show3Dpose(fmpose_np, ax2, color, world = False, linewidth=linewidth)
+    plt.savefig(f'{out_dir}{index_image}_delta_{delta:.2f}_{fmpose_mpjpe:.2f}_FMPose.png', dpi=dpi_number, format='png', bbox_inches = 'tight')
+    plt.clf ()
     plt.close () 
- 
+
 if __name__ == "__main__":
   # Delete_Files('results/')
   manualSeed = 1
