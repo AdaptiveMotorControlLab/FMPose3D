@@ -8,7 +8,8 @@ from tqdm import tqdm
 import torch.optim as optim
 from common.arguments import opts as parse_args
 from common.utils import *
-from common.animal3d_dataset import TrainDataset, EvaluationDataset
+from common.load_data_rat7m import Rat7MFusion
+from common.rat7m_dataset_ti import Rat7MDataset
 import time
 
 args = parse_args().parse()
@@ -229,24 +230,27 @@ if __name__ == '__main__':
     
     # All Rat7M dataset configurations (n_joints, joints_left, joints_right, etc.) 
     # are set in arguments.py based on --dataset rat7m parameter
-    
-    
-    dataset_path = '/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/animal3d/'
-    train_path = os.path.join(dataset_path, 'train_data.json')
-    test_path = os.path.join(dataset_path, 'test_data.json')
 
+    dataset = Rat7MDataset(dataset_path, args)
+    
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
-
+    
+    # Verify dataset configuration
+    print(f"Dataset: {args.dataset}")
+    print(f"Train subjects: {dataset.train_list}")
+    print(f"Test subjects: {dataset.test_list}")
+    print(f"Train views: {args.train_views}")
+    print(f"Test views: {args.test_views}")
 
     if args.train:
-        train_data = TrainDataset(is_train=True, json_file=train_path)
+        train_data = Rat7MFusion(opt=args, train=True, dataset=dataset, root_path=root_path)
         train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
                                                        shuffle=True, num_workers=int(args.workers), pin_memory=True)
     if args.test:
-        test_data = EvaluationDataset(is_train = False, json_file=test_path)
-        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.test_batch_size,
-                                                      shuffle=False, num_workers=int(args.workers), pin_memory=True)    
+        test_data = Rat7MFusion(opt=args, train=False, dataset=dataset, root_path=root_path)
+        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
+                                                      shuffle=False, num_workers=int(args.workers), pin_memory=True)
 
     model = {}
     model['CFM'] = CFM(args).cuda()
