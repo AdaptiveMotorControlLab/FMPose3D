@@ -8,22 +8,22 @@ epochs=100
 
 # Multi-hypothesis parameters
 weight_softmax_tau=1.0
-num_hypothesis_list=1
+num_hypothesis_list=10
 topk=5
 mode="exp"
 exp_temp=0.005
-sh_file=FM_test_3dhp_reproduce.sh
+sh_file=FM_test_3dhp_multi_hypo_reproduce.sh
 # all
 # subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
 # GS
 # subjects_test=TS1,TS2
 # no GS
-# subjects_test=TS3,TS4
-# Outdoor
-subjects_test=TS5,TS6
+subjects_test=TS3,TS4
+# # Outdoor
+# subjects_test=TS5,TS6
 
 # Generate folder name with timestamp
-folder_name=s_${eval_sample_steps}_Top${topk}_${mode}_temp${exp_temp}_S${subjects_test}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
+folder_name=MultiHypo_s_${eval_sample_steps}_Top${topk}_${mode}_temp${exp_temp}_S${subjects_test}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
 
 # Model paths - 49.72
 saved_model_path='./pretrained_models/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
