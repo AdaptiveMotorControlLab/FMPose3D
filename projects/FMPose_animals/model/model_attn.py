@@ -139,8 +139,7 @@ class FMPose(nn.Module):
 
         self.norm_mu = norm_layer(embed_dim)
         
-        # Learnable positional embedding for joints
-        n_joints = 26
+        # Learnable positional embedding for joints (use n_joints from args)
         self.pos_embed = nn.Parameter(torch.zeros(1, n_joints, embed_dim))
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
 
