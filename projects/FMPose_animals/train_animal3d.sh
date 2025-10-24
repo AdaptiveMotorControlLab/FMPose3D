@@ -9,7 +9,7 @@ gpu_id=0
 eval_sample_steps=3
 num_saved_models=3
 frames=1
-large_decay_epoch=20
+large_decay_epoch=25
 lr_decay_large=0.75
 n_joints=26
 out_joints=26
@@ -18,7 +18,7 @@ epochs=800
 model_path='model/model_attn.py'
 
 # root path denotes the path to the original dataset
-root_path="/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/animal3d/"
+root_path="/home/xiaohang/Ti_workspace/projects/FMPose_animals/dataset/"
 folder_name="Rat7M_data_GCN_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
 sh_file='train_animal3d.sh'
 

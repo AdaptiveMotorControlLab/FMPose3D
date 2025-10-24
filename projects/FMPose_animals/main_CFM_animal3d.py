@@ -241,24 +241,28 @@ if __name__ == '__main__':
     root_path = args.root_path
     dataset_path = root_path  # Directly use root_path for Rat7M
     
+    animal3d_dataset_path = os.path.join(root_path, 'animal3d')
+    contrl_dataset_path = os.path.join(root_path, 'control_animal3dlatest')
     # All Rat7M dataset configurations (n_joints, joints_left, joints_right, etc.) 
     # are set in arguments.py based on --dataset rat7m parameter
     
     
-    train_path = os.path.join(dataset_path, 'train.json')
-    test_path = os.path.join(dataset_path, 'test.json')
+    train_paths = [os.path.join(animal3d_dataset_path, 'train.json'), os.path.join(contrl_dataset_path, 'train.json')]
+    test_paths = [os.path.join(animal3d_dataset_path, 'test.json'), os.path.join(contrl_dataset_path, 'test.json')]
 
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
 
 
     if args.train:
-        train_data = TrainDataset(is_train=True, json_file=train_path)
-        train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
+        train_datasets = [TrainDataset(is_train=True, json_file=p) for p in train_paths]
+        train_dataset = torch.utils.data.ConcatDataset(train_datasets)
+        train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                                        shuffle=True, num_workers=int(args.workers), pin_memory=True)
     if args.test:
-        test_data = TrainDataset(is_train= False, json_file=train_path)
-        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
+        test_datasets = [TrainDataset(is_train=False, json_file=p) for p in test_paths]
+        test_dataset = torch.utils.data.ConcatDataset(test_datasets)
+        test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size,
                                                       shuffle=False, num_workers=int(args.workers), pin_memory=True)    
 
     model = {}
