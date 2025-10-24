@@ -51,21 +51,6 @@ if args.reload:
     model['CFM'].load_state_dict(model_dict)
     print("Load model Successfully!")
 
-def getFiles(path):
-    image_files = []
-    path_list = os.listdir(path)
-    path_list.sort()
-    for item in path_list:
-        if item.startswith('.') and os.path.isfile(os.path.join(path, item)):
-            path_list.remove(item)
-    for file in path_list:
-        image_files.append(os.path.join(path, file))
-    return image_files
-
-def Delete_Files(path = 'images'):
-  file_name = getFiles(path)
-  for remove_file in file_name:
-    os.remove(remove_file)
 
 def drawskeleton(kps, img, thickness=3, mpii=2):
     # colors = [(255, 128, 255), # 躯干
@@ -216,7 +201,7 @@ def show3Dpose(channels, ax, color, world = True, linewidth = 2.5): # blue, oran
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
     ax.invert_zaxis()
 
-def show2Dpose(channels, ax): # blue, orange
+def show2Dpose(channels, ax, color): # blue, orange
   vals = np.reshape( channels, (17, 2) )
   # vals = np.reshape( channels, (16, 2))
   # human3.6m
@@ -232,8 +217,8 @@ def show2Dpose(channels, ax): # blue, orange
     # ax.text(x[0] - 0.12, y[0], joints_name[I[i]], size = 9)
     # ax.text(x[1] - 0.12 , y[1], joints_name[J[i]], size = 9)
 
-    ax.plot(x, y, lw=1) # lw=2
-    ax.scatter(x, y,s=5) # s 默认是20
+    ax.plot(x, y, lw=4, color=color) # lw=2
+    ax.scatter(x, y, s=5, color=color) # s 默认是20
     ax.set_aspect('equal') # 正常的人体比例
 
   # ax.invert_xaxis()
@@ -243,6 +228,8 @@ def show2Dpose(channels, ax): # blue, orange
   ax.set_yticks([]) 
   white = (1.0, 1.0, 1.0, 0.0)
   plt.axis('off')
+  
+
 
 def save3Dpose(index, pose3D, out_target, ax, color, save_path, action, dpi_number):
 
@@ -567,13 +554,13 @@ def show_frame():
     image = drawskeleton(input_2D_no, image)
     cv2.imwrite(out_dir + str(i_data) + '_2d.jpg', image)
 
-
     # figure - Plot 2D Pose
     fig1  = plt.figure(num=1, figsize=(figsize_x, figsize_y) ) # 1280 * 720
     ax1 = plt.axes()  # 2D axes
 
     input_2D_GT_np = input_2D_GT[0, 0].cpu().detach().numpy()  # (17, 2)
-    show2Dpose(input_2D_GT_np, ax1)
+    color = (0/255, 176/255, 240/255)
+    show2Dpose(input_2D_GT_np, ax1, color)
     
     # Save 2D pose figure
     pose_2d_path = os.path.join(path, action[0] + '_idx_' + str(i_data) + '_2d_pose.jpg')
