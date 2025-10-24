@@ -622,11 +622,11 @@ def show_frame():
         str(camera_index) + '/' + str(('%04d'%index_image)) + '.jpg'
     image = cv2.imread(image_path)
     image = drawskeleton(input_2D_no, image)
-    cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
+    cv2.imwrite(out_dir + str(i_data) + '_2d.jpg', image)
     
     # figure
     fig = plt.figure( figsize=(figsize_x, figsize_y) ) # 1280 * 720
-    fig.subplots_adjust(wspace=-0.1)  # Reduce horizontal spacing between subplots
+    fig.subplots_adjust(wspace=-0.05)  # Reduce horizontal spacing between subplots
     color=(0/255, 176/255, 240/255)
     linewidth=2.5
     # ax0 = fig.add_subplot(121)
