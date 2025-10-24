@@ -177,5 +177,14 @@ class opts():
             self.opt.joints_left = [8, 10, 11, 17, 18]  # HipL, ElbowL, ArmL, KneeL, ShinL
             self.opt.joints_right = [9, 14, 15, 16, 19]  # HipR, ElbowR, ArmR, KneeR, ShinR
             self.opt.root_joint = 4
+        elif self.opt.dataset == 'animal3d':
+            # Animal3D dataset configuration
+            self.opt.n_joints = 26
+            self.opt.out_joints = 26
+            # Root joint: Body_Center (index 12) is a stable center point
+            # Alternative: Hip_Center (index 13)
+            self.opt.root_joint = 12  # Body_Center - most stable central point
+            self.opt.joints_left = [8, 9, 10, 11, 17, 18, 19, 2]  # Left_Paw, Wrist, Elbow, Shoulder, Foot, Ankle, Knee, Left_Ear
+            self.opt.joints_right = [4, 5, 6, 7, 14, 15, 16, 1]  # Right_Paw, Wrist, Elbow, Shoulder, Foot, Ankle, Knee, Right_Ear
                 
         return self.opt
