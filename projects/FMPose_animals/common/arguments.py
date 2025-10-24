@@ -197,6 +197,6 @@ class opts():
             # Alternative: Hip_Center (index 13)
             self.opt.root_joint = 7  # Body_Center - most stable central point -- use tail_base here 
             self.opt.joints_left = [0, 3, 5, 8, 10, 12, 14, 16, 20, 22]  
-            self.opt.joints_right = [1, 4, 6, 9, 11, 13, 15, 17, 21, 23]  # Right_Paw, Wrist, Elbow, Shoulder, Foot, Ankle, Knee, Right_Ear
+            self.opt.joints_right = [1, 4, 6, 9, 11, 13, 15, 17, 21, 23] 
                 
         return self.opt
