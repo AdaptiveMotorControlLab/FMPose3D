@@ -2,18 +2,18 @@
 # Train Rat7M with default split: train=['s1d1'], test=['s5d1']
 # Model: model/model_attn.py (Conditional Flow Matching with Attention)
 
-layers=5
+layers=4
 batch_size=32
 lr=1e-3
 gpu_id=0
 eval_sample_steps=3
 num_saved_models=3
 frames=1
-large_decay_epoch=25
-lr_decay_large=0.75
+large_decay_epoch=15
+lr_decay_large=0.7
 n_joints=26
 out_joints=26
-epochs=800
+epochs=400
 # model_path='model/model_G_P_Attn_rat.py'
 model_path='model/model_attn.py'
 

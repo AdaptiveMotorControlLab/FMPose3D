@@ -30,7 +30,10 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, item):
         data = self.data['data'][item]
-        keypoint_2d = np.array(data['keypoint_2d'], dtype=np.float32)
+        if data['reproj_kp_2d'] is not None:
+            keypoint_2d = np.array(data['reproj_kp_2d'], dtype=np.float32)
+        else:
+            keypoint_2d = np.array(data['keypoint_2d'], dtype=np.float32)
         # normalize 2D keypoints
         hight = np.array(data['height'])
         width = np.array(data['width'])
