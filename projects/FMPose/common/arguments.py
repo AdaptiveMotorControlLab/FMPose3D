@@ -94,6 +94,8 @@ class opts():
         # allow multiple hypothesis counts, e.g. --num_hypothesis_list 1 3 5 7 9
         self.parser.add_argument('--num_hypothesis_list', type=str, default='1')
         self.parser.add_argument('--hypothesis_num', type=int, default=1)
+        # Classifier-Free Guidance scale (1.0 = no guidance, >1.0 = stronger conditioning)
+        self.parser.add_argument('--guidance_scale', type=float, default=1.0)
         # number of best checkpoints to keep
         self.parser.add_argument('--num_saved_models', type=int, default=3)
         self.parser.add_argument('--sh_file', type=str, default='')
