@@ -188,6 +188,11 @@ class opts():
             16: 'left_back_knee', 17: 'right_back_knee',18: 'neck', 19: 'tail_end',
             20: 'left_ear', 21: 'right_ear', 22: 'left_mouth', 23: 'right_mouth',
             24: 'nose', 25: 'tail_mid']
+            
+            skeleton pairs:
+                pairs = [0, 24,  1, 24,  2, 24,  3, 14,  4, 15,  5, 16,  6, 17,  7, 18,  8, 12,  9, 13,  10, 7,  11, 7,
+                12, 18,  13, 18,  14, 8,  15, 9,  16, 10,  17, 11,  18, 24,  19, 25,  20, 0,  21, 1,  22, 24,
+                23, 24,  25, 7]
 
             '''
 
