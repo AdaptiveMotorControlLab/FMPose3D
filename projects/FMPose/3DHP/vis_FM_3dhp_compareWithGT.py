@@ -8,23 +8,17 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt 
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.gridspec as gridspec
 from IPython import embed
 import os
-import shutil
 import h5py
-import glob
 import cv2
 import torch
 from tqdm import tqdm
-# from common.vis.load_data_3dhp_vis import Fusion_3dhp
 from common.vis.load_data_3dhp_vis import Fusion_3dhp
 from common.dataset.mpi_inf_3dhp_dataset import Mpi_inf_3dhp_Dataset
 from common.arguments import parse_args
 from common.utils import *
 import common.eval_cal as eval_cal
-from model.utils.post_refine import post_refine
 
 import matplotlib
 import matplotlib.pyplot as plot
@@ -79,7 +73,7 @@ args.dataset = '3dhp_valid'
 args.keypoints = 'gt_17_univ'
 args.root_path = './dataset/'
 args.subjects_train = 'S1,S2,S3,S4,S5,S6,S7,S8' 
-# args.subjects_test = 'TS1,TS2,TS3,TS4,TS5,TS6'
+args.subjects_test = args.subjects_test
 
 def getFiles(path):
     image_files = []
@@ -409,190 +403,198 @@ def show_input(img, ax):
     plt.axis('off')
 
 def show_frame():
-  dataset, dataloader = Load_3DHP()
-  model_FMPose = model['CFM']
-  model_FMPose.eval()
-  
-  import time
-  logtime = time.strftime('%y%m%d_%H%M_%S')
-  args.create_time = logtime
+    dataset, dataloader = Load_3DHP()
+    model_FMPose = model['CFM']
+    model_FMPose.eval()
+    
+    import time
+    logtime = time.strftime('%y%m%d_%H%M_%S')
+    args.create_time = logtime
 
-  args.filename = 'nonflip2D_' + args.create_time
-  # create backup folder
-  if args.create_file:
-    if args.debug:
-        folder = './debug/' + logtime + "_vis"
+    if args.folder_name != '':
+        folder_name = args.folder_name
     else:
-        folder = './test/' + logtime + "_vis"
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-    # backup python file
-    import shutil
-    file_name = os.path.basename(__file__)
-    shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
-    shutil.copyfile(src="test_3dhp.sh", dst = os.path.join(folder, args.create_time + "_test_3dhp.sh"))
-  
-  figsize_x = 6.4*2
-  figsize_y = 3.6*2
-  dpi_number = 1000
-  
-  eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
-  
-  for i_data, data in enumerate(tqdm(dataloader, 0)):
-    batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
-
-    # print(action, subject, cam_ind, index)
-    index_image = index + args.pad + 1
-    index_image = index_image.item()
-
-    ## valid
-    base_dir = '/data3/xiu/datasets/mpi_inf_3dhp_test_set'
-    anno_path = os.path.join(base_dir, subject[0], 'annot_data.mat')
-    mat_as_h5 = h5py.File(anno_path, 'r')
-    valid = np.array(mat_as_h5['valid_frame']).astype('bool')
-
-    valid_sum = []
-    for i, value in enumerate(valid):
-      valid_sum.append(sum(valid[:i+1]))
-    index_image = valid_sum.index(index_image)
-    
-    # if index_image != 453:
-    #    continue
-
-    if subject[0] == 'TS6':
-      batch_cam = torch.tensor([ 1.7421e+00,  1.7372e+00, -2.2164e-02,  2.0153e-02, -3.5696e-02,
-         1.7747e-01,  2.5115e-01,  1.1674e-03,  8.4259e-03], requires_grad=False)
-    if subject[0] == 'TS1':
-      batch_cam = torch.tensor([ 1.4969e+00,  1.6551e+00, -4.7996e-03,  2.9757e-02, -1.0288e-01,
-         1.6693e-01,  2.6289e-01, -1.4845e-03, -3.8559e-03], requires_grad=False)
-    if subject[0] == 'TS5':
-      batch_cam = torch.tensor([ 1.8332e+00,  1.8096e+00, -1.2404e-02,  1.0143e-02,  6.8727e-02,
-        -1.6290e-03, -1.8267e-01,  2.0062e-02, -6.6486e-03], requires_grad=False)
-      
-
-    [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
-    batch_cam = batch_cam.unsqueeze(0)
-
-    input_2D_GT = input_2D_GT[:, 0, args.pad].unsqueeze(1)
-    input_2D_no = input_2D_no[:, 0, args.pad].unsqueeze(1)
-  
-    input_2D_nonflip = input_2D_GT
-    out_target = gt_3D.clone() # B F J 3
-    out_target[:, :, args.root_joint] = 0
-    
-    # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
-    def euler_sample(x2d, y_local, steps, model_3d):
-        list_v_s = []
-        dt = 1.0 / steps
-        for s in range(steps):
-            t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
-            v_s = model_3d(x2d, y_local, t_s)
-            y_local = y_local + dt * v_s
-            list_v_s.append(v_s)
-        return y_local, list_v_s
-    
-    for s_keep in eval_steps:
-        list_hypothesis = []
-        for i in range(args.hypothesis_num):
-            
-            y = torch.randn_like(gt_3D)
-            
-            y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
-            
-            if args.test_augmentation:
-                joints_left = [4, 5, 6, 11, 12, 13]
-                joints_right = [1, 2, 3, 14, 15, 16]
-                
-                y_flip = torch.randn_like(gt_3D)
-                y_flip[:, :, :, 0] *= -1
-                y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
-                y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
-                y_flip_s[:, :, :, 0] *= -1
-                y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
-                y_s = (y_s + y_flip_s) / 2
-            
-            # per-step metrics only; do not store per-sample outputs
-            output_3D_s = y_s[:, args.pad].unsqueeze(1)
-            output_3D_s[:, :, 0, :] = 0
-            
-            list_hypothesis.append(output_3D_s)
+        folder_name = logtime
         
-        # output_3D_s = aggregate_hypothesis(list_hypothesis)
-        output_fmpose = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
-                
-    output_fmpose[:, :, 0, :] = 0
+    # create backup folder
+    if args.create_file:
+        if args.debug:
+            folder = './debug/' + folder_name + "_vis"
+        else:
+            folder = './test/' + folder_name + "_vis"
+
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        # backup python file
+        import shutil
+        file_name = os.path.basename(__file__)
+        shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
+        shutil.copyfile(src="vis_3dhp.sh", dst = os.path.join(folder, args.create_time + "_vis_3dhp.sh"))
     
-    # For comparison, also compute initial prediction (first hypothesis)
-
-    output_3D = output_fmpose.clone()
-    error_0_P = mpjpe_cal(output_3D, out_target) * 1000
-    
-
-
-    delta_P = ((error_0_P)).item()
-
-    # 根据P+U loss的机理, 筛选不合格的可视化样例
-    # if delta_P < 10:
-        # continue
-    # print(delta_P)
-    # break
-    # input_2D = input_2D[:, 0]
-    # output_3D[:, :, args.root_joint] = 0 
-    # output_3D_optimized[:, :, args.root_joint] = 0 
-    # error_1 = mpjpe_cal(output_3D, out_target) * 1000
-    # error_2 = mpjpe_cal(output_3D_optimized, out_target) * 1000
-
-    input_2D_no = input_2D_no[0, 0].cpu().detach().numpy()
-    vis_gt = out_target.clone()
-    vis_gt = vis_gt[0, 0].cpu().detach().numpy()
-    output_3D = output_3D[0, 0].cpu().detach().numpy()
-
-    path = folder + "/" + str(i_data)
-    path_nonflip = path + "/nonflip" 
-    path_list = [path_nonflip, path]
-    for path1 in path_list:
-        if not os.path.exists(path1):
-            os.makedirs(path1)
-
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    # image_dir = '/data0/liwh/MPI_INF_3DHP/video/mpi_inf_3dhp_test_set'
-    image_dir = '/data3/xiu/datasets/mpi_inf_3dhp_test_set'
-    # out_dir = 'results_3DHP/' + subject[0] + '_'
-    out_dir = path + '/' + subject[0] + '_'
-
-    image_path = image_dir + '/' + str(subject[0]) + '/imageSequence/img_' + str(('%06d'%index_image)) + '.jpg'
-    print(image_path)
-
-    if subject[0] == 'TS5' or subject[0] == 'TS6':
-        scale = 1
-    else:
-        scale = 2
-
-    image = cv2.imread(image_path)
-    image = drawskeleton(input_2D_no, image, scale)
-    cv2.imwrite(out_dir + str(('%06d'%index_image)) + '.png', image)
-
-    # figure~ show 3D pose
     figsize_x = 6.4*2
     figsize_y = 3.6*2
     dpi_number = 1000
+    
+    eval_steps = sorted({int(s) for s in getattr(args, 'eval_sample_steps', '3').split(',') if str(s).strip()})
+    
+    for i_data, data in enumerate(tqdm(dataloader, 0)):
+        batch_cam, gt_3D, input_2D, input_2D_GT, input_2D_no, action, subject, cam_ind, index = data
 
-    fig  = plt.figure(figsize=(figsize_x, figsize_y) ) # 1280 * 720
-    fig.subplots_adjust(wspace=-0.05, hspace=0)
+        # print(action, subject, cam_ind, index)
+        index_image = index + args.pad + 1
+        index_image = index_image.item()
 
-    ax1 = fig.add_subplot(111, projection='3d')
-    color=(0/255, 176/255, 240/255)
-    linewidth=2.5
-    show3Dpose_GT(vis_gt, ax1, world = False, linewidth=linewidth)
-    show3Dpose(output_3D, ax1, color, world = False, linewidth=linewidth)
+        ## valid
+        base_dir = '/media/ti/datasets/mpi_inf_3dhp/mpi_inf_3dhp_test_set'
+        # base_dir = '/data3/xiu/datasets/mpi_inf_3dhp_test_set'
+        anno_path = os.path.join(base_dir, subject[0], 'annot_data.mat')
+        mat_as_h5 = h5py.File(anno_path, 'r')
+        valid = np.array(mat_as_h5['valid_frame']).astype('bool')
 
-    plt.savefig(path_nonflip + str(index_image) + '_Error_' + "{:.2f}".format(error_0_P.item()) + '.png', dpi=dpi_number, format='png', bbox_inches = 'tight')
+        if index_image %5!=0:
+            continue
+        
+        
+        valid_sum = []
+        for i, value in enumerate(valid):
+            valid_sum.append(sum(valid[:i+1]))
+        index_image = valid_sum.index(index_image)
+        
+        # if index_image != 453:
+        #    continue
 
-    plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
-    plt.close () #完全关闭图形窗口
+        if subject[0] == 'TS6':
+            batch_cam = torch.tensor([ 1.7421e+00,  1.7372e+00, -2.2164e-02,  2.0153e-02, -3.5696e-02,
+            1.7747e-01,  2.5115e-01,  1.1674e-03,  8.4259e-03], requires_grad=False)
+        if subject[0] == 'TS1':
+            batch_cam = torch.tensor([ 1.4969e+00,  1.6551e+00, -4.7996e-03,  2.9757e-02, -1.0288e-01,
+            1.6693e-01,  2.6289e-01, -1.4845e-03, -3.8559e-03], requires_grad=False)
+        if subject[0] == 'TS5':
+            batch_cam = torch.tensor([ 1.8332e+00,  1.8096e+00, -1.2404e-02,  1.0143e-02,  6.8727e-02,
+            -1.6290e-03, -1.8267e-01,  2.0062e-02, -6.6486e-03], requires_grad=False)
+        
+
+        [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam] = get_varialbe('test', [input_2D, input_2D_GT, input_2D_no, gt_3D, batch_cam])
+        batch_cam = batch_cam.unsqueeze(0)
+
+        input_2D_GT = input_2D_GT[:, 0, args.pad].unsqueeze(1)
+        input_2D_no = input_2D_no[:, 0, args.pad].unsqueeze(1)
+    
+        input_2D_nonflip = input_2D[:, 0]
+        input_2D_flip = input_2D[:, 1]
+        out_target = gt_3D.clone() # B F J 3
+        out_target[:, :, args.root_joint] = 0
+        
+        # Simple Euler sampler for CFM at test time (independent runs per step if eval_multi_steps)
+        def euler_sample(x2d, y_local, steps, model_3d):
+            list_v_s = []
+            dt = 1.0 / steps
+            for s in range(steps):
+                t_s = torch.full((gt_3D.size(0), 1, 1, 1), s * dt, device=gt_3D.device, dtype=gt_3D.dtype)
+                v_s = model_3d(x2d, y_local, t_s)
+                y_local = y_local + dt * v_s
+                list_v_s.append(v_s)
+            return y_local, list_v_s
+        
+        for s_keep in eval_steps:
+            list_hypothesis = []
+            for i in range(args.hypothesis_num):
+                
+                y = torch.randn_like(gt_3D)
+                
+                y_s, list_v_s = euler_sample(input_2D_nonflip, y, s_keep, model_FMPose)
+                
+                if args.test_augmentation:
+                    joints_left = [4, 5, 6, 11, 12, 13]
+                    joints_right = [1, 2, 3, 14, 15, 16]
+                    
+                    y_flip = torch.randn_like(gt_3D)
+                    y_flip[:, :, :, 0] *= -1
+                    y_flip[:, :, joints_left + joints_right, :] = y_flip[:, :, joints_right + joints_left, :] 
+                    y_flip_s, list_v_s_flip = euler_sample(input_2D_flip, y_flip, s_keep, model_FMPose)
+                    y_flip_s[:, :, :, 0] *= -1
+                    y_flip_s[:, :, joints_left + joints_right, :] = y_flip_s[:, :, joints_right + joints_left, :]
+                    y_s = (y_s + y_flip_s) / 2
+                
+                # per-step metrics only; do not store per-sample outputs
+                output_3D_s = y_s[:, args.pad].unsqueeze(1)
+                output_3D_s[:, :, 0, :] = 0
+                
+                list_hypothesis.append(output_3D_s)
+            
+            # output_3D_s = aggregate_hypothesis(list_hypothesis)
+            output_fmpose = aggregate_hypothesis_camera_weight(list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk)
+                    
+        output_fmpose[:, :, 0, :] = 0
+        
+        # For comparison, also compute initial prediction (first hypothesis)
+
+        output_3D = output_fmpose.clone()
+        error_0_P = mpjpe_cal(output_3D, out_target) * 1000
+        
+
+
+        delta_P = ((error_0_P)).item()
+
+        if delta_P > 65:
+            continue
+        # print(delta_P)
+        # break
+        # input_2D = input_2D[:, 0]
+        # output_3D[:, :, args.root_joint] = 0 
+        # output_3D_optimized[:, :, args.root_joint] = 0 
+        # error_1 = mpjpe_cal(output_3D, out_target) * 1000
+        # error_2 = mpjpe_cal(output_3D_optimized, out_target) * 1000
+
+        input_2D_no = input_2D_no[0, 0].cpu().detach().numpy()
+        vis_gt = out_target.clone()
+        vis_gt = vis_gt[0, 0].cpu().detach().numpy()
+        output_3D = output_3D[0, 0].cpu().detach().numpy()
+
+        path = folder + "/" + str(i_data)
+        path_list = [path]
+        for path1 in path_list:
+            if not os.path.exists(path1):
+                os.makedirs(path1)
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        # image_dir = '/data0/liwh/MPI_INF_3DHP/video/mpi_inf_3dhp_test_set'
+        image_dir = '/media/ti/datasets/mpi_inf_3dhp/mpi_inf_3dhp_test_set'
+        # out_dir = 'results_3DHP/' + subject[0] + '_'
+        out_dir = path + '/' + subject[0] + '_'
+
+        image_path = image_dir + '/' + str(subject[0]) + '/imageSequence/img_' + str(('%06d'%index_image)) + '.jpg'
+        print(image_path)
+
+        if subject[0] == 'TS5' or subject[0] == 'TS6':
+            scale = 1
+        else:
+            scale = 2
+
+        image = cv2.imread(image_path)
+        image = drawskeleton(input_2D_no, image, scale)
+        cv2.imwrite(out_dir + str(('%06d'%index_image)) + '.jpg', image)
+
+        # figure~ show 3D pose
+        figsize_x = 6.4*2
+        figsize_y = 3.6*2
+        dpi_number = 1000
+
+        fig  = plt.figure(figsize=(figsize_x, figsize_y) ) # 1280 * 720
+        fig.subplots_adjust(wspace=-0.05, hspace=0)
+
+        ax1 = fig.add_subplot(111, projection='3d')
+        color=(0/255, 176/255, 240/255)
+        linewidth=2.5
+        show3Dpose_GT(vis_gt, ax1, world = False, linewidth=linewidth)
+        show3Dpose(output_3D, ax1, color, world = False, linewidth=linewidth)
+
+        plt.savefig(path + '/' + str(('%06d'%index_image)) + '_Error_' + "{:.2f}".format(error_0_P.item()) + '.jpg', dpi=dpi_number, format='jpg', bbox_inches = 'tight')
+
+        plt.clf () #
+        plt.close () #
 
 if __name__ == "__main__":
   # Delete_Files('results_3d/')
