@@ -233,7 +233,7 @@ def test_fps():
     
     # Actual FPS testing
     print("Starting FPS measurement...")
-    num_test_samples = 200  # Test on 200 samples for reliable statistics
+    num_test_samples = 500  # Test on 500 samples for reliable statistics
     inference_times = []
     
     with torch.no_grad():
