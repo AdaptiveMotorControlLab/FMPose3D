@@ -10,22 +10,22 @@ eval_sample_steps=3
 num_saved_models=3
 frames=1
 large_decay_epoch=15
-lr_decay_large=0.75
+lr_decay_large=0.7
 n_joints=26
 out_joints=26
 epochs=400
 # model_path='model/model_G_P_Attn_rat.py'
 model_path='model/model_attn.py'
+saved_model_path="./checkpoint/animal3d_data_GCN_L4_lr1e-3_B32_20251107_170150/CFM_190_16086_best.pth"
 
 # root path denotes the path to the original dataset
 root_path="./dataset/"
 folder_name="animal3d_data_GCN_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
-sh_file='train_animal3d_ti.sh'
+sh_file='test_animal3d_ti.sh'
 
 python main_CFM_animal3d_ti.py \
   --root_path ${root_path} \
   --dataset animal3d \
-  --train \
   --test 1 \
   --batch_size ${batch_size} \
   --lr ${lr} \
@@ -39,6 +39,7 @@ python main_CFM_animal3d_ti.py \
   --nepoch ${epochs} \
   --large_decay_epoch ${large_decay_epoch} \
   --lr_decay_large ${lr_decay_large} \
-  # --saved_model_path ${saved_model_path} \
+  --saved_model_path ${saved_model_path} \
+  --reload 
   # --n_joints ${n_joints} \
   # --out_joints ${out_joints} 

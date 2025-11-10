@@ -251,7 +251,9 @@ if __name__ == '__main__':
     
     
     train_paths = [os.path.join(animal3d_dataset_path, 'train.json'), os.path.join(contrl_dataset_path, 'train.json')]
-    test_paths = [os.path.join(animal3d_dataset_path, 'test.json'), os.path.join(contrl_dataset_path, 'test.json')]
+    # test_paths = [os.path.join(animal3d_dataset_path, 'test.json'), os.path.join(contrl_dataset_path, 'test.json')]
+    test_paths = [os.path.join(contrl_dataset_path, 'test.json')]
+    
 
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
@@ -307,7 +309,7 @@ if __name__ == '__main__':
             p1_s, p2_s = val(args, actions, test_dataloader, model, steps=s_eval)
             p1_per_step[s_eval] = float(p1_s)
             p2_per_step[s_eval] = float(p2_s)
-        best_step = min(p1_per_step, key=p1_per_step.get)
+        best_step = min(p2_per_step, key=p2_per_step.get)
         p1 = p1_per_step[best_step]
         p2 = p2_per_step[best_step]
         if WANDB_AVAILABLE:
