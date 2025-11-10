@@ -107,7 +107,6 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
                 y_flip = torch.randn_like(gt_3D)
                 y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :]
                 y_flip_s = euler_sample(input_2D_flip, y_flip, steps_to_use)
-                y_flip_s = y_flip_s
                 y_flip_s[:, :, :, 0] *= -1
                 y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
                 y_s = (y_s + y_flip_s) / 2
