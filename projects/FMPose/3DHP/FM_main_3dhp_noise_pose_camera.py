@@ -17,9 +17,7 @@ import matplotlib.pyplot as plt
 import common.eval_cal as eval_cal
 from common.arguments import parse_args
 from model.utils.post_refine import post_refine
-from common.dataset.load_data_hm36 import Fusion
 from common.dataset.load_data_3dhp import Fusion_3dhp
-from common.dataset.h36m_dataset import Human36mDataset
 from common.dataset.mpi_inf_3dhp_dataset import Mpi_inf_3dhp_Dataset
 import numpy as np 
 args = parse_args()
@@ -312,9 +310,9 @@ def test(actions, dataloader, model, model_refine, hypothesis_num=1):
             cam_tensor = cam_tensor.unsqueeze(0).expand(batch_size, -1)  # (B, 9)
            
 
-            # output_3D_s = aggregate_hypothesis_mean(list_hypothesis)            
+            output_3D_s = aggregate_hypothesis_mean(list_hypothesis)            
             
-            output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, cam_tensor, input_2D_nonflip, gt_3D, topk=args.topk)
+            # output_3D_s = aggregate_hypothesis_camera_weight(list_hypothesis, cam_tensor, input_2D_nonflip, gt_3D, topk=args.topk)
 
             # accumulate by action across the entire test set
             action_error_sum_multi[s_keep] = eval_cal.test_calculation(output_3D_s, out_target, action, action_error_sum_multi[s_keep], args.dataset, subject)
@@ -485,18 +483,10 @@ if __name__ == '__main__':
                             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)
 
     ## load data
-    if args.dataset == 'h36m':
-        dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
-        dataset = Human36mDataset(dataset_path, args)
-        actions = define_actions(args.actions)
-    # elif args.dataset == 'humaneva15':
-    #     from common.dataset.humaneva_dataset import HumanEvaDataset
-    #     dataset_path = args.root_path + 'data_3d_' + args.dataset + '.npz'
-    #     dataset = HumanEvaDataset(dataset_path, args)
-    #     actions = define_actions_humaneva(args.actions)
-    elif args.dataset.startswith('3dhp'):
+    if args.dataset.startswith('3dhp'):
         dataset_path = args.root_path + 'data_3d_' + args.dataset + '_' + args.keypoints + '.npz'
         print(dataset_path)
+        
         dataset = Mpi_inf_3dhp_Dataset(dataset_path, args)
 
     if args.dataset.startswith('3dhp'):
@@ -507,15 +497,7 @@ if __name__ == '__main__':
         test_data = Fusion_3dhp(args, dataset, args.root_path, train=False)
         test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
                                         shuffle=False, num_workers=int(args.workers), pin_memory=True)
-    else:
-        if args.train:
-            train_data = Fusion(args, dataset, args.root_path, train=True)
-            train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
-                                        shuffle=True, num_workers=int(args.workers), pin_memory=True)
-        test_data = Fusion(args, dataset, args.root_path, train=False)
-        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size,
-                                        shuffle=False, num_workers=int(args.workers), pin_memory=True)
-
+        
     ## load model
     model = Model(args).cuda()
     model_refine = post_refine(args).cuda()
