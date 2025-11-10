@@ -14,12 +14,13 @@ hypothesis_num=10
 topk=8
 exp_temp=0.005
 
+folder_name=noGS_$(date +%Y%m%d_%H%M%S)
 # Test subjects - all test subjects
-subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
+# subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
 # GS only
 # subjects_test=TS1,TS2
 # no GS only
-# subjects_test=TS3,TS4
+subjects_test=TS3,TS4
 # Outdoor only
 # subjects_test=TS5,TS6
 
@@ -43,12 +44,13 @@ python vis_FM_3dhp_compareWithGT.py \
 --batch_size ${batch_size} \
 --layers ${layers} \
 --gpu ${gpu_id} \
---hypothesis_num ${hypothesis_num} \
+--hypothesis_num "${hypothesis_num}" \
 --topk ${topk} \
 --exp_temp ${exp_temp} \
 --dataset '3dhp_valid' \
 --keypoints 'gt_17_univ' \
 --subjects_test "${subjects_test}" \
 --create_file 1 \
---sh_file ${sh_file}
+--sh_file ${sh_file} \
+--folder_name ${folder_name}
 
