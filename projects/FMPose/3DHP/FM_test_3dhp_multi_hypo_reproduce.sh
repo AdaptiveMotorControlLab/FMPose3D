@@ -3,7 +3,7 @@ layers=5
 lr=1e-3
 gpu_id=1
 eval_sample_steps=2
-batch_size=1024
+batch_size=1
 epochs=100
 
 # Multi-hypothesis parameters
@@ -14,11 +14,11 @@ mode="exp"
 exp_temp=0.005
 sh_file=FM_test_3dhp_multi_hypo_reproduce.sh
 # all
-# subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
+subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
 # GS
 # subjects_test=TS1,TS2
 # no GS
-subjects_test=TS3,TS4
+# subjects_test=TS3,TS4
 # # Outdoor
 # subjects_test=TS5,TS6
 
