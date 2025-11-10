@@ -80,6 +80,7 @@ def parse_args():
     
     # Multi-hypothesis parameters
     parser.add_argument('--num_hypothesis_list', type=str, default='1', help='comma-separated list of hypothesis counts')
+    parser.add_argument('--hypothesis_num', type=int, default=1)
     parser.add_argument('--topk', type=int, default=3, help='top-k hypotheses for weighted aggregation')
     parser.add_argument('--exp_temp', type=float, default=0.005, help='temperature for exponential weighting')
     parser.add_argument('--weight_softmax_tau', type=float, default=1.0, help='tau for softmax weighting')
@@ -87,7 +88,8 @@ def parse_args():
     parser.add_argument('--test_augmentation_flip_hypothesis', type=bool, default=False, help='use flip augmentation for hypotheses')
     parser.add_argument('--sh_file', type=str, default='') 
     parser.add_argument('--subjects_test', type=str, default='', help='override test subjects, e.g., TS1,TS2 or TS5,TS6')
- 
+    parser.add_argument('--reload', action='store_true')
+    
     args = parser.parse_args()
 
     if args.test:
