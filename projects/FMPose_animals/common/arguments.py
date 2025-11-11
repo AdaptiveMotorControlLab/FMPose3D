@@ -107,6 +107,14 @@ class opts():
         self.parser.add_argument('--mask_prob', type=float, default=0.5)
         self.parser.add_argument('--masked_joints', type=str, default='12,13')
 
+        # General arguments for animal3d
+        self.parser.add_argument('--train_dataset_path', type=str, nargs='+', 
+                                default=['./dataset/animal3d/train.json'],
+                                help='List of training dataset paths (can specify multiple)')
+        self.parser.add_argument('--test_dataset_path', type=str, nargs='+',
+                                default=['./dataset/animal3d/test.json'],
+                                help='List of test dataset paths (can specify multiple)')
+
         # General arguments for rat7m
         self.parser.add_argument('--cfg', help="Specify the path of the path of the config(*.yaml)", default='./cfg/rat7m/t_7_dim_4.yaml')
         self.parser.add_argument('--metric', help="eval metric", default='mpjpe') #['mpjpe', 'p_mpjpe', 'n_mpjpe']
