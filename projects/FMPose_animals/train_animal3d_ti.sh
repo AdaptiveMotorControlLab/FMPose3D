@@ -21,16 +21,17 @@ train_dataset_paths=(
   "./dataset/control_animal3dlatest/train.json"
 )
 test_dataset_paths=(
-  "./dataset/animal3d/test.json"
+  "./dataset/control_animal3dlatest/test.json"
 )
 
-folder_name="GPA_TrainBoth_TestAnimal3d_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
+folder_name="GPA_TrainBoth_TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
 sh_file='train_animal3d_ti.sh'
 
 python main_CFM_animal3d_ti.py \
   --root_path ${root_path} \
   --dataset animal3d \
   --train \
+  --test 1 \
   --batch_size ${batch_size} \
   --lr ${lr} \
   --model_path ${model_path} \
