@@ -321,10 +321,10 @@ def test_multi_hypothesis(args, actions, dataLoader, model, optimizer=None, epoc
                 #     y_s = (y_s + y_flip_s) / 2
                 
                 if args.test_augmentation_flip_hypothesis:
-                    # y_flip = torch.randn_like(gt_3D)
-                    y_flip = y_s.clone()
-                    y_flip[:, :, :, 0] *= -1
-                    y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
+                    y_flip = torch.randn_like(gt_3D)
+                    # y_flip = y_s.clone()
+                    # y_flip[:, :, :, 0] *= -1
+                    # y_flip[:, :, args.joints_left + args.joints_right, :] = y_flip[:, :, args.joints_right + args.joints_left, :] 
                     y_flip_s = euler_sample(input_2D_flip, y_flip, s_keep)
                     y_flip_s[:, :, :, 0] *= -1
                     y_flip_s[:, :, args.joints_left + args.joints_right, :] = y_flip_s[:, :, args.joints_right + args.joints_left, :]
