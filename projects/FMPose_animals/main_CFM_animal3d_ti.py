@@ -8,7 +8,7 @@ from tqdm import tqdm
 import torch.optim as optim
 from common.arguments import opts as parse_args
 from common.utils import *
-from common.animal3d_dataset_ti import TrainDataset, EvaluationDataset
+from common.animal3d_dataset_ti import TrainDataset
 import time
 
 args = parse_args().parse()
@@ -241,23 +241,13 @@ if __name__ == '__main__':
                 opt_file.write('  %s: %s\n' % (str(k), str(v)))
             opt_file.write('==> Args:\n')
 
-    root_path = args.root_path
-    dataset_path = root_path  # Directly use root_path for Rat7M
     
-    animal3d_dataset_path = os.path.join(root_path, 'animal3d')
-    contrl_dataset_path = os.path.join(root_path, 'control_animal3dlatest')
-    # All Rat7M dataset configurations (n_joints, joints_left, joints_right, etc.) 
-    # are set in arguments.py based on --dataset rat7m parameter
-    
-    
-    train_paths = [os.path.join(animal3d_dataset_path, 'train.json'), os.path.join(contrl_dataset_path, 'train.json')]
-    # test_paths = [os.path.join(animal3d_dataset_path, 'test.json'), os.path.join(contrl_dataset_path, 'test.json')]
-    test_paths = [os.path.join(contrl_dataset_path, 'test.json')]
-    
+    # Support multiple training and test dataset paths from arguments
+    train_paths = args.train_dataset_path if isinstance(args.train_dataset_path, list) else [args.train_dataset_path]
+    test_paths = args.test_dataset_path if isinstance(args.test_dataset_path, list) else [args.test_dataset_path]
 
     # Rat7M doesn't have action labels, use placeholder for error calculation
     actions = ['rat_motion']
-
 
     if args.train:
         train_datasets = [TrainDataset(is_train=True, json_file=p, root_joint=args.root_joint) for p in train_paths]
@@ -312,12 +302,14 @@ if __name__ == '__main__':
         best_step = min(p2_per_step, key=p2_per_step.get)
         p1 = p1_per_step[best_step]
         p2 = p2_per_step[best_step]
+        
         if WANDB_AVAILABLE:
             log_data = {'test_p1': p1, 'epoch': epoch}
             wandb.log(log_data)
         
         if args.train:
-            data_threshold = p1
+            # Use P2 (P-MPJPE) as the metric for saving best models
+            data_threshold = p2  # Changed from p1 to p2
             saved_path = save_top_N_models(args.previous_name, args.checkpoint, epoch, data_threshold, model['CFM'], "CFM", num_saved_models=getattr(args, 'num_saved_models', 3))
             # update best tracker
             if data_threshold < args.previous_best_threshold:
@@ -351,8 +343,8 @@ if __name__ == '__main__':
     mins = (a-3600*h)//60
     s = a-3600*h-mins*60
     
-    print("best epoch:{}, best result(mpjpe):{}".format(best_epoch, args.previous_best_threshold))
-    logging.info("best epoch:{}, best result(mpjpe):{}".format(best_epoch, args.previous_best_threshold))
+    print("best epoch:{}, best result(p-mpjpe):{}".format(best_epoch, args.previous_best_threshold))
+    logging.info("best epoch:{}, best result(p-mpjpe):{}".format(best_epoch, args.previous_best_threshold))
     print(h,"h",mins,"mins", s,"s")
     logging.info('training time: %dh,%dmin%ds' % (h, mins, s))
     print(args.checkpoint)
