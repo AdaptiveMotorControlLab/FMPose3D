@@ -18,7 +18,7 @@ saved_model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnML
 # saved_model_path='pretrained_model/FM_GPA_Noise_1GCN_P_Attn_layers5_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20251012_163120/CFM_23_4969_best.pth'
 
 #Test CFM
-python3 main_CFM_noise_pose_multiHypothesis_test_debug.py \
+python3 main_CFM_noise_pose_multiHypothesis_test.py \
 --reload \
 --topk ${topk} \
 --exp_temp ${exp_temp} \
