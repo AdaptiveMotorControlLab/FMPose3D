@@ -1,15 +1,16 @@
 import numpy as np
 
 class Graph():
-    """ The Graph to model the skeletons of human body/hand/rat
+    """ The Graph to model the skeletons of human body/hand/rat/animal
 
     Args:
         strategy (string): must be one of the follow candidates
         - spatial: Clustered Configuration
 
         layout (string): must be one of the follow candidates
-        - 'hm36_gt' same with ground truth structure of human 3.6, with 17 joints per frame
-        - 'rat7m' skeleton structure for Rat7M dataset, with 20 joints per frame
+        - 'hm36_gt': Ground truth structure of Human3.6M, with 17 joints per frame
+        - 'animal3d': Skeleton structure for Animal3D dataset, with 26 joints per frame
+        - 'rat7m': Skeleton structure for Rat7M dataset, with 20 joints per frame
 
         max_hop (int): the maximal distance between two connected nodes
         dilation (int): controls the spacing between the kernel points
