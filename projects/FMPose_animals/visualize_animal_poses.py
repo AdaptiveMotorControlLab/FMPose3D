@@ -55,14 +55,15 @@ def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
     J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-        ax.plot(x, y, z, lw=linewidth, color=color)
+        ax.plot(z, x, y, lw=linewidth, color=color)  # Plot z, x, y
     # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
     max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
-    RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
-    ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
-    ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
-    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
+    RADIUS = max(np.max(max_range) * 0.9, 0.4)  # Scale up and ensure minimum size
+    # RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
+    ax.set_xlim3d([-RADIUS+zroot, RADIUS+zroot])  # xlim for z
+    ax.set_ylim3d([-RADIUS+xroot, RADIUS+xroot])  # ylim for x
+    ax.set_zlim3d([-RADIUS+yroot, RADIUS+yroot])  # zlim for y
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white)
     ax.yaxis.set_pane_color(white)
@@ -70,7 +71,7 @@ def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
     ax.tick_params('x', labelbottom=False)
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
-    # ax.view_init(elev=0, azim=0)  # Set view to front view, like 2D
+    # ax.view_init(elev=5, azim=-90)  # Set view to front view, like 2D
 
 def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     vals = np.reshape(channels, (26, 3))
@@ -80,14 +81,14 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     colors = [(255/255, 0/255, 0/255), (255/255, 0/255, 0/255), (255/255, 0/255, 0/255)]
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-        ax.plot(x, y, z, lw=linewidth, color=colors[LR[i]-1])
+        ax.plot(z, x, y, lw=linewidth, color=colors[LR[i]-1])  # Plot z, x, y
     # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
     max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
-    RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
-    ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
-    ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
-    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
+    RADIUS = max(np.max(max_range) * 0.9, 0.4)  # Scale up and ensure minimum size
+    ax.set_xlim3d([-RADIUS+zroot, RADIUS+zroot])  # xlim for z
+    ax.set_ylim3d([-RADIUS+xroot, RADIUS+xroot])  # ylim for x
+    ax.set_zlim3d([-RADIUS+yroot, RADIUS+yroot])  # zlim for y
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white)
     ax.yaxis.set_pane_color(white)
@@ -95,7 +96,7 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     ax.tick_params('x', labelbottom=False)
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
-    # ax.view_init(elev=0, azim=0)  # Set view to front view, like 2D
+    # ax.view_init(elev=5, azim=-90)  # Set view to front view, like 2D
 
 def show2Dpose(channels, ax, img=None, width=None, height=None):
     if img is not None:
@@ -256,7 +257,7 @@ if __name__ == '__main__':
             fig = plt.figure(figsize=(15, 5))
 
             # 2D Pose on Image
-            ax0 = fig.add_subplot(131)
+            ax0 = fig.add_subplot(121)
             if img is not None:
                 show2Dpose(None, ax0, img=img, width=width, height=height)  # img already has pose drawn
                 ax0.set_title("2D Pose on Image")
@@ -266,15 +267,15 @@ if __name__ == '__main__':
                 print(f"Image not found for {img_path}")
 
             # 3D GT
-            ax1 = fig.add_subplot(132, projection='3d')
-            ax1.set_title("3D GT Pose")
-            show3Dpose_GT(gt_3d_np, ax1, world=False)
+            # ax1 = fig.add_subplot(132, projection='3d')
+            # ax1.set_title("3D GT Pose")
+            # show3Dpose_GT(gt_3d_np, ax1, world=False)
 
             # 3D Predicted
-            ax2 = fig.add_subplot(133, projection='3d')
+            ax2 = fig.add_subplot(122, projection='3d')
             ax2.set_title(f"3D Predicted Pose\nP-MPJPE: {error:.2f} mm")
-            show3Dpose_GT(gt_3d_np, ax2, world=False)
-            show3Dpose(pred_3d_np, ax2, color=(0/255, 176/255, 240/255), world=False)
+            show3Dpose_GT(gt_3d_np, ax2, world=True)
+            show3Dpose(pred_3d_np, ax2, color=(0/255, 176/255, 240/255), world=True)
 
             plt.tight_layout()
             plt.savefig(f'{output_folder}/frame_{i_data:04d}.png', dpi=300, bbox_inches='tight')

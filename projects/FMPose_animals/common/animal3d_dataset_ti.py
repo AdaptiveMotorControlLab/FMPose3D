@@ -29,12 +29,12 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, item):
         data = self.data['data'][item]
-        # 安全地检查是否存在 reproj_kp_2d
-        reproj = data.get('reproj_kp_2d', None)
-        if reproj is not None:
-            keypoint_2d = np.array(reproj, dtype=np.float32)
-        else:
-            keypoint_2d = np.array(data.get('keypoint_2d', []), dtype=np.float32)
+        # # 安全地检查是否存在 reproj_kp_2d
+        # reproj = data.get('reproj_kp_2d', None)
+        # if reproj is not None:
+        #     keypoint_2d = np.array(reproj, dtype=np.float32)
+        # else:
+        keypoint_2d = np.array(data.get('keypoint_2d', []), dtype=np.float32)
          # normalize 2D keypoints
         hight = np.array(data['height'])
         width = np.array(data['width'])
