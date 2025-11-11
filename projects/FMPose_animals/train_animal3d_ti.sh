@@ -17,14 +17,14 @@ model_path='model/model_G_P_Attn_animal3d.py'
 # root path denotes the path to the original dataset
 root_path="./dataset/"
 train_dataset_paths=(
-  "./dataset/animal3d/train.json"
+  # "./dataset/animal3d/train.json"
   "./dataset/control_animal3dlatest/train.json"
 )
 test_dataset_paths=(
   "./dataset/control_animal3dlatest/test.json"
 )
 
-folder_name="GPA_TrainBoth_TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
+folder_name="GPA_TrainCtrlAni3D_TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
 sh_file='train_animal3d_ti.sh'
 
 python main_CFM_animal3d_ti.py \

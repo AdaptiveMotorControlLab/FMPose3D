@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-# from yacs.config import CfgNode
 
 from torch.utils.data import ConcatDataset
 from typing import List
@@ -62,5 +61,6 @@ class TrainDataset(Dataset):
         item = {
                  'keypoints_2d': keypoint_2d, #
                  'keypoints_3d': keypoint_3d,
+                 'img_path': str(data['img_path']),
                  }
         return item

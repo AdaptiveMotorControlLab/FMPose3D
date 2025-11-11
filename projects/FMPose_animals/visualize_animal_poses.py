@@ -56,8 +56,10 @@ def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
         ax.plot(x, y, z, lw=linewidth, color=color)
-    RADIUS = 0.55
+    # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
+    max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
+    RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
     ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
     ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
@@ -68,9 +70,7 @@ def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
     ax.tick_params('x', labelbottom=False)
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
-    if not world:
-        ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
-        ax.invert_zaxis()
+    # ax.view_init(elev=0, azim=0)  # Set view to front view, like 2D
 
 def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     vals = np.reshape(channels, (26, 3))
@@ -81,8 +81,10 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
         ax.plot(x, y, z, lw=linewidth, color=colors[LR[i]-1])
-    RADIUS = 0.55
+    # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
+    max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
+    RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
     ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
     ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
     ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
@@ -93,20 +95,24 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
     ax.tick_params('x', labelbottom=False)
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
-    if not world:
-        ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])
-        ax.invert_zaxis()
+    # ax.view_init(elev=0, azim=0)  # Set view to front view, like 2D
 
-def show2Dpose(channels, ax):
-    vals = np.reshape(channels, (26, 2))
-    I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-    J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
-    for i in np.arange(len(I)):
-        x, y = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(2)]
-        ax.plot(x, y, lw=1)
-        ax.scatter(x, y, s=5)
+def show2Dpose(channels, ax, img=None, width=None, height=None):
+    if img is not None:
+        b, g, r = cv2.split(img)
+        image_mat = cv2.merge([r, g, b])
+        ax.imshow(image_mat)
+    if channels is not None:
+        vals = np.reshape(channels, (26, 2))
+        if width is not None and height is not None:
+            vals = vals * np.array([width, height])
+        I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
+        J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+        for i in np.arange(len(I)):
+            x, y = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(2)]
+            ax.plot(x, y, lw=1)
+            ax.scatter(x, y, s=5)
     ax.set_aspect('equal')
-    ax.invert_yaxis()
     ax.set_xticks([])
     ax.set_yticks([])
     plt.axis('off')
@@ -136,15 +142,15 @@ if __name__ == '__main__':
     model = {}
     model['CFM'] = CFM(args).cuda()
 
-    if args.reload:
-        model_dict = model['CFM'].state_dict()
-        model_path = args.saved_model_path
-        print(f"Loading model from {model_path}")
-        pre_dict = torch.load(model_path)
-        for name, key in model_dict.items():
-            model_dict[name] = pre_dict[name]
-        model['CFM'].load_state_dict(model_dict)
-        print("Model loaded successfully!")
+
+    model_dict = model['CFM'].state_dict()
+    model_path = args.saved_model_path
+    print(f"Loading model from {model_path}")
+    pre_dict = torch.load(model_path)
+    for name, key in model_dict.items():
+        model_dict[name] = pre_dict[name]
+    model['CFM'].load_state_dict(model_dict)
+    print("Model loaded successfully!")
 
     # Load dataset
     test_paths = args.test_dataset_path if isinstance(args.test_dataset_path, list) else [args.test_dataset_path]
@@ -155,7 +161,7 @@ if __name__ == '__main__':
     # Create output folder
     import time
     logtime = time.strftime('%y%m%d_%H%M_%S')
-    output_folder = f'./visualizations_{logtime}'
+    output_folder = f'./vis/visualizations_{logtime}'
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
@@ -167,6 +173,18 @@ if __name__ == '__main__':
         for i_data, data in enumerate(tqdm(test_dataloader, desc="Visualizing")):
             input_2D = data['keypoints_2d']
             gt_3D = data['keypoints_3d']
+            img_path = data['img_path']
+            if isinstance(img_path, list):
+                img_path = img_path[0]
+            img_path = os.path.join(args.root_path, img_path)
+            
+            # Load image if exists
+            img = None
+            width, height = None, None
+            if os.path.exists(img_path):
+                img = cv2.imread(img_path)
+                if img is not None:
+                    height, width = img.shape[:2]
             
             # Convert to numpy if tensor and squeeze batch dim
             if isinstance(input_2D, torch.Tensor):
@@ -213,26 +231,50 @@ if __name__ == '__main__':
             pred_3d_np = output_3D[0, 0].cpu().numpy()
 
             # Calculate error
-            error = mpjpe_cal(output_3D, out_target).item() * 1000
+            error = p_mpjpe(pred_3d_np[np.newaxis, ...], gt_3d_np[np.newaxis, ...])[0] * 1000
+
+            # Draw 2D pose on image if available
+            if img is not None and width is not None and height is not None:
+                vals = np.reshape(input_2d_np, (26, 2))
+                # Denormalize properly
+                vals[:, 0] = ((vals[:, 0] + 1) / 2) * width
+                vals[:, 1] = ((vals[:, 1] + height / width) / 2) * width
+                I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
+                J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+                for i in np.arange(len(I)):
+                    pt1 = (int(vals[I[i], 0]), int(vals[I[i], 1]))
+                    pt2 = (int(vals[J[i], 0]), int(vals[J[i], 1]))
+                    cv2.line(img, pt1, pt2, (0, 255, 0), 2)
+                    cv2.circle(img, pt1, 3, (0, 255, 0), -1)
+                    cv2.circle(img, pt2, 3, (0, 255, 0), -1)
+                # Draw keypoints
+                for idx in range(len(vals)):
+                    x, y = vals[idx]
+                    cv2.circle(img, (int(x), int(y)), 3, (0, 255, 0), -1)
 
             # Visualization
             fig = plt.figure(figsize=(15, 5))
 
-            # 2D Pose
-            ax1 = fig.add_subplot(131)
-            ax1.set_title("2D Pose")
-            show2Dpose(input_2d_np, ax1)
+            # 2D Pose on Image
+            ax0 = fig.add_subplot(131)
+            if img is not None:
+                show2Dpose(None, ax0, img=img, width=width, height=height)  # img already has pose drawn
+                ax0.set_title("2D Pose on Image")
+            else:
+                ax0.text(0.5, 0.5, f"Image not found\n{img_path}", ha='center', va='center', transform=ax0.transAxes)
+                ax0.set_title("2D Pose (Image Missing)")
+                print(f"Image not found for {img_path}")
 
             # 3D GT
-            ax2 = fig.add_subplot(132, projection='3d')
-            ax2.set_title("3D GT Pose")
-            show3Dpose_GT(gt_3d_np, ax2, world=False)
+            ax1 = fig.add_subplot(132, projection='3d')
+            ax1.set_title("3D GT Pose")
+            show3Dpose_GT(gt_3d_np, ax1, world=False)
 
             # 3D Predicted
-            ax3 = fig.add_subplot(133, projection='3d')
-            ax3.set_title(f"3D Predicted Pose\nMPJPE: {error:.2f} mm")
-            show3Dpose_GT(gt_3d_np, ax3, world=False)
-            show3Dpose(pred_3d_np, ax3, color=(0/255, 176/255, 240/255), world=False)
+            ax2 = fig.add_subplot(133, projection='3d')
+            ax2.set_title(f"3D Predicted Pose\nP-MPJPE: {error:.2f} mm")
+            show3Dpose_GT(gt_3d_np, ax2, world=False)
+            show3Dpose(pred_3d_np, ax2, color=(0/255, 176/255, 240/255), world=False)
 
             plt.tight_layout()
             plt.savefig(f'{output_folder}/frame_{i_data:04d}.png', dpi=300, bbox_inches='tight')
