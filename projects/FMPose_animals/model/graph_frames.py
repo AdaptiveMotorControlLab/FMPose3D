@@ -1,14 +1,16 @@
 import numpy as np
 
 class Graph():
-    """ The Graph to model the skeletons of human body/hand
+    """ The Graph to model the skeletons of human body/hand/rat/animal
 
     Args:
         strategy (string): must be one of the follow candidates
         - spatial: Clustered Configuration
 
         layout (string): must be one of the follow candidates
-        - 'hm36_gt' same with ground truth structure of human 3.6 , with 17 joints per frame
+        - 'hm36_gt': Ground truth structure of Human3.6M, with 17 joints per frame
+        - 'animal3d': Skeleton structure for Animal3D dataset, with 26 joints per frame
+        - 'rat7m': Skeleton structure for Rat7M dataset, with 20 joints per frame
 
         max_hop (int): the maximal distance between two connected nodes
         dilation (int): controls the spacing between the kernel points
@@ -34,7 +36,10 @@ class Graph():
 
     def get_distance_to_center(self,layout): 
         """
-        :return: get the distance of each node to center (joint 7)
+        :return: get the distance of each node to center
+        For hm36_gt: center is joint 7
+        For animal3d: center is joint 18 (neck, root joint)
+        For rat7m: center is joint 4 (SpineM, root joint)
         """
         dist_center = np.zeros(self.num_node)
         if layout == 'hm36_gt':
@@ -43,6 +48,32 @@ class Graph():
                 dist_center[index_start+0 : index_start+7] = [1, 2, 3, 4, 2, 3, 4]
                 dist_center[index_start+7 : index_start+11] = [0, 1, 2, 3]
                 dist_center[index_start+11 : index_start+17] = [2, 3, 4, 2, 3, 4]
+        elif layout == 'animal3d':
+            # Animal3D: 26 joints, center is joint 18 (neck)
+            # Calculate distance from each joint to neck (joint 18) along skeleton
+            for i in range(self.seqlen):
+                index_start = i*self.num_node_each
+                # Distance from each joint to neck (18):
+                # Head: 24(1)→18(0), eyes/mouth from nose, ears from eyes
+                # Front legs: 18→shoulder→thigh→knee→paw
+                # Hind legs: 18→tail_base→thigh→knee→paw
+                # Tail: 18→tail_base→tail_mid→tail_end
+                dist_center[index_start+0 : index_start+26] = [
+                    2, 2, 2, 4, 4,  # 0-4: left_eye, right_eye, mouth_mid, left_front_paw, right_front_paw
+                    4, 4, 1, 2, 2,  # 5-9: left_back_paw, right_back_paw, tail_base, left_front_thigh, right_front_thigh
+                    2, 2, 1, 1, 3,  # 10-14: left_back_thigh, right_back_thigh, left_shoulder, right_shoulder, left_front_knee
+                    3, 3, 3, 0, 3,  # 15-19: right_front_knee, left_back_knee, right_back_knee, neck(center), tail_end
+                    3, 3, 3, 3, 1,  # 20-24: left_ear, right_ear, left_mouth, right_mouth, nose
+                    2               # 25: tail_mid
+                ]
+        elif layout == 'rat7m':
+            # Rat7M: 20 joints, center is joint 4 (SpineM)
+            # Distance from each joint to joint 4 along the skeleton chain
+            # parents=[-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            for i in range(self.seqlen):
+                index_start = i*self.num_node_each
+                # [Joint0-3: distance going up from 4, Joint4: center=0, Joint5-19: distance going down from 4]
+                dist_center[index_start+0 : index_start+20] = [4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
         return dist_center
 
     def __str__(self):
@@ -86,9 +117,9 @@ class Graph():
     def get_edge(self, layout):
         """
         get edge link of the graph
-        la,ra: left/right arm
-        ll/rl: left/right leg
-        cb: center bone
+        la,ra: left/right arm (for rat: left/right front leg)
+        ll/rl: left/right leg (for rat: left/right hind leg)
+        cb: center bone (spine)
         """
         if layout == 'hm36_gt':
             self.num_node_each = 17
@@ -111,6 +142,148 @@ class Graph():
 
             # center node of body/hand
             self.center = 8 - 1
+            
+        elif layout == 'animal3d':
+            # Animal3D: 26 joints
+            # Joint indices from animaldata.md:
+            # 0: left_eye, 1: right_eye, 2: mouth_mid, 3: left_front_paw, 4: right_front_paw
+            # 5: left_back_paw, 6: right_back_paw, 7: tail_base, 8: left_front_thigh, 9: right_front_thigh
+            # 10: left_back_thigh, 11: right_back_thigh, 12: left_shoulder, 13: right_shoulder
+            # 14: left_front_knee, 15: right_front_knee, 16: left_back_knee, 17: right_back_knee
+            # 18: neck, 19: tail_end, 20: left_ear, 21: right_ear, 22: left_mouth, 23: right_mouth
+            # 24: nose, 25: tail_mid
+            # Root joint: 18 (neck - most stable central point)
+            
+            self.num_node_each = 26
+            
+            # Neighbour connections based on skeleton from animaldata.md
+            neighbour_base = [
+                # Head connections
+                (24, 0),   # nose → left_eye
+                (24, 1),   # nose → right_eye
+                (1, 21),   # right_eye → right_ear
+                (0, 20),   # left_eye → left_ear (corrected)
+                (24, 2),   # nose → mouth_mid
+                (2, 22),   # mouth_mid → left_mouth
+                (2, 23),   # mouth_mid → right_mouth
+                (24, 18),  # nose → neck
+                
+                # Upper body (neck/shoulders/front legs)
+                (18, 12),  # neck → left_shoulder
+                (18, 13),  # neck → right_shoulder
+                (12, 8),   # left_shoulder → left_front_thigh
+                (13, 9),   # right_shoulder → right_front_thigh
+                (8, 14),   # left_front_thigh → left_front_knee
+                (9, 15),   # right_front_thigh → right_front_knee
+                (14, 3),   # left_front_knee → left_front_paw
+                (15, 4),   # right_front_knee → right_front_paw
+                
+                # Spine and hind legs
+                (18, 7),   # neck → tail_base
+                (7, 10),   # tail_base → left_back_thigh
+                (7, 11),   # tail_base → right_back_thigh
+                (10, 16),  # left_back_thigh → left_back_knee
+                (11, 17),  # right_back_thigh → right_back_knee
+                (16, 5),   # left_back_knee → left_back_paw
+                (17, 6),   # right_back_knee → right_back_paw
+                
+                # Tail
+                (7, 25),   # tail_base → tail_mid
+                (25, 19),  # tail_mid → tail_end
+            ]
+            
+            # Symmetry links between left and right sides
+            sym_base = [
+                (0, 1),    # left_eye <-> right_eye
+                (20, 21),  # left_ear <-> right_ear
+                (22, 23),  # left_mouth <-> right_mouth
+                (12, 13),  # left_shoulder <-> right_shoulder
+                (8, 9),    # left_front_thigh <-> right_front_thigh
+                (14, 15),  # left_front_knee <-> right_front_knee
+                (3, 4),    # left_front_paw <-> right_front_paw
+                (10, 11),  # left_back_thigh <-> right_back_thigh
+                (16, 17),  # left_back_knee <-> right_back_knee
+                (5, 6),    # left_back_paw <-> right_back_paw
+            ]
+            
+            self_link, time_link = self.basic_layout(neighbour_base, sym_base)
+            
+            # Body parts for animal skeleton
+            self.left_front = [12, 8, 14, 3]      # Left front leg
+            self.right_front = [13, 9, 15, 4]     # Right front leg
+            self.left_hind = [10, 16, 5]          # Left hind leg
+            self.right_hind = [11, 17, 6]         # Right hind leg
+            self.spine = [18, 7]                  # Neck and tail_base
+            self.tail = [7, 25, 19]               # Tail
+            self.head = [24, 0, 1, 2, 20, 21, 22, 23]  # Head
+            self.cb = self.spine + self.tail + [12, 13]  # Center body
+            
+            # For compatibility with original structure
+            self.la = self.left_front
+            self.ra = self.right_front
+            self.ll = self.left_hind
+            self.rl = self.right_hind
+            self.part = [self.la, self.ra, self.ll, self.rl, self.cb]
+            
+            self.edge = self_link + self.neighbour_link_all + self.sym_link_all + time_link
+            
+            # Center node: joint 18 (neck, root joint)
+            self.center = 18
+            
+        elif layout == 'rat7m':
+            # Rat7M: 20 joints
+            # Joint names and structure based on parents array
+            # parents=[-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            # Root joint: 4 (SpineM)
+            # Left: [8, 10, 11, 17, 18] (HipL, ElbowL, ArmL, KneeL, ShinL)
+            # Right: [9, 14, 15, 16, 19] (HipR, ElbowR, ArmR, KneeR, ShinR)
+            
+            self.num_node_each = 20
+
+            # Neighbour connections based on parent-child relationships
+            # Edge (child, parent) for all joints except root (parent=-1)
+            neighbour_base = [
+                (1, 0), (2, 1), (3, 2), (4, 3),     # Spine chain: 0->1->2->3->4
+                (5, 4), (6, 5), (7, 6),             # Continue from SpineM(4): 4->5->6->7
+                (8, 7), (9, 8), (10, 9), (11, 10),  # Chain: 7->8->9->10->11
+                (12, 11), (13, 12), (14, 13),       # Chain: 11->12->13->14
+                (15, 14), (16, 15), (17, 16),       # Chain: 14->15->16->17
+                (18, 17), (19, 18)                  # Chain: 17->18->19
+            ]
+            
+            # Symmetry links between left and right sides
+            # Left: [8, 10, 11, 17, 18], Right: [9, 14, 15, 16, 19]
+            sym_base = [
+                (8, 9),    # HipL <-> HipR
+                (10, 14),  # ElbowL <-> ElbowR
+                (11, 15),  # ArmL <-> ArmR
+                (17, 16),  # KneeL <-> KneeR
+                (18, 19)   # ShinL <-> ShinR
+            ]
+
+            self_link, time_link = self.basic_layout(neighbour_base, sym_base)
+
+            # Body parts for rat skeleton
+            self.left_front = [10, 11]        # Left front leg (ElbowL, ArmL)
+            self.right_front = [14, 15]       # Right front leg (ElbowR, ArmR)
+            self.left_hind = [17, 18]         # Left hind leg (KneeL, ShinL)
+            self.right_hind = [16, 19]        # Right hind leg (KneeR, ShinR)
+            self.spine = [0, 1, 2, 3, 4, 5, 6, 7]  # Spine chain
+            self.hips = [8, 9]                # Hip joints
+            self.cb = self.spine + self.hips + [12, 13]  # Center body
+            
+            # For compatibility with original structure
+            self.la = self.left_front
+            self.ra = self.right_front
+            self.ll = self.left_hind
+            self.rl = self.right_hind
+            self.part = [self.la, self.ra, self.ll, self.rl, self.cb]
+
+            self.edge = self_link + self.neighbour_link_all + self.sym_link_all + time_link
+
+            # Center node: joint 4 (SpineM, root joint)
+            self.center = 4
+            
         else:
             raise ValueError("Do Not Exist This Layout.")
 
@@ -196,6 +369,38 @@ def normalize_undigraph(A):
     return DAD
 
 if __name__=="__main__":
-    graph = Graph('hm36_gt', 'spatial', 1)
-    print(graph.A.shape)
-    # print(graph)
+    # Test Human3.6M skeleton
+    print("Testing Human3.6M skeleton (17 joints):")
+    graph_h36m = Graph('hm36_gt', 'spatial', 1)
+    print(f"  Adjacency matrix shape: {graph_h36m.A.shape}")
+    print(f"  Center joint: {graph_h36m.center}")
+    print(f"  Number of nodes: {graph_h36m.num_node}")
+    
+    # Test Animal3D skeleton
+    print("\nTesting Animal3D skeleton (26 joints):")
+    graph_animal = Graph('animal3d', 'spatial', 1)
+    print(f"  Adjacency matrix shape: {graph_animal.A.shape}")
+    print(f"  Center joint: {graph_animal.center} (neck)")
+    print(f"  Number of nodes: {graph_animal.num_node}")
+    print(f"  Body parts:")
+    print(f"    - Left front leg: {graph_animal.left_front}")
+    print(f"    - Right front leg: {graph_animal.right_front}")
+    print(f"    - Left hind leg: {graph_animal.left_hind}")
+    print(f"    - Right hind leg: {graph_animal.right_hind}")
+    print(f"    - Head: {graph_animal.head}")
+    print(f"    - Tail: {graph_animal.tail}")
+    print(f"  Distance to center (joint 18): {graph_animal.dist_center}")
+    
+    # Test Rat7M skeleton
+    print("\nTesting Rat7M skeleton (20 joints):")
+    graph_rat = Graph('rat7m', 'spatial', 1)
+    print(f"  Adjacency matrix shape: {graph_rat.A.shape}")
+    print(f"  Center joint: {graph_rat.center}")
+    print(f"  Number of nodes: {graph_rat.num_node}")
+    print(f"  Body parts:")
+    print(f"    - Left front leg: {graph_rat.left_front}")
+    print(f"    - Right front leg: {graph_rat.right_front}")
+    print(f"    - Left hind leg: {graph_rat.left_hind}")
+    print(f"    - Right hind leg: {graph_rat.right_hind}")
+    print(f"    - Spine: {graph_rat.spine}")
+    print(f"  Distance to center (joint 4): {graph_rat.dist_center}")
