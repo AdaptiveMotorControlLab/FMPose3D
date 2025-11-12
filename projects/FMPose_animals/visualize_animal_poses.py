@@ -55,15 +55,15 @@ def show3Dpose(channels, ax, color, world=True, linewidth=1.5):
     J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-        ax.plot(z, x, y, lw=linewidth, color=color)  # Plot z, x, y
+        ax.plot(x, y, z, lw=linewidth, color=color)  # Plot z, x, y
     # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
     max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
     RADIUS = max(np.max(max_range) * 0.9, 0.4)  # Scale up and ensure minimum size
     # RADIUS = max(np.max(max_range) * 2.0, 1.0)  # Scale up and ensure minimum size
-    ax.set_xlim3d([-RADIUS+zroot, RADIUS+zroot])  # xlim for z
-    ax.set_ylim3d([-RADIUS+xroot, RADIUS+xroot])  # ylim for x
-    ax.set_zlim3d([-RADIUS+yroot, RADIUS+yroot])  # zlim for y
+    ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])  # xlim for x
+    ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])  # ylim for y
+    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])  # zlim for z
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white)
     ax.yaxis.set_pane_color(white)
@@ -72,6 +72,7 @@ def show3Dpose(channels, ax, color, world=True, linewidth=1.5):
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
     # ax.view_init(elev=5, azim=-90)  # Set view to front view, like 2D
+    # ax.view_init(elev=180, azim=45)  # 改变仰角和方位角
 
 def show3Dpose_GT(channels, ax, world=True, linewidth=1.5):
     vals = np.reshape(channels, (26, 3))
@@ -81,14 +82,14 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=1.5):
     colors = [(255/255, 0/255, 0/255), (255/255, 0/255, 0/255), (255/255, 0/255, 0/255)]
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-        ax.plot(z, x, y, lw=linewidth, color=colors[LR[i]-1])  # Plot z, x, y
+        ax.plot(x, y, z, lw=linewidth, color=colors[LR[i]-1])  # Plot z, x, y
     # Compute dynamic limits
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
     max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0,1))
     RADIUS = max(np.max(max_range) * 0.9, 0.4)  # Scale up and ensure minimum size
-    ax.set_xlim3d([-RADIUS+zroot, RADIUS+zroot])  # xlim for z
-    ax.set_ylim3d([-RADIUS+xroot, RADIUS+xroot])  # ylim for x
-    ax.set_zlim3d([-RADIUS+yroot, RADIUS+yroot])  # zlim for y
+    ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])  # xlim for x
+    ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])  # ylim for y
+    ax.set_zlim3d([-RADIUS+zroot, RADIUS+zroot])  # zlim for z
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white)
     ax.yaxis.set_pane_color(white)
@@ -97,6 +98,8 @@ def show3Dpose_GT(channels, ax, world=True, linewidth=1.5):
     ax.tick_params('y', labelleft=False)
     ax.tick_params('z', labelleft=False)
     # ax.view_init(elev=5, azim=-90)  # Set view to front view, like 2D
+    # ax.view_init(elev=180, azim=45)  # 改变仰角和方位角
+
 
 def show2Dpose(channels, ax, img=None, width=None, height=None):
     if img is not None:
@@ -121,6 +124,90 @@ def show2Dpose(channels, ax, img=None, width=None, height=None):
 def mpjpe_cal(predicted, target):
     assert predicted.shape == target.shape
     return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
+
+def compute_limb_regularization_matrix(gt_3d):
+    """
+    计算正则化矩阵，使指定的腿部连接平均方向朝向竖直向上(0,0,1)
+    
+    Args:
+        gt_3d: numpy array of shape (J, 3) - GT 3D pose
+        
+    Returns:
+        R: 3x3 rotation matrix to align limbs to vertical
+    """
+    # 定义腿部连接对 (起点, 终点)
+    limb_connections = [
+        (8, 14),   # left_front_thigh → left_front_knee
+        (9, 15),   # right_front_thigh → right_front_knee
+        (10, 16),  # left_back_thigh → left_back_knee
+        (11, 17),  # right_back_thigh → right_back_knee
+    ]
+    
+    # 计算所有连接的方向向量
+    # 注意：这些连接是从近端（大腿/膝盖）到远端（爪子），方向是向下的
+    # 为了让它们朝向竖直向上，我们需要反转方向
+    limb_vectors = []
+    for start_idx, end_idx in limb_connections:
+        # 反转方向：从end到start（从爪子指向身体，即向上）
+        vec = gt_3d[start_idx] - gt_3d[end_idx]
+        # 归一化
+        vec_norm = np.linalg.norm(vec)
+        if vec_norm > 1e-6:  # 避免除零
+            vec = vec / vec_norm
+            limb_vectors.append(vec)
+    
+    if len(limb_vectors) == 0:
+        return np.eye(3)  # 如果没有有效向量，返回单位矩阵
+    
+    # 计算平均方向
+    avg_direction = np.mean(limb_vectors, axis=0)
+    avg_direction = avg_direction / (np.linalg.norm(avg_direction) + 1e-8)
+    
+    # 目标方向：竖直向上 (0, 0, 1)
+    target_direction = np.array([0.0, 0.0, 1.0])
+    
+    # 计算旋转矩阵，将avg_direction对齐到target_direction
+    # 使用Rodrigues公式
+    v = np.cross(avg_direction, target_direction)
+    c = np.dot(avg_direction, target_direction)
+    
+    # 如果两个向量已经对齐或相反
+    if np.linalg.norm(v) < 1e-6:
+        if c > 0:
+            return np.eye(3)  # 已经对齐
+        else:
+            # 相反方向，旋转180度
+            # 找一个垂直轴
+            if abs(avg_direction[0]) < 0.9:
+                axis = np.array([1.0, 0.0, 0.0])
+            else:
+                axis = np.array([0.0, 1.0, 0.0])
+            axis = axis - avg_direction * np.dot(axis, avg_direction)
+            axis = axis / np.linalg.norm(axis)
+            return 2 * np.outer(axis, axis) - np.eye(3)
+    
+    # Rodrigues旋转公式
+    s = np.linalg.norm(v)
+    kmat = np.array([[0, -v[2], v[1]],
+                     [v[2], 0, -v[0]],
+                     [-v[1], v[0], 0]])
+    
+    R = np.eye(3) + kmat + kmat @ kmat * ((1 - c) / (s ** 2))
+    
+    return R
+
+def apply_regularization(pose_3d, R):
+    """
+    应用正则化矩阵到3D姿态
+    
+    Args:
+        pose_3d: numpy array of shape (J, 3)
+        R: 3x3 rotation matrix
+        
+    Returns:
+        regularized pose_3d: numpy array of shape (J, 3)
+    """
+    return (R @ pose_3d.T).T
 
 def euler_sample(x2d, y_local, steps_local, model_3d):
     dt = 1.0 / steps_local
@@ -231,15 +318,53 @@ if __name__ == '__main__':
             gt_3d_np = out_target[0, 0].cpu().numpy()
             pred_3d_np = output_3D[0, 0].cpu().numpy()
 
+            # Apply limb regularization
+            # Compute regularization matrix from GT 3D pose
+            R = compute_limb_regularization_matrix(gt_3d_np)
+            
+            # Apply regularization to both GT and predicted 3D poses
+            gt_3d_np_original = gt_3d_np.copy()
+            pred_3d_np_original = pred_3d_np.copy()
+            
+            gt_3d_np = apply_regularization(gt_3d_np, R)
+            pred_3d_np = apply_regularization(pred_3d_np, R)
+            
+            # Print debug info for first sample
+            if i_data == 0:
+                print("\n=== Regularization Debug Info ===")
+                print(f"Rotation matrix R:\n{R}")
+                
+                # 验证正则化后的平均方向
+                limb_connections = [
+                    (8, 14), (9, 15), (14, 3), (15, 4),
+                    (10, 16), (11, 17), (16, 5), (17, 6)
+                ]
+                limb_vectors_after = []
+                for start_idx, end_idx in limb_connections:
+                    vec = gt_3d_np[end_idx] - gt_3d_np[start_idx]
+                    vec_norm = np.linalg.norm(vec)
+                    if vec_norm > 1e-6:
+                        vec = vec / vec_norm
+                        limb_vectors_after.append(vec)
+                
+                if len(limb_vectors_after) > 0:
+                    avg_dir_after = np.mean(limb_vectors_after, axis=0)
+                    avg_dir_after = avg_dir_after / (np.linalg.norm(avg_dir_after) + 1e-8)
+                    print(f"Average limb direction after regularization: {avg_dir_after}")
+                    print(f"Target direction: [0, 0, 1]")
+                    print(f"Alignment (dot product): {np.dot(avg_dir_after, np.array([0, 0, 1])):.4f}")
+                print("================================\n")
+
             # Calculate error
             error = p_mpjpe(pred_3d_np[np.newaxis, ...], gt_3d_np[np.newaxis, ...])[0] * 1000
 
             # Filter frames based on error threshold
-            if error >= 64:
+            if error >= 60:
                 continue
 
-            # Draw 2D pose on image if available
+            # Save 2D pose on image
             if img is not None and width is not None and height is not None:
+                img_copy = img.copy()
                 vals = np.reshape(input_2d_np, (26, 2))
                 # Denormalize properly
                 vals[:, 0] = ((vals[:, 0] + 1) / 2) * width
@@ -249,43 +374,29 @@ if __name__ == '__main__':
                 for i in np.arange(len(I)):
                     pt1 = (int(vals[I[i], 0]), int(vals[I[i], 1]))
                     pt2 = (int(vals[J[i], 0]), int(vals[J[i], 1]))
-                    cv2.line(img, pt1, pt2, (240, 176, 0), 1.5)
-                    cv2.circle(img, pt1, 1, (240, 176, 0), -1)
-                    cv2.circle(img, pt2, 1, (240, 176, 0), -1)
+                    cv2.line(img_copy, pt1, pt2, (240, 176, 0), 2, cv2.LINE_AA)  # Anti-aliasing
+                    # cv2.circle(img_copy, pt1, 3, (240, 176, 0), -1, cv2.LINE_AA)
+                    # cv2.circle(img_copy, pt2, 3, (240, 176, 0), -1, cv2.LINE_AA)
                 # Draw keypoints
-                for idx in range(len(vals)):
-                    x, y = vals[idx]
-                    cv2.circle(img, (int(x), int(y)), 1, (240, 176, 0), -1)
-
-            # Visualization
-            fig = plt.figure(figsize=(15, 5))
-
-            # 2D Pose on Image
-            ax0 = fig.add_subplot(121)
-            if img is not None:
-                show2Dpose(None, ax0, img=img, width=width, height=height)  # img already has pose drawn
-                # ax0.set_title("2D Pose on Image")
+                # for idx in range(len(vals)):
+                #     x, y = vals[idx]
+                #     cv2.circle(img_copy, (int(x), int(y)), 3, (240, 176, 0), -1, cv2.LINE_AA)
+                
+                # Save 2D image directly using cv2
+                cv2.imwrite(f'{output_folder}/frame_{i_data:04d}_2d.png', img_copy)
             else:
-                ax0.text(0.5, 0.5, f"Image not found\n{img_path}", ha='center', va='center', transform=ax0.transAxes)
-                # ax0.set_title("2D Pose (Image Missing)")
                 print(f"Image not found for {img_path}")
 
-            # 3D GT
-            # ax1 = fig.add_subplot(132, projection='3d')
-            # ax1.set_title("3D GT Pose")
-            # show3Dpose_GT(gt_3d_np, ax1, world=False)
-
-            # 3D Predicted
-            ax2 = fig.add_subplot(122, projection='3d')
-            # ax2.set_title(f"3D Predicted Pose\nP-MPJPE: {error:.2f} mm")
-            show3Dpose_GT(gt_3d_np, ax2, world=True)
-            show3Dpose(pred_3d_np, ax2, color=(0/255, 176/255, 240/255), world=True)
-
+            # Save 3D pose visualization
+            fig = plt.figure(figsize=(8, 8), dpi=150)  # Higher dpi for better quality
+            ax = fig.add_subplot(111, projection='3d')
+            show3Dpose_GT(gt_3d_np, ax, world=True, linewidth=2.5)  # Thicker lines
+            show3Dpose(pred_3d_np, ax, color=(0/255, 176/255, 240/255), world=True, linewidth=2.5)
             plt.tight_layout()
-            plt.savefig(f'{output_folder}/frame_{i_data:04d}.png', dpi=200, bbox_inches='tight')
+            plt.savefig(f'{output_folder}/frame_{i_data:04d}_3d.png', bbox_inches='tight', dpi=150)
             plt.close()
 
-            if i_data >= 199:  # Limit to first 100 for demo
-                break
+            # if i_data >= 10:  # Limit to first 100 for demo
+            #     break
 
     print(f"Visualizations saved to {output_folder}")
