@@ -49,10 +49,10 @@ plt.switch_backend('agg')
 #         cv2.circle(img, end, thickness=-1, color=colors[LR[j]-1], radius=3)
 #     return img
 
-def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
+def show3Dpose(channels, ax, color, world=True, linewidth=1.5):
     vals = np.reshape(channels, (26, 3))
     I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-    J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+    J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
         ax.plot(z, x, y, lw=linewidth, color=color)  # Plot z, x, y
@@ -73,10 +73,10 @@ def show3Dpose(channels, ax, color, world=True, linewidth=2.5):
     ax.tick_params('z', labelleft=False)
     # ax.view_init(elev=5, azim=-90)  # Set view to front view, like 2D
 
-def show3Dpose_GT(channels, ax, world=True, linewidth=2.5):
+def show3Dpose_GT(channels, ax, world=True, linewidth=1.5):
     vals = np.reshape(channels, (26, 3))
     I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-    J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+    J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
     LR = [1, 2, 2, 1, 0, 1, 2, 0, 1, 2, 1, 2, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 2, 0, 0]
     colors = [(255/255, 0/255, 0/255), (255/255, 0/255, 0/255), (255/255, 0/255, 0/255)]
     for i in np.arange(len(I)):
@@ -108,7 +108,7 @@ def show2Dpose(channels, ax, img=None, width=None, height=None):
         if width is not None and height is not None:
             vals = vals * np.array([width, height])
         I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-        J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+        J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
         for i in np.arange(len(I)):
             x, y = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(2)]
             ax.plot(x, y, lw=1)
@@ -234,6 +234,10 @@ if __name__ == '__main__':
             # Calculate error
             error = p_mpjpe(pred_3d_np[np.newaxis, ...], gt_3d_np[np.newaxis, ...])[0] * 1000
 
+            # Filter frames based on error threshold
+            if error >= 64:
+                continue
+
             # Draw 2D pose on image if available
             if img is not None and width is not None and height is not None:
                 vals = np.reshape(input_2d_np, (26, 2))
@@ -241,17 +245,17 @@ if __name__ == '__main__':
                 vals[:, 0] = ((vals[:, 0] + 1) / 2) * width
                 vals[:, 1] = ((vals[:, 1] + height / width) / 2) * width
                 I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-                J = np.array([0, 1, 21, 21, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
+                J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
                 for i in np.arange(len(I)):
                     pt1 = (int(vals[I[i], 0]), int(vals[I[i], 1]))
                     pt2 = (int(vals[J[i], 0]), int(vals[J[i], 1]))
-                    cv2.line(img, pt1, pt2, (0, 255, 0), 2)
-                    cv2.circle(img, pt1, 3, (0, 255, 0), -1)
-                    cv2.circle(img, pt2, 3, (0, 255, 0), -1)
+                    cv2.line(img, pt1, pt2, (240, 176, 0), 1.5)
+                    cv2.circle(img, pt1, 1, (240, 176, 0), -1)
+                    cv2.circle(img, pt2, 1, (240, 176, 0), -1)
                 # Draw keypoints
                 for idx in range(len(vals)):
                     x, y = vals[idx]
-                    cv2.circle(img, (int(x), int(y)), 3, (0, 255, 0), -1)
+                    cv2.circle(img, (int(x), int(y)), 1, (240, 176, 0), -1)
 
             # Visualization
             fig = plt.figure(figsize=(15, 5))
@@ -260,10 +264,10 @@ if __name__ == '__main__':
             ax0 = fig.add_subplot(121)
             if img is not None:
                 show2Dpose(None, ax0, img=img, width=width, height=height)  # img already has pose drawn
-                ax0.set_title("2D Pose on Image")
+                # ax0.set_title("2D Pose on Image")
             else:
                 ax0.text(0.5, 0.5, f"Image not found\n{img_path}", ha='center', va='center', transform=ax0.transAxes)
-                ax0.set_title("2D Pose (Image Missing)")
+                # ax0.set_title("2D Pose (Image Missing)")
                 print(f"Image not found for {img_path}")
 
             # 3D GT
@@ -273,15 +277,15 @@ if __name__ == '__main__':
 
             # 3D Predicted
             ax2 = fig.add_subplot(122, projection='3d')
-            ax2.set_title(f"3D Predicted Pose\nP-MPJPE: {error:.2f} mm")
+            # ax2.set_title(f"3D Predicted Pose\nP-MPJPE: {error:.2f} mm")
             show3Dpose_GT(gt_3d_np, ax2, world=True)
             show3Dpose(pred_3d_np, ax2, color=(0/255, 176/255, 240/255), world=True)
 
             plt.tight_layout()
-            plt.savefig(f'{output_folder}/frame_{i_data:04d}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(f'{output_folder}/frame_{i_data:04d}.png', dpi=200, bbox_inches='tight')
             plt.close()
 
-            if i_data >= 99:  # Limit to first 100 for demo
+            if i_data >= 199:  # Limit to first 100 for demo
                 break
 
     print(f"Visualizations saved to {output_folder}")

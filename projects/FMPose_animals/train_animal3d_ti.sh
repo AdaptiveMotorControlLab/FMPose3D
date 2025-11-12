@@ -1,5 +1,5 @@
 # bash train_animal3d_ti.sh
-layers=3
+layers=7
 batch_size=32
 lr=1e-3
 gpu_id=0
