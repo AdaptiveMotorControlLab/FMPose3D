@@ -610,7 +610,6 @@ def show_frame():
     figsize_x = 6.0*2
     figsize_y = 3.6*2
     dpi_number = 1000
-    
 
     path = folder + "/" + str(i_data)
     if not os.path.exists(path):
