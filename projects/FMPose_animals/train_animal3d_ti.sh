@@ -1,16 +1,16 @@
 # bash train_animal3d_ti.sh
-layers=6
-batch_size=32
-lr=2e-3
+layers=5
+batch_size=13
+lr=1e-3
 gpu_id=0
 eval_sample_steps=3
 num_saved_models=3
 frames=1
-large_decay_epoch=9
+large_decay_epoch=15
 lr_decay_large=0.75
 n_joints=26
 out_joints=26
-epochs=400
+epochs=300
 # model_path='model/model_attn.py'
 model_path='model/model_G_P_Attn_animal3d.py'
 
