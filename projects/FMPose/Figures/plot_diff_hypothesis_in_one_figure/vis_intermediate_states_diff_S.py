@@ -547,7 +547,7 @@ def show_frame():
     import shutil
     file_name = os.path.basename(__file__)
     shutil.copyfile(src=file_name, dst = os.path.join(folder, args.create_time + "_" + file_name))
-    # shutil.copyfile(src="vis_FM_multi_hypothesis.sh", dst = os.path.join(folder, args.create_time + "_vis_FM_multi_hypothesis.sh"))
+    shutil.copyfile(src="vis_intermediate_states_diff_S.sh", dst = os.path.join(folder, args.create_time + "_vis_intermediate_states_diff_S.sh"))
     # shutil.copyfile(src="vis_FMPose_hypothesis.py", dst = os.path.join(folder, args.create_time + "_vis_FMPose_hypothesis.py"))
   figsize_x = 6.4*2
   figsize_y = 3.6*2
@@ -659,7 +659,7 @@ def show_frame():
         str(camera_index) + '/' + str(('%04d'%index_image)) + '.jpg'
     image = cv2.imread(image_path)
     image = drawskeleton(input_2D_no, image)
-    cv2.imwrite(out_dir + str(i_data) + '_2d.png', image)
+    cv2.imwrite(out_dir + str(i_data) + '_2d.jpg', image)
 
     # figure
     fig2  = plt.figure(num=2, figsize=(figsize_x, figsize_y) ) # 1280 * 720
@@ -696,20 +696,15 @@ def show_frame():
             ax_step = plt.axes(projection='3d')
             
             # Plot GT in red
-            show3Dpose_GT(gt_np, ax_step, world=False, linewidth=1.0)
+            show3Dpose_GT(gt_np, ax_step, world=False, linewidth=1.5)
             
-            # Plot intermediate state with color gradient from gray to orange
-            step_ratio = step_idx / max(len(list_y_s) - 1, 1)
-            # Gradient from gray (0.5, 0.5, 0.5) to orange (1.0, 0.55, 0.0)
-            color_r = 0.5 + 0.5 * step_ratio
-            color_g = 0.5 + 0.05 * step_ratio
-            color_b = 0.5 - 0.5 * step_ratio
-            color = (255/255, 140/255, 0/255) # blue
-            show3Dpose(pose_step_np, ax_step, color=(color_r, color_g, color_b), world=False, linewidth=1.5)
+            # Plot intermediate state
+            color = (0/255, 176/255, 240/255) # blue
+            show3Dpose(pose_step_np, ax_step, color=color, world=False, linewidth=1.5)
             
             # Save figure
-            step_path = os.path.join(path_intermediate_s, f'step_{step_idx:03d}.png')
-            plt.savefig(step_path, dpi=dpi_number, format='png', bbox_inches='tight', transparent=False)
+            step_path = os.path.join(path_intermediate_s, f'step_{step_idx:03d}.jpg')
+            plt.savefig(step_path, dpi=dpi_number, format='jpg', bbox_inches='tight', transparent=False)
             plt.close(fig_step)
 
     plt.clf()  # Clear current figure and all axes
