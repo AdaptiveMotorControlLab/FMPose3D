@@ -1,4 +1,4 @@
-#Train CFM
+#Train FMPose
 layers=5
 lr=1e-3
 decay=0.98
@@ -15,9 +15,8 @@ model_path='./model/model_G_P_Attn.py'
 sh_file='run_FM_noiseX.sh'
 folder_name=FM_GPA_TestP_deleteclone_inGCN_1GCN_P_Attn_layers${layers}_lr${lr}_decay${decay}_lr_decay_large_e${large_decay_epoch}_${lr_decay_large}_B${batch_size}_$(date +%Y%m%d_%H%M%S)
 
-#--keypoints gt \
-# training
 python3 main_CFM_noise_pose.py \
+  --debug \
   --train \
   --dataset h36m \
   --frames ${frames} \
@@ -35,19 +34,3 @@ python3 main_CFM_noise_pose.py \
   --num_saved_models ${num_saved_models} \
   --sh_file ${sh_file} \
   --channel ${channel_dim}
-
-# Testing CFM
-# model_path='./pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/250916_1953_32_model_GAMLP.py'
-# saved_model_path='./pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
-
-# python3 main_CFM_noise_pose_test.py \
-# --reload \
-# --saved_model_path ${saved_model_path} \
-# --model_path ${model_path} \
-# --gpu ${gpu_id} \
-# --batch_size ${batch_size} \
-# --layers ${layers} \
-# --nepoch ${epochs} \
-# --eval_sample_steps ${eval_sample_steps} \
-# --num_saved_models ${num_saved_models} \
-# --sh_file ${sh_file}
