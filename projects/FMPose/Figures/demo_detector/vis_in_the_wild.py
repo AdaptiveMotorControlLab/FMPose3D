@@ -313,16 +313,16 @@ def get_pose3D(path, output_dir, type='image'):
         fig = plt.figure(figsize=(9.6, 5.4))
         ax = plt.subplot(121)
         showimage(ax, image_2d)
-        ax.set_title("Input", fontsize = font_size)
+        # ax.set_title("Input", fontsize = font_size)
 
         ax = plt.subplot(122)
         showimage(ax, image_3d)
-        ax.set_title("Reconstruction", fontsize = font_size)
+        # ax.set_title("Reconstruction", fontsize = font_size)
 
         ## save
         output_dir_pose = output_dir +'pose/'
         os.makedirs(output_dir_pose, exist_ok=True)
-        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.png', dpi=200, bbox_inches = 'tight')
+        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.jpg', dpi=200, bbox_inches = 'tight')
 
 
 if __name__ == "__main__":
@@ -335,16 +335,44 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    path = args.path # file path
-    filename = path.split('/')[-1].split('.')[0]
-    output_dir = './demo/output/' + filename + '/'
+    path = args.path # file path or folder path
+    
+    # Check if path is a directory
+    if os.path.isdir(path):
+        # Get all image files in the directory
+        image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']
+        image_files = []
+        for ext in image_extensions:
+            image_files.extend(glob.glob(os.path.join(path, ext)))
+        image_files.sort()
+        
+        if len(image_files) == 0:
+            print(f"No image files found in {path}")
+            exit(0)
+        
+        print(f"Found {len(image_files)} images in {path}")
+        
+        # Process each image
+        for img_path in tqdm(image_files, desc="Processing images"):
+            filename = img_path.split('/')[-1].split('.')[0]
+            output_dir = './demo/output/' + filename + '/'
+            
+            print(f"\nProcessing: {img_path}")
+            get_pose2D(img_path, output_dir, args.type)
+            get_pose3D(img_path, output_dir, args.type)
+        
+        print(f'\nAll {len(image_files)} images processed successfully!')
+    else:
+        # Single file processing
+        filename = path.split('/')[-1].split('.')[0]
+        output_dir = './demo/output/' + filename + '/'
 
-    get_pose2D(path, output_dir, args.type)
-    get_pose3D(path, output_dir, args.type)
+        get_pose2D(path, output_dir, args.type)
+        get_pose3D(path, output_dir, args.type)
 
-    if args.type=="video":
-        img2video(path, filename, output_dir)
-        img2gif(path, filename, output_dir)
+        if args.type=="video":
+            img2video(path, filename, output_dir)
+            img2gif(path, filename, output_dir)
 
-    print('Generating demo successful!')
+        print('Generating demo successful!')
 
