@@ -12,11 +12,12 @@ sh_file='vis_in_the_wild.sh'
 model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/250916_1953_32_model_GAMLP.py'
 saved_model_path='pretrained_model/FM_GAMLP_noisePose_layers5_1GCNParallelAttnMLP_attnD_0.2_projD_0.25_lr1e-3_decay0.98_lr_decay_large_e5_0.8_B256_20250916_1953/CFM_36_4972_best.pth'
 
-path='./images/image_00068.jpg'
+# path='./images/image_00068.jpg'  # single image
+input_images_folder='./images/'  # folder containing multiple images
 
 python3 vis_in_the_wild.py \
  --type 'image' \
- --path ${path} \
+ --path ${input_images_folder} \
  --saved_model_path "${saved_model_path}" \
  --model_path "${model_path}" \
  --sample_steps ${sample_steps} \
