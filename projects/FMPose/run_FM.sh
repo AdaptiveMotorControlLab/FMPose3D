@@ -24,7 +24,6 @@ fi
 
 # python3 main_CFM_noise_pose.py --train --model ${model_name} --gpu ${gpu_id} --batch_size ${batch_size} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch ${epochs} --eval_multi_steps --eval_sample_steps ${eval_multi_steps} --folder_name $folder_name --large_decay_epoch ${large_decay_epoch} --lr_decay_large ${lr_decay_large}
 python3 main_CFM_noise_pose.py --train --model ${model_name} --gpu ${gpu_id} --batch_size ${batch_size} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch ${epochs} --eval_sample_steps ${eval_sample_steps} --folder_name $folder_name --large_decay_epoch ${large_decay_epoch} --lr_decay_large ${lr_decay_large} --num_saved_models ${num_saved_models}
-# python3 main_CFM_noise_pose_weights_GA.py --train --model ${model_name} --gpu ${gpu_id} --batch_size ${batch_size} --layers ${layers} --lr ${lr} --lr_decay ${decay} --nepoch ${epochs} --eval_sample_steps ${eval_sample_steps} --folder_name $folder_name --large_decay_epoch ${large_decay_epoch} --lr_decay_large ${lr_decay_large} --num_saved_models ${num_saved_models}
 
 
 #Test CFM
