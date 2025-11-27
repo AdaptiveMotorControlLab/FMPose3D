@@ -99,14 +99,6 @@ def drawskeleton(kps, img, thickness=3, mpii=2):
     return img
 
 def show3Dpose_GT(channels, ax, world = True): # blue, orange
-  # colors = [(255/255, 128/255, 255/255), # 躯干
-  #           (127/255, 127/255, 255/255), # 手
-  #           (255/255, 127/255, 127/255)] # 脚
-
-  # colors = [(0/255, 176/255, 240/255), # blue
-  #           (255/255, 0/255, 0/255), # red
-  #           (255/255, 127/255, 127/255)] # 脚
-
 
   colors = [(255/255, 0/255, 0/255), # blue
             (255/255, 0/255, 0/255), # red
@@ -559,12 +551,11 @@ def show_frame():
     # # create_gif(path_mix_z + '/' + action[0] +"_idx" + str(i)+ "_iter" + str(iter_num) + '.gif', folder_path=path_mix_z, duration=0.25)
     # create_gif(path_nonflip_P + '/' + action[0] +"_idx" + str(index_image)+ "_iter" + str(iter_num) + '.gif', folder_path=path_nonflip_PU, duration=0.3)
         
-    plt.clf () #清除当前图形及其所有轴，但保持窗口打开，以便可以将其重新用于其他绘图。
-    plt.close () #完全关闭图形窗口
+    plt.clf()  # Clear current figure and all axes
+    plt.close()  # Close the figure window completely
     break
  
 if __name__ == "__main__":
-  # Delete_Files('results/')
   manualSeed = 1
   random.seed(manualSeed)
   torch.manual_seed(manualSeed)
