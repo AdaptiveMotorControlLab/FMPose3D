@@ -9,14 +9,12 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
-from fmpose.common.arguments import opts as parse_args
-from fmpose.common.h36m_dataset import Human36mDataset
-from fmpose.common.load_data_hm36 import Fusion
+from fmpose.common import opts, Human36mDataset, Fusion
 from fmpose.common.utils import *
 
 from fmpose.aggregation_methods import aggregation_RPEA_weighted_by_2D_error
 
-args = parse_args().parse()
+args = opts().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 # Support loading the model class from a specific file path if provided
 CFM = None
@@ -31,7 +29,6 @@ if getattr(args, "model_path", ""):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
-
 
 def test_multi_hypothesis(
     args,
@@ -264,28 +261,28 @@ if __name__ == "__main__":
 
         # backup files
         import shutil
-        file_name = os.path.basename(__file__)
-        shutil.copyfile(
-            src=file_name,
-            dst=os.path.join(args.checkpoint, args.create_time + "_" + file_name),
-        )
-        shutil.copyfile(
-            src="common/arguments.py",
-            dst=os.path.join(args.checkpoint, args.create_time + "_arguments.py"),
-        )
-        if getattr(args, "model_path", ""):
-            model_src_path = os.path.abspath(args.model_path)
-            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-            shutil.copyfile(
-                src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name)
-            )
-        shutil.copyfile(
-            src="common/utils.py",
-            dst=os.path.join(args.checkpoint, args.create_time + "_utils.py"),
-        )
-        sh_base = os.path.basename(args.sh_file)
-        dst_name = f"{args.create_time}_" + sh_base
-        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
+        # file_name = os.path.basename(__file__)
+        # shutil.copyfile(
+        #     src=file_name,
+        #     dst=os.path.join(args.checkpoint, args.create_time + "_" + file_name),
+        # )
+        # shutil.copyfile(
+        #     src="common/arguments.py",
+        #     dst=os.path.join(args.checkpoint, args.create_time + "_arguments.py"),
+        # )
+        # if getattr(args, "model_path", ""):
+        #     model_src_path = os.path.abspath(args.model_path)
+        #     model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+        #     shutil.copyfile(
+        #         src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name)
+        #     )
+        # shutil.copyfile(
+        #     src="common/utils.py",
+        #     dst=os.path.join(args.checkpoint, args.create_time + "_utils.py"),
+        # )
+        # sh_base = os.path.basename(args.sh_file)
+        # dst_name = f"{args.create_time}_" + sh_base
+        # shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(
             format="%(asctime)s %(message)s",
