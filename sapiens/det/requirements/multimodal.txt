@@ -1,4 +1,0 @@
-fairscale
-nltk
-pycocoevalcap
-transformers

@@ -1,6 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./DeepLabCut",
-        "./sam2"
-    ]
-}
