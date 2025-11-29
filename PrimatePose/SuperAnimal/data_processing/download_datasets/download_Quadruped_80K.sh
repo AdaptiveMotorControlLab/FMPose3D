@@ -1,1 +1,0 @@
-wget -P /home/ti_wang/data/SuperAnimal/ https://zenodo.org/records/14016777/files/Quadruped80K_20240925.tar.gz

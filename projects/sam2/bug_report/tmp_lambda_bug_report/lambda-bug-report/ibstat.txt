@@ -1,1 +1,0 @@
-No InfiniBand data available. This machine may not have InfiniBand.

@@ -1,1 +1,0 @@
-python3 vis_2D_3D_poses_OMS.py -b 7 -f 11
