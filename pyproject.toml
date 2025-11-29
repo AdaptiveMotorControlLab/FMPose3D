@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fmpose"
+dynamic = ["version"]
+description = "FMPose: 3D Pose Estimation via Flow Matching"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Ti Wang", email = "ti.wang@epfl.ch"},
+    {name = "Xiaohang Yu"},
+    {name = "Mackenzie Weygandt Mathis"},
+]
+keywords = ["pose estimation", "3D pose", "flow matching", "computer vision", "deep learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "timm>=1.0.0",
+    "einops>=0.4.0",
+    "numpy>=1.20.0",
+    "tqdm>=4.60.0",
+    "scipy>=1.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "isort>=5.10.0",
+]
+wandb = [
+    "wandb>=0.12.0",
+]
+viz = [
+    "matplotlib>=3.5.0",
+    "opencv-python>=4.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/fmpose"
+Repository = "https://github.com/yourusername/fmpose"
+Documentation = "https://github.com/yourusername/fmpose#readme"
+"Bug Tracker" = "https://github.com/yourusername/fmpose/issues"
+
+[project.scripts]
+# 可选：提供命令行入口
+# fmpose-train = "fmpose.cli:train"
+# fmpose-eval = "fmpose.cli:evaluate"
+
+[tool.setuptools]
+packages = ["fmpose", "fmpose.common", "fmpose.models"]
+
+[tool.setuptools.package-data]
+fmpose = ["*.json", "*.yaml"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.setuptools.dynamic]
+version = {attr = "fmpose.__version__"}
+
