@@ -9,7 +9,7 @@ topk=8
 gpu_id=0
 mode='exp'
 exp_temp=0.005
-folder_name=test_s${eval_multi_steps}_${mode}_h${num_hypothesis_list}_test_results_$(date +%Y%m%d_%H%M%S)
+folder_name=test_s${eval_multi_steps}_${mode}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
 
 model_path='pre_trained_models/fmpose_detected2d/model_GAMLP.py'
 saved_model_path='pre_trained_models/fmpose_detected2d/FMpose_36_4972_best.pth'
