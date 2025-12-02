@@ -11,7 +11,7 @@ epochs=80
 num_saved_models=3
 frames=1
 channel_dim=512
-model_path='./fmpose/models/model_G_P_Attn.py'
+model_path='./fmpose/models/model_GAMLP.py'
 sh_file='scripts/FMPose_train.sh'
 folder_name=FMPose_Publish_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
