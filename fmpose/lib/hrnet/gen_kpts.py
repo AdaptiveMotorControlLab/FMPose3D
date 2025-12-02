@@ -78,7 +78,7 @@ def model_load(config):
     if torch.cuda.is_available():
         model = model.cuda()
 
-    state_dict = torch.load(config.OUTPUT_DIR)
+    state_dict = torch.load(config.OUTPUT_DIR, weights_only=True)
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
