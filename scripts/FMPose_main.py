@@ -260,7 +260,7 @@ if __name__ == "__main__":
             os.makedirs(args.checkpoint)
 
         # backup files
-        import shutil
+        # import shutil
         # file_name = os.path.basename(__file__)
         # shutil.copyfile(
         #     src=file_name,
