@@ -146,7 +146,7 @@ class opts:
         self.parser.add_argument("--opt_steps", type=int, default=2)
 
         # demo
-        self.parser.add_argument('--type', type=str, default='image', help='input type, onlys support image or video')
+        self.parser.add_argument('--type', type=str, default='image', help='input type, only support image or video')
         self.parser.add_argument('--path', type=str, default='demo/images/running.png', help='the path of your file')
     
     def parse(self):
