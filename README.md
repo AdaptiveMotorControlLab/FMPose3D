@@ -18,7 +18,7 @@ conda create -n fmpose python=3.10
 <!-- test version -->
 ```bash
 git clone xxxx.git  # clone this repo
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose=0.0.4
 # pip install fmpose
 ```
 
