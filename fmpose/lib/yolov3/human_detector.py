@@ -148,7 +148,7 @@ def yolo_human_det(img, model=None, reso=416, confidence=0.70):
     for i in range(len(output)):
         item = output[i]
         bbox = item[1:5].cpu().numpy()
-        # conver float32 to .2f data
+        # convert float32 to .2f data
         bbox = [round(i, 2) for i in list(bbox)]
         score = item[5].cpu().numpy()
         bboxs.append(bbox)
