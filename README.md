@@ -28,7 +28,7 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 
 This visualization script is designed for single-frame based model, allowing you to easily run 3D human pose estimation on any single image.
 
-Before testing, make sureyou have the pre-traind model ready.
+Before testing, make sure you have the pre-trained model ready.
 You may either use the model trained by your own or download ours from [here](https://drive.google.com/drive/folders/1235_UgUQXYZtjprBOv2ZJJHY2KOAS_6p?usp=sharing) and place it in the `./pre_trained_models` directory.
 
 Next, put your test images into folder `demo/images`. Then run the visualization script:
