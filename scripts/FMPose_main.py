@@ -18,7 +18,9 @@ args = opts().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 # Support loading the model class from a specific file path if provided
 CFM = None
+
 if getattr(args, "model_path", ""):
+    # Load model from local file path (for custom models)
     import importlib.util
     import pathlib
 
@@ -29,6 +31,10 @@ if getattr(args, "model_path", ""):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
+else:
+    # Load model from installed fmpose package
+    from fmpose.models import Model as CFM
+
 
 def test_multi_hypothesis(
     args,
