@@ -72,7 +72,7 @@ def arg_parse():
     parser.add_argument('-np', '--num-person', type=int, default=1, help='number of estimated human poses. [1, 2]')
     parser.add_argument('--gpu', type=str, default='0', help='input video')
     
-    parser.add_argument('--type', type=str, default='image', help='input type, onlys support image or video')
+    parser.add_argument('--type', type=str, default='image', help='input type, only support image or video')
     parser.add_argument('--path', type=str, default='images/running.png', help='the path of your file')
 
     args, unknown = parser.parse_known_args()
