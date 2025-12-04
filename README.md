@@ -13,7 +13,8 @@ This is the official implementation of the approach described in the paper:
 
 Make sure you have Python 3.10. You can set this up with:
 ```bash
-conda create -n fmpose python=3.10
+conda create -n fmpose_3d python=3.10
+conda activate fmpose_3d
 ```
 <!-- test version -->
 ```bash
@@ -49,12 +50,14 @@ You can obtain the Human3.6M dataset from the [Human3.6M](http://vision.imar.ro/
 #### Setup from preprocessed dataset (Recommended)
  You also can access the processed data by downloading it from [here](https://drive.google.com/drive/folders/112GPdRC9IEcwcJRyrLJeYw9_YV4wLdKC?usp=sharing).
 
-```bash
-${POSE_ROOT}/
-|-- dataset
-|   |-- data_3d_h36m.npz
-|   |-- data_2d_h36m_gt.npz
-|   |-- data_2d_h36m_cpn_ft_h36m_dbb.npz
+Place the downloaded files in the `dataset/` folder of this project:
+
+```
+<project_root>/
+├── dataset/
+│   ├── data_3d_h36m.npz
+│   ├── data_2d_h36m_gt.npz
+│   └── data_2d_h36m_cpn_ft_h36m_dbb.npz
 ```
 
 ### Training 
