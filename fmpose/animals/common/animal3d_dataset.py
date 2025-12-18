@@ -28,11 +28,11 @@ class TrainDataset(Dataset):
             keypoint_2d = np.array(reproj, dtype=np.float32)
         else:
             keypoint_2d = np.array(data.get("keypoint_2d", []), dtype=np.float32)
-        # normalize 2D keypoints
+         # normalize 2D keypoints
         hight = np.array(data["height"])
         width = np.array(data["width"])
         keypoint_2d = normalize_screen_coordinates(keypoint_2d[..., :2], width, hight)
-
+         
         # build 3D keypoints; append ones; fallback to zeros if missing
         if "keypoint_3d" in data and data["keypoint_3d"] is not None:
             kp3d = np.array(data["keypoint_3d"], dtype=np.float32)
@@ -48,10 +48,10 @@ class TrainDataset(Dataset):
 
         bbox = data["bbox"]  # [x, y, w, h]
         ori_keypoint_2d = keypoint_2d.copy()
-
+  
         item = {
             "keypoints_2d": keypoint_2d,  #
             "keypoints_3d": keypoint_3d,
             "img_path": str(data["img_path"]),
-        }
+              }
         return item
