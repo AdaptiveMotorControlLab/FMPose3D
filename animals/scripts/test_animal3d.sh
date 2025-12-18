@@ -10,8 +10,9 @@ lr_decay_large=0.75
 n_joints=26
 out_joints=26
 epochs=300
-model_path='model/model_animals.py'
-saved_model_path='pre_trained_models/animal3d_pretrained_weights/CFM_154_4403_best.pth'
+model_path='models/model_animals.py'
+# model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
+saved_model_path='../pre_trained_models/animal3d_pretrained_weights/CFM_154_4403_best.pth'
 # root path denotes the path to the original dataset
 root_path="./dataset/"
 train_dataset_paths=(
@@ -25,14 +26,14 @@ test_dataset_paths=(
 folder_name="TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
 sh_file='scripts/animals/test_animal3d.sh'
 
-python scripts/animals/main_animal3d.py \
+python ./scripts/main_animal3d.py \
   --root_path ${root_path} \
   --reload \
   --dataset animal3d \
   --test 1 \
   --batch_size ${batch_size} \
   --lr ${lr} \
-  --model_path ${model_path} \
+  ${model_path:+--model_path "$model_path"} \
   --folder_name ${folder_name} \
   --layers ${layers} \
   --gpu ${gpu_id} \
