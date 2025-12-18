@@ -1,5 +1,5 @@
-
 import numpy as np
+
 
 class Skeleton:
     def __init__(self, parents, joints_left, joints_right):
@@ -77,6 +77,3 @@ class Skeleton:
         for i, parent in enumerate(self._parents):
             if parent != -1:
                 self._children[parent].append(i)
-
-
-                
