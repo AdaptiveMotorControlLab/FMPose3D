@@ -1,20 +1,20 @@
-import torch
-import torch.nn as nn
 import math
 from functools import partial
 
+import torch
+import torch.nn as nn
 from einops import rearrange
-from fmpose.animals.models.graph_frames import Graph
 from timm.models.layers import DropPath
 
+from fmpose.animals.models.graph_frames import Graph
+
+
 class TimeEmbedding(nn.Module):
-    # Continuous-time embedding with Gaussian Fourier features
     def __init__(self, dim: int, hidden_dim: int = 64):
         super().__init__()
         self.dim = dim
         self.hidden_dim = hidden_dim
         assert self.dim % 2 == 0, "TimeEmbedding.dim must be even"
-        # Gaussian Fourier features for continuous-time conditioning (Flow Matching friendly)
         self.gaussian_std = 1.0
         self.register_buffer('B', torch.randn(self.dim // 2) * self.gaussian_std, persistent=True)
         self.proj = nn.Sequential(
@@ -28,8 +28,6 @@ class TimeEmbedding(nn.Module):
         b, f = t.shape[0], t.shape[1]
         half_dim = self.dim // 2
         
-        # Gaussian Fourier features: sin(2π B t), cos(2π B t)
-        # t: (B,F,1,1) -> (B,F,1,1,1) -> broadcast with (1,1,1,1,half_dim)
         angles = (2 * math.pi) * t.to(torch.float32).unsqueeze(-1) * self.B.view(1, 1, 1, 1, half_dim)
         sin = torch.sin(angles)
         cos = torch.cos(angles)
@@ -42,8 +40,8 @@ class Mlp(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        self.fc1 = nn.Linear(in_features, hidden_features) # 32 64
-        self.act = act_layer() # GELU
+        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.act = act_layer()
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
 
@@ -51,7 +49,7 @@ class Mlp(nn.Module):
         x = self.fc1(x)
         x = self.act(x)
         x = self.drop(x)
-        x = self.fc2(x) # 64,32
+        x = self.fc2(x)
         x = self.drop(x)
         return x
 
@@ -60,23 +58,18 @@ class GCN(nn.Module):
     def __init__(self, in_channels, out_channels, adj):
         super().__init__()
 
-        # Register adj as buffer to follow module device automatically
         self.register_buffer('adj', adj)
         self.kernel_size = adj.size(0)
-        #
         self.conv1d = nn.Conv1d(in_channels, out_channels * self.kernel_size, kernel_size=1)
-    def forward(self, x): # b, j, c
-        # conv1d
+    def forward(self, x):
         x = rearrange(x,"b j c -> b c j") 
-        x = self.conv1d(x)   # b,c*kernel_size,j = b,c*4,j
+        x = self.conv1d(x)
         x = rearrange(x,"b ck j -> b ck 1 j")
         b, kc, t, v = x.size()
-        x = x.view(b, self.kernel_size, kc//self.kernel_size, t, v) # b,k, kc/k, 1, j 
-        x = torch.einsum('bkctv, kvw->bctw', (x, self.adj))   # bctw    b,c,1,j 
-        # x.shape b,c,1,j   [128,512,17,1]
+        x = x.view(b, self.kernel_size, kc//self.kernel_size, t, v)
+        x = torch.einsum('bkctv, kvw->bctw', (x, self.adj))
         x = x.contiguous()
         x = rearrange(x, 'b c 1 j -> b j c')
-        # 激活函数  x.contiguous() + relu 
         return x.contiguous()
 
 class Attention(nn.Module):
@@ -84,11 +77,10 @@ class Attention(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
         self.scale = qk_scale or head_dim ** -0.5
 
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias) # 
-        self.attn_drop = nn.Dropout(attn_drop) # p=0
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
         
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)  # 0
@@ -98,7 +90,7 @@ class Attention(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4) 
         q, k, v = qkv[0], qkv[1], qkv[2]  
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale # b,heads,17,4 @ b,heads,4,17 = b,heads,17,17
+        attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1) 
         attn = self.attn_drop(attn)
 
@@ -108,17 +100,14 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
     
-class Block(nn.Module): # drop=0.1
+class Block(nn.Module):
     def __init__(self, length, dim, tokens_dim, channels_dim, adj, drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
-        # length =17, dim = args.channel = 512, tokens_dim = args.token_dim=256, channels_dim = args.d_hid = 1024
         super().__init__()
-        # GCN
         self.norm1 = norm_layer(length)
         self.gcn1 = GCN(dim, dim, adj)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         
-        # attention
         self.norm_att1=norm_layer(dim)
         self.num_heads = 8
         qkv_bias =  True
@@ -132,24 +121,20 @@ class Block(nn.Module): # drop=0.1
         self.mlp = Mlp(in_features=dim, hidden_features=1024, act_layer=act_layer, drop=drop)
 
     def forward(self, x):
-        # B,J,dim 
-        res1 = x # b,j,c
+        res1 = x
         x_gcn_1 = x.clone()
-        # gcn
         x_gcn_1 = rearrange(x_gcn_1,"b j c -> b c j").contiguous() 
         x_gcn_1 = self.norm1(x_gcn_1) # b,c,j
         x_gcn_1 = rearrange(x_gcn_1,"b c j -> b j c").contiguous()
         x_gcn_1 = self.gcn1(x_gcn_1)  # b,j,c
-        # attention
         x_atten = x.clone()
         x_atten = self.norm_att1(x_atten)
         x_atten = self.attn(x_atten)
         
         x = res1 + self.drop_path(x_gcn_1 + x_atten)
         
-        # MLP residual
-        res2 = x  # b,j,c
-        x2 = self.norm_mlp(x.clone())
+        res2 = x
+        x2 = self.norm_mlp(x)
         x = self.mlp(x2)
         x = res2 + self.drop_path(x)
         return x
@@ -157,8 +142,6 @@ class Block(nn.Module): # drop=0.1
 class FMPose(nn.Module):
     def __init__(self, depth, embed_dim, channels_dim, tokens_dim, adj, drop_rate=0.10, length=27):
         super().__init__()
-        # depth = args.layers=3, embed_dim=args.channel=512, channels_dim=args.d_hid=1024, tokens_dim=args.token_dim=256(set by myself)
-        
         drop_path_rate = 0.2
         norm_layer = partial(nn.LayerNorm, eps=1e-6)
 
@@ -220,12 +203,9 @@ class Model(nn.Module):
     def __init__(self, args):
         super().__init__()
 
-        ## GCN - Use Animal3D skeleton structure (26 joints)
         self.graph = Graph('animal3d', 'spatial', pad=1)
-        # Register as buffer (not parameter) to follow module device automatically
         self.register_buffer('A', torch.tensor(self.graph.A, dtype=torch.float32))
 
-        # time embedding for t (CTM style conditioning)
         self.t_embed_dim = 32
         self.time_embed = TimeEmbedding(self.t_embed_dim, hidden_dim=64)
         self.encoder_pose_2d = encoder(2, args.channel//2, args.channel//2-self.t_embed_dim//2)
@@ -235,14 +215,11 @@ class Model(nn.Module):
         self.pred_mu = decoder(args.channel, args.channel//2, 3)
         
     def forward(self, pose_2d, y_t, t):
-        # pose_2d: (B,F,J,2)  y_t: (B,F,J,3)  t: (B,F,1,1)
         b, f, j, _ = pose_2d.shape
         
-        # Ensure t has the correct shape (B,F,1,1)
         if t.shape[1] == 1 and f > 1:
             t = t.expand(b, f, 1, 1).contiguous()
         
-        # build time embedding
         t_emb = self.time_embed(t) # (B,F,t_dim)
         t_emb = t_emb.unsqueeze(2).expand(b, f, j, self.t_embed_dim).contiguous()  # (B,F,J,t_dim)
 
