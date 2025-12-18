@@ -1,3 +1,5 @@
+# SuperAnimal Demo: https://github.com/DeepLabCut/DeepLabCut/blob/main/examples/COLAB/COLAB_YOURDATA_SuperAnimal.ipynb
+
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
