@@ -10,9 +10,9 @@ lr_decay_large=0.75
 n_joints=26
 out_joints=26
 epochs=300
-model_path='models/model_animals.py'
-# model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
-saved_model_path='../pre_trained_models/animal3d_pretrained_weights/CFM_154_4403_best.pth'
+# model_path='models/model_animals.py'
+model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
+saved_model_path='./pre_trained_models/animal3d_pretrained_weights/CFM_154_4403_best.pth'
 # root path denotes the path to the original dataset
 root_path="./dataset/"
 train_dataset_paths=(
