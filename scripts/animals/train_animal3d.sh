@@ -22,7 +22,7 @@ test_dataset_paths=(
   "./dataset/control_animal3dlatest/test.json"
 )
 
-folder_name="GPA_TrainBoth_TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
+folder_name="TrainBoth_TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
 sh_file='scripts/animals/train_animal3d.sh'
 
 python scripts/animals/main_animal3d.py \
