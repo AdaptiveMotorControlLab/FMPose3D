@@ -17,30 +17,30 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import matplotlib.gridspec as gridspec
-from fmpose.common.arguments import opts as parse_args
+from fmpose.animals.common.arguments import opts as parse_args
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-if getattr(args, 'model_path', ''):
+
+
+CFM = None
+
+if getattr(args, "model_path", ""):
+    # Load model from local file path (for custom models)
     import importlib.util
     import pathlib
-    # Add the model directory and its parent to sys.path for importing dependencies
+
     model_abspath = os.path.abspath(args.model_path)
-    model_dir = os.path.dirname(model_abspath)
-    parent_dir = os.path.dirname(model_dir)
-    # Add parent directory so "from model.xxx" works
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    # Also add model directory so "from xxx" works
-    if model_dir not in sys.path:
-        sys.path.insert(0, model_dir)
     module_name = pathlib.Path(model_abspath).stem
     spec = importlib.util.spec_from_file_location(module_name, model_abspath)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
-    CFM = getattr(module, 'Model')
-    
+    CFM = getattr(module, "Model")
+else:
+    # Load model from installed fmpose package
+    from fmpose.models import Model as CFM
+
 
 import deeplabcut
 import deeplabcut.utils.auxiliaryfunctions as auxiliaryfunctions
@@ -290,6 +290,9 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         return y_local
     
     ## Estimation
+    print("input_2D.shape:", input_2D[:, 0].shape)
+    print("input_2D:", input_2D[:, 0])  # Bugs -> fix:Nan
+    
     y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
     output_3D_non_flip = euler_sample(input_2D[:, 0], y, steps=args.sample_steps, model_3d=model)
     
