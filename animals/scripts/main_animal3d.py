@@ -15,20 +15,23 @@ args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 # Support loading the model class from a specific file path if provided
-CFM = None
-if getattr(args, 'model_path', ''):
+CFM = None    
+if getattr(args, "model_path", ""):
+    # Load model from local file path (for custom models)
     import importlib.util
     import pathlib
+
     model_abspath = os.path.abspath(args.model_path)
     module_name = pathlib.Path(model_abspath).stem
     spec = importlib.util.spec_from_file_location(module_name, model_abspath)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
-    CFM = getattr(module, 'Model')
-    
-# wandb removed
-
+    CFM = getattr(module, "Model")
+else:
+    # Load model from installed fmpose package
+    from fmpose.animals.models import Model as CFM
+     
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)
 
