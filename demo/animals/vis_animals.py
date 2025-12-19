@@ -443,7 +443,7 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     output_3D = (output_3D_non_flip + output_3D_flip) / 2
 
     output_3D = output_3D[0:, args.pad].unsqueeze(1)
-    output_3D[:, :, 0, :] = 0
+    # output_3D[:, :, 0, :] = 0
     post_out = output_3D[0, 0].cpu().detach().numpy()
 
     # rot = [0.1407056450843811, -0.1500701755285263, -0.755240797996521, 0.6223280429840088]
@@ -535,11 +535,6 @@ def show3Dpose(vals, ax, color=(0/255, 176/255, 240/255), world=True, linewidth=
     for i in np.arange(len(I)):
         x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
         ax.plot(x, y, z, lw=linewidth, color=color)
-    
-    # Plot keypoint indices
-    for i in range(len(vals)):
-        ax.text(vals[i, 0], vals[i, 1], vals[i, 2], str(i), 
-                color='red', fontsize=8, weight='bold')
     
     # Compute dynamic limits based on pose size
     xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
