@@ -99,6 +99,20 @@ def get_pose2D(path, output_dir, type):
     # keypoint mapping from quadruped80K super keypotints to animal3d keypoints
     keypoint_mapping = {"quadruped80k":[10, 5, -1, 26, 29, 30, 35, 22, 24, 27, 31, 32, -1, -1, 25, 28, 33, 34, 15, 23, 11, 6, 4, 3, 0, -1]}
     
+    # for the keypoint_mapping, -1 indicates that there is no corresponding keypoint in the source set, but we can interpolate 
+    # for index 2, we can interpolate between keypoints 3 and 4 in the source set to get a better estimate of the missing keypoint
+    # for index 25, we can interpolate between keypoints 22 and 23 in the source set
+    # for index 12, we can interpolate between keypoints 24 and 19 in the source set
+    # for index 13, we can interpolate between keypoints 27 and 19 in the source set
+    
+    # Define interpolation rules for -1 indices: {target_idx: (source_idx1, source_idx2)}
+    interpolation_rules = {
+        2: (3, 4),      # interpolate between source keypoints 3 and 4
+        12: (24, 19),   # interpolate between source keypoints 24 and 19
+        13: (27, 19),   # interpolate between source keypoints 27 and 19
+        25: (22, 23),   # interpolate between source keypoints 22 and 23
+    }
+    
     # map the keypoints
     mapped_keypoints = {}
     mapping_indices = keypoint_mapping["quadruped80k"]
@@ -115,6 +129,13 @@ def get_pose2D(path, output_dir, type):
             if source_idx != -1 and source_idx < num_keypoints:
                 # Copy the keypoint from source to target position
                 mapped_xy[:, target_idx, :] = xy[:, source_idx, :]
+            elif source_idx == -1 and target_idx in interpolation_rules:
+                # Perform interpolation for -1 indices
+                src1, src2 = interpolation_rules[target_idx]
+                if src1 < num_keypoints and src2 < num_keypoints:
+                    # Interpolate as the average of the two source keypoints
+                    mapped_xy[:, target_idx, :] = (xy[:, src1, :] + xy[:, src2, :]) / 2.0
+                    print(f"Interpolated keypoint {target_idx} from source keypoints {src1} and {src2}")
         
         mapped_keypoints[img_path] = mapped_xy
         print(f"Mapped {img_path}: {xy.shape} -> {mapped_xy.shape}")
