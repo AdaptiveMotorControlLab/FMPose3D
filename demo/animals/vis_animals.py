@@ -1,27 +1,25 @@
 # SuperAnimal Demo: https://github.com/DeepLabCut/DeepLabCut/blob/main/examples/COLAB/COLAB_YOURDATA_SuperAnimal.ipynb
 import sys
-import os 
+import os
 import numpy as np
 import glob
 from tqdm import tqdm
 import cv2
 import torch
 import copy
-
-sys.path.append(os.getcwd())
-sys.path.append("/home/xiaohang/Ti_workspace/projects/FMPose_animals/model")
-
-import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import matplotlib.gridspec as gridspec
+import imageio
 from fmpose.animals.common.arguments import opts as parse_args
+from fmpose.common.camera import normalize_screen_coordinates, camera_to_world
+
+sys.path.append(os.getcwd())
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-
 
 CFM = None
 
@@ -41,35 +39,16 @@ else:
     # Load model from installed fmpose package
     from fmpose.models import Model as CFM
 
+from deeplabcut.pose_estimation_pytorch.apis import superanimal_analyze_images
 
-import deeplabcut
-import deeplabcut.utils.auxiliaryfunctions as auxiliaryfunctions
-from deeplabcut.pose_estimation_pytorch.apis import (
-    superanimal_analyze_images,
-)
-from deeplabcut.modelzoo import build_weight_init
-from deeplabcut.modelzoo.utils import (
-    create_conversion_table,
-    read_conversion_table_from_csv,
-)
-
-from deeplabcut.modelzoo.video_inference import video_inference_superanimal
-from deeplabcut.utils.pseudo_label import keypoint_matching
-
-
-superanimal_name = "superanimal_quadruped" #@param ["superanimal_topviewmouse", "superanimal_quadruped"]
-model_name = "hrnet_w32" #@param ["hrnet_w32", "resnet_50"]
-detector_name = "fasterrcnn_resnet50_fpn_v2" #@param ["fasterrcnn_resnet50_fpn_v2", "fasterrcnn_mobilenet_v3_large_fpn"]
-
-# @markdown ---
-# @markdown What is the maximum number of animals you expect to have in an image
-max_individuals = 1  # @param {type:"slider", min:1, max:30, step:1}
-
-image_path = "./images/dog.JPEG"
+superanimal_name = "superanimal_quadruped"
+model_name = "hrnet_w32"
+detector_name = "fasterrcnn_resnet50_fpn_v2"
+max_individuals = 1
 
 def compute_limb_regularization_matrix(gt_3d):
     """
-    计算正则化矩阵，使指定的腿部连接平均方向朝向竖直向上(0,0,1)
+    Compute regularization matrix to align limb directions to vertical (0,0,1).
     
     Args:
         gt_3d: numpy array of shape (J, 3) - 3D pose
@@ -387,10 +366,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     Generate 3D pose for a single image frame.
     Adapted from vis_in_the_wild.py for animal pose estimation.
     """
-    import torch
-    import cv2
-    from fmpose.common.camera import normalize_screen_coordinates, camera_to_world
-    
     img_size = img.shape
     
     ## Input frames
@@ -428,8 +403,8 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         return y_local
     
     ## Estimation
-    print("input_2D.shape:", input_2D[:, 0].shape)
-    print("input_2D:", input_2D[:, 0])  # Bugs -> fix:Nan
+    # print("input_2D.shape:", input_2D[:, 0].shape)
+    # print("input_2D:", input_2D[:, 0])  # Bugs -> fix:Nan
     
     y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
     output_3D_non_flip = euler_sample(input_2D[:, 0], y, steps=args.sample_steps, model_3d=model)
@@ -458,35 +433,35 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     post_out = apply_regularization(post_out, R_reg)
     
     # Print debug info for first frame
-    if i == 0:
-        print("\n=== Regularization Debug Info ===")
-        print(f"Rotation matrix R:\n{R_reg}")
+    # if i == 0:
+    #     print("\n=== Regularization Debug Info ===")
+    #     print(f"Rotation matrix R:\n{R_reg}")
         
-        # 验证正则化后的平均方向
-        limb_connections = [
-            (8, 14), (9, 15), (10, 16), (11, 17)
-        ]
-        limb_vectors_after = []
-        for start_idx, end_idx in limb_connections:
-            vec = post_out[start_idx] - post_out[end_idx]
-            vec_norm = np.linalg.norm(vec)
-            if vec_norm > 1e-6:
-                vec = vec / vec_norm
-                limb_vectors_after.append(vec)
+    #     # 验证正则化后的平均方向
+    #     limb_connections = [
+    #         (8, 14), (9, 15), (10, 16), (11, 17)
+    #     ]
+    #     limb_vectors_after = []
+    #     for start_idx, end_idx in limb_connections:
+    #         vec = post_out[start_idx] - post_out[end_idx]
+    #         vec_norm = np.linalg.norm(vec)
+    #         if vec_norm > 1e-6:
+    #             vec = vec / vec_norm
+    #             limb_vectors_after.append(vec)
         
-        if len(limb_vectors_after) > 0:
-            avg_dir_after = np.mean(limb_vectors_after, axis=0)
-            avg_dir_after = avg_dir_after / (np.linalg.norm(avg_dir_after) + 1e-8)
-            print(f"Average limb direction after regularization: {avg_dir_after}")
-            print(f"Target direction: [0, 0, 1]")
-            print(f"Alignment (dot product): {np.dot(avg_dir_after, np.array([0, 0, 1])):.4f}")
-        print("================================\n")
+    #     if len(limb_vectors_after) > 0:
+    #         avg_dir_after = np.mean(limb_vectors_after, axis=0)
+    #         avg_dir_after = avg_dir_after / (np.linalg.norm(avg_dir_after) + 1e-8)
+    #         print(f"Average limb direction after regularization: {avg_dir_after}")
+    #         print(f"Target direction: [0, 0, 1]")
+    #         print(f"Alignment (dot product): {np.dot(avg_dir_after, np.array([0, 0, 1])):.4f}")
+    #     print("================================\n")
 
     ## Save 2D pose on image (similar to visualize_animal_poses.py)
     if img is not None:
         height, width = img_size[0], img_size[1]
         img_copy = img.copy()
-        
+
         # Use original 2D coordinates (before normalization)
         vals = input_2D_original[args.pad] if input_2D_original.shape[0] > args.pad else input_2D_original[0]
         vals = np.reshape(vals, (26, 2))
@@ -516,6 +491,9 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     output_dir_3D = output_dir + 'pose3D/'
     os.makedirs(output_dir_3D, exist_ok=True)
     plt.savefig(output_dir_3D + str(('%04d' % i)) + '_3D.png', dpi=200, format='png', bbox_inches='tight')
+    # Save raw 3D pose alongside the image
+    pose_npz = Path(output_dir_3D) / f"{i:04d}_3D.npz"
+    np.savez_compressed(pose_npz, pose3d=post_out)
     plt.close(fig)
 
 
@@ -559,48 +537,8 @@ def show3Dpose(vals, ax, color=(0/255, 176/255, 240/255), world=True, linewidth=
     # ax.view_init(elev=15., azim=70)
 
 
-def show3Dpose_GT(vals, ax, world=True, linewidth=2.5):
-    """
-    Visualize 3D pose skeleton with GT coloring (left/right differentiation).
-    Adapted from visualize_animal_poses.py
-    """
-    # Reshape to (26, 3) if needed
-    if vals.ndim == 1:
-        vals = np.reshape(vals, (26, 3))
-    
-    # Animal skeleton connections (26 joints)
-    I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
-    J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
-    LR = [1, 2, 2, 1, 0, 1, 2, 0, 1, 2, 1, 2, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 2, 0, 0]
-    colors = [(255/255, 0/255, 0/255), (0/255, 255/255, 0/255), (0/255, 0/255, 255/255)]
-    
-    for i in np.arange(len(I)):
-        x, y, z = [np.array([vals[I[i], j], vals[J[i], j]]) for j in range(3)]
-        ax.plot(x, y, z, lw=linewidth, color=colors[LR[i]-1] if LR[i] > 0 else colors[0])
-    
-    # Compute dynamic limits based on pose size
-    xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
-    max_range = np.max(np.abs(vals - np.array([xroot, yroot, zroot])), axis=(0, 1))
-    RADIUS = max(np.max(max_range) * 0.9, 0.4)  # Scale up and ensure minimum size
-    
-    ax.set_xlim3d([-RADIUS + xroot, RADIUS + xroot])
-    ax.set_ylim3d([-RADIUS + yroot, RADIUS + yroot])
-    ax.set_zlim3d([-RADIUS + zroot, RADIUS + zroot])
-    ax.set_aspect('auto')
-
-    white = (1.0, 1.0, 1.0, 0.0)
-    ax.xaxis.set_pane_color(white)
-    ax.yaxis.set_pane_color(white)
-    ax.zaxis.set_pane_color(white)
-
-    ax.tick_params('x', labelbottom=False)
-    ax.tick_params('y', labelleft=False)
-    ax.tick_params('z', labelleft=False)
-
-
 def img2video(video_path, filename, output_dir):
     """Convert pose images to video"""
-    import cv2
     cap = cv2.VideoCapture(video_path)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -623,11 +561,8 @@ def img2video(video_path, filename, output_dir):
     cap.release()
     print(f"Video saved to {output_dir + filename + '.mp4'}")
 
-
 def img2gif(video_path, name, output_dir, duration=0.25):
     """Convert pose images to GIF"""
-    import imageio
-    
     frames = []
     cap = cv2.VideoCapture(video_path)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
