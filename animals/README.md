@@ -24,7 +24,7 @@ The predictions will be saved to folder `demo/predictions`.
 </p>
 
 
-## datasets
+## Datasets
 
 Download the Animal3D dataset from [here](https://drive.google.com/drive/folders/17KRe8Z7jCZNDeBu45Wx2zS8Yh2tV_t2v)
 
@@ -47,7 +47,9 @@ Place the downloaded files in the `dataset/` folder of this project:
 ```
 
 ## Training
+The training logs, checkpoints, and related files of each training time will be saved in the './checkpoint' folder.
 
+For trainig on the two datasets:
 
 ```bash
 cd animals
