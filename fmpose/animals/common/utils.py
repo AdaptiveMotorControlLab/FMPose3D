@@ -1,19 +1,18 @@
-import torch
-import numpy as np
-import hashlib
-from torch.autograd import Variable
-import os
-import json
-import shutil
 import glob
-def deterministic_random(min_value, max_value, data):
-    digest = hashlib.sha256(data.encode()).digest()
-    raw_value = int.from_bytes(digest[:4], byteorder='little', signed=False)
-    return int(raw_value / (2 ** 32 - 1) * (max_value - min_value)) + min_value
+import hashlib
+import json
+import os
+import shutil
 
-def mpjpe_cal(predicted, target): 
+import numpy as np
+import torch
+from torch.autograd import Variable
+
+
+def mpjpe_cal(predicted, target):
     assert predicted.shape == target.shape
     return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
+
 
 def test_calculation(predicted, target, action, error_sum, data_type, subject, vis_mask):
     error_sum = mpjpe_by_action_p1(predicted, target, action, error_sum, vis_mask)
@@ -24,14 +23,14 @@ def test_calculation(predicted, target, action, error_sum, data_type, subject, v
 def mpjpe_by_action_p1(predicted, target, action, action_error_sum, vis_mask=None):
     assert predicted.shape == target.shape
     num = predicted.size(0)
-    
+
     # Compute per-joint error: [B, F, J]
     per_joint_error = torch.norm(predicted - target, dim=len(target.shape) - 1)  # [B, F, J]
-    
+
     if vis_mask is not None:
         # vis_mask: [B, F, J, 3], reduce to [B, F, J]
         vis_mask_reduced = vis_mask[..., 0]  # [B, F, J]
-        
+
         # Only compute error on visible joints
         num_visible = vis_mask_reduced.sum(dim=-1)  # [B, F]
         masked_error = per_joint_error * vis_mask_reduced  # [B, F, J]
@@ -43,24 +42,25 @@ def mpjpe_by_action_p1(predicted, target, action, action_error_sum, vis_mask=Non
         if len(dist.shape) > 1:
             dist = dist.mean(dim=-1)  # average over frames
     if len(set(list(action))) == 1:
-        end_index = action[0].find(' ')
+        end_index = action[0].find(" ")
         if end_index != -1:
             action_name = action[0][:end_index]
         else:
             action_name = action[0]
 
-        action_error_sum[action_name]['p1'].update(torch.mean(dist).item()*num, num)
+        action_error_sum[action_name]["p1"].update(torch.mean(dist).item() * num, num)
     else:
         for i in range(num):
-            end_index = action[i].find(' ')
+            end_index = action[i].find(" ")
             if end_index != -1:
                 action_name = action[i][:end_index]
             else:
                 action_name = action[i]
 
-            action_error_sum[action_name]['p1'].update(dist[i].item(), 1)
-            
+            action_error_sum[action_name]["p1"].update(dist[i].item(), 1)
+
     return action_error_sum
+
 
 def p_mpjpe(predicted, target, mask=None):  # p2, Procrustes analysis MPJPE
     assert predicted.shape == target.shape
@@ -68,26 +68,30 @@ def p_mpjpe(predicted, target, mask=None):  # p2, Procrustes analysis MPJPE
     if mask is not None:
         # mask: [B, J], 1.0 for visible, 0.0 for invisible
         mask_expanded = mask[:, :, np.newaxis]  # [B, J, 1]
-        
+
         # Compute weighted mean for visible joints only
         num_visible = mask.sum(axis=1, keepdims=True)  # [B, 1]
-        muX = np.sum(target * mask_expanded, axis=1, keepdims=True) / (num_visible[:, :, np.newaxis] + 1e-8)  # B,1,3
-        muY = np.sum(predicted * mask_expanded, axis=1, keepdims=True) / (num_visible[:, :, np.newaxis] + 1e-8)  # B,1,3
+        muX = np.sum(target * mask_expanded, axis=1, keepdims=True) / (
+            num_visible[:, :, np.newaxis] + 1e-8
+        )  # B,1,3
+        muY = np.sum(predicted * mask_expanded, axis=1, keepdims=True) / (
+            num_visible[:, :, np.newaxis] + 1e-8
+        )  # B,1,3
 
         X0 = (target - muX) * mask_expanded
         Y0 = (predicted - muY) * mask_expanded
 
-        normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True)) # B,1,1
-        normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
+        normX = np.sqrt(np.sum(X0**2, axis=(1, 2), keepdims=True))  # B,1,1
+        normY = np.sqrt(np.sum(Y0**2, axis=(1, 2), keepdims=True))
     else:
-        muX = np.mean(target, axis=1, keepdims=True) # B,1,3
-        muY = np.mean(predicted, axis=1, keepdims=True) # B,1,3
+        muX = np.mean(target, axis=1, keepdims=True)  # B,1,3
+        muY = np.mean(predicted, axis=1, keepdims=True)  # B,1,3
 
         X0 = target - muX
         Y0 = predicted - muY
 
-        normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True)) # B,1,1
-        normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
+        normX = np.sqrt(np.sum(X0**2, axis=(1, 2), keepdims=True))  # B,1,1
+        normY = np.sqrt(np.sum(Y0**2, axis=(1, 2), keepdims=True))
 
     X0 /= normX
     Y0 /= normY
@@ -104,29 +108,32 @@ def p_mpjpe(predicted, target, mask=None):  # p2, Procrustes analysis MPJPE
 
     tr = np.expand_dims(np.sum(s, axis=1, keepdims=True), axis=2)
 
-    a = tr * normX / normY 
+    a = tr * normX / normY
     t = muX - a * np.matmul(muY, R)
 
     predicted_aligned = a * np.matmul(predicted, R) + t
 
     # Compute error
     error = np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1)  # [B, J]
-    
+
     if mask is not None:
         # Only compute error on visible joints
         masked_error = error * mask  # [B, J]
         dist = masked_error.sum(axis=1) / (num_visible.flatten() + 1e-8)  # [B]
     else:
         dist = np.mean(error, axis=len(target.shape) - 2)  # [B]
-    
+
     return dist
-    
+
+
 def mpjpe_by_action_p2(predicted, target, action, action_error_sum, vis_mask=None):
     assert predicted.shape == target.shape
     num = predicted.size(0)
-    pred = predicted.detach().cpu().numpy().reshape(-1, predicted.shape[-2], predicted.shape[-1]) # B,17,3
-    gt = target.detach().cpu().numpy().reshape(-1, target.shape[-2], target.shape[-1]) # # B,17,3
-    
+    pred = (
+        predicted.detach().cpu().numpy().reshape(-1, predicted.shape[-2], predicted.shape[-1])
+    )  # B,17,3
+    gt = target.detach().cpu().numpy().reshape(-1, target.shape[-2], target.shape[-1])  # # B,17,3
+
     if vis_mask is not None:
         # Convert mask to numpy and reshape to [B, J]
         mask = vis_mask[..., 0].detach().cpu().numpy().reshape(-1, vis_mask.shape[-2])  # [B, J]
@@ -135,45 +142,58 @@ def mpjpe_by_action_p2(predicted, target, action, action_error_sum, vis_mask=Non
         dist = p_mpjpe(pred, gt)
 
     if len(set(list(action))) == 1:
-        end_index = action[0].find(' ')
+        end_index = action[0].find(" ")
         if end_index != -1:
             action_name = action[0][:end_index]
         else:
             action_name = action[0]
-        action_error_sum[action_name]['p2'].update(np.mean(dist) * num, num)
+        action_error_sum[action_name]["p2"].update(np.mean(dist) * num, num)
     else:
         for i in range(num):
-            end_index = action[i].find(' ')
+            end_index = action[i].find(" ")
             if end_index != -1:
                 action_name = action[i][:end_index]
             else:
                 action_name = action[i]
-            action_error_sum[action_name]['p2'].update(np.mean(dist), 1)
-            
+            action_error_sum[action_name]["p2"].update(np.mean(dist), 1)
+
     return action_error_sum
 
 
+def define_actions(action):
 
-def define_actions( action ):
+    actions = [
+        "Directions",
+        "Discussion",
+        "Eating",
+        "Greeting",
+        "Phoning",
+        "Photo",
+        "Posing",
+        "Purchases",
+        "Sitting",
+        "SittingDown",
+        "Smoking",
+        "Waiting",
+        "WalkDog",
+        "Walking",
+        "WalkTogether",
+    ]
 
-  actions = ["Directions","Discussion","Eating","Greeting",
-           "Phoning","Photo","Posing","Purchases",
-           "Sitting","SittingDown","Smoking","Waiting",
-           "WalkDog","Walking","WalkTogether"]
+    if action == "All" or action == "all" or action == "*":
+        return actions
 
-  if action == "All" or action == "all" or action == '*':
-    return actions
+    if not action in actions:
+        raise (ValueError, "Unrecognized action: %s" % action)
 
-  if not action in actions:
-    raise( ValueError, "Unrecognized action: %s" % action )
+    return [action]
 
-  return [action]
 
 def define_error_list(actions):
     error_sum = {}
-    error_sum.update({actions[i]: 
-        {'p1':AccumLoss(), 'p2':AccumLoss()} 
-        for i in range(len(actions))})
+    error_sum.update(
+        {actions[i]: {"p1": AccumLoss(), "p2": AccumLoss()} for i in range(len(actions))}
+    )
     return error_sum
 
 
@@ -189,14 +209,16 @@ class AccumLoss(object):
         self.sum += val
         self.count += n
         self.avg = self.sum / self.count
-        
+
 
 def get_varialbe(split, target):
     num = len(target)
     var = []
-    if split == 'train':
+    if split == "train":
         for i in range(num):
-            temp = Variable(target[i], requires_grad=False).contiguous().type(torch.cuda.FloatTensor)
+            temp = (
+                Variable(target[i], requires_grad=False).contiguous().type(torch.cuda.FloatTensor)
+            )
             var.append(temp)
     else:
         for i in range(num):
@@ -207,13 +229,14 @@ def get_varialbe(split, target):
 
 
 def print_error(data_type, action_error_sum, is_train):
-    mean_error_p1, mean_error_p2  = print_error_action(action_error_sum, is_train)
+    mean_error_p1, mean_error_p2 = print_error_action(action_error_sum, is_train)
 
     return mean_error_p1, mean_error_p2
 
+
 def print_error_action(action_error_sum, is_train):
-    mean_error_each = {'p1': 0.0, 'p2': 0.0}
-    mean_error_all  = {'p1': AccumLoss(), 'p2': AccumLoss()}
+    mean_error_each = {"p1": 0.0, "p2": 0.0}
+    mean_error_all = {"p1": AccumLoss(), "p2": AccumLoss()}
 
     if is_train == 0:
         print("{0:=^12} {1:=^10} {2:=^8}".format("Action", "p#1 mm", "p#2 mm"))
@@ -222,20 +245,23 @@ def print_error_action(action_error_sum, is_train):
         if is_train == 0:
             print("{0:<12} ".format(action), end="")
 
-        mean_error_each['p1'] = action_error_sum[action]['p1'].avg * 1000.0
-        mean_error_all['p1'].update(mean_error_each['p1'], 1)
+        mean_error_each["p1"] = action_error_sum[action]["p1"].avg * 1000.0
+        mean_error_all["p1"].update(mean_error_each["p1"], 1)
 
-        mean_error_each['p2'] = action_error_sum[action]['p2'].avg * 1000.0
-        mean_error_all['p2'].update(mean_error_each['p2'], 1)
+        mean_error_each["p2"] = action_error_sum[action]["p2"].avg * 1000.0
+        mean_error_all["p2"].update(mean_error_each["p2"], 1)
 
         if is_train == 0:
-            print("{0:>6.2f} {1:>10.2f}".format(mean_error_each['p1'], mean_error_each['p2']))
+            print("{0:>6.2f} {1:>10.2f}".format(mean_error_each["p1"], mean_error_each["p2"]))
 
     if is_train == 0:
-        print("{0:<12} {1:>6.4f} {2:>10.4f}".format("Average", mean_error_all['p1'].avg, \
-                mean_error_all['p2'].avg))
-    
-    return mean_error_all['p1'].avg, mean_error_all['p2'].avg
+        print(
+            "{0:<12} {1:>6.4f} {2:>10.4f}".format(
+                "Average", mean_error_all["p1"].avg, mean_error_all["p2"].avg
+            )
+        )
+
+    return mean_error_all["p1"].avg, mean_error_all["p2"].avg
 
 
 def save_model(previous_name, save_dir, epoch, data_threshold, model, model_name):
@@ -243,13 +269,16 @@ def save_model(previous_name, save_dir, epoch, data_threshold, model, model_name
     if os.path.exists(previous_name):
         os.remove(previous_name)
 
-    torch.save(model.state_dict(),
-               '%s/%s_%d_%d.pth' % (save_dir, model_name, epoch, data_threshold * 100))
-    previous_name = '%s/%s_%d_%d.pth' % (save_dir, model_name, epoch, data_threshold * 100)
+    torch.save(
+        model.state_dict(), "%s/%s_%d_%d.pth" % (save_dir, model_name, epoch, data_threshold * 100)
+    )
+    previous_name = "%s/%s_%d_%d.pth" % (save_dir, model_name, epoch, data_threshold * 100)
     return previous_name
 
 
-def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, model_name, num_saved_models=3):
+def save_top_N_models(
+    previous_name, save_dir, epoch, data_threshold, model, model_name, num_saved_models=3
+):
     """
     Save a checkpoint if it belongs to the top-N best (by lower data_threshold).
     Maintains an index file '<model_name>_top_models.json' in save_dir.
@@ -264,7 +293,7 @@ def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, mod
     # load current list
     top_list = []
     if os.path.exists(index_path):
-        with open(index_path, 'r') as f:
+        with open(index_path, "r") as f:
             top_list = json.load(f)
 
     # decide if we should save
@@ -272,8 +301,8 @@ def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, mod
     if len(top_list) < int(num_saved_models):
         should_save = True
     else:
-        worst_item = max(top_list, key=lambda x: x.get('p1', float('inf')))
-        if data_threshold < float(worst_item.get('p1', float('inf'))):
+        worst_item = max(top_list, key=lambda x: x.get("p1", float("inf")))
+        if data_threshold < float(worst_item.get("p1", float("inf"))):
             should_save = True
 
     if not should_save:
@@ -283,25 +312,21 @@ def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, mod
     torch.save(model.state_dict(), ckpt_path)
 
     # append and trim to N
-    top_list.append({
-        'p1': float(data_threshold),
-        'path': ckpt_path,
-        'epoch': int(epoch)
-    })
+    top_list.append({"p1": float(data_threshold), "path": ckpt_path, "epoch": int(epoch)})
     # sort ascending by p1 and keep best N
-    top_list.sort(key=lambda x: x.get('p1', float('inf')))
+    top_list.sort(key=lambda x: x.get("p1", float("inf")))
     while len(top_list) > int(num_saved_models):
         removed = top_list.pop()  # remove worst (last after sort ascending)
-        if os.path.exists(removed.get('path', '')):
-            os.remove(removed['path'])
+        if os.path.exists(removed.get("path", "")):
+            os.remove(removed["path"])
 
     # write back index
-    with open(index_path, 'w') as f:
+    with open(index_path, "w") as f:
         json.dump(top_list, f, indent=2)
 
     # update best marker to point to current best (lowest p1): append _best to the original name
     if len(top_list) > 0:
-        best_src = top_list[0].get('path')
+        best_src = top_list[0].get("path")
         if best_src and os.path.exists(best_src):
             root_name, ext = os.path.splitext(best_src)
             best_path = f"{root_name}_best{ext}"
@@ -320,13 +345,13 @@ def save_top_N_models(previous_name, save_dir, epoch, data_threshold, model, mod
     return ckpt_path
 
 
-def back_to_ori_uv(cropped_uv,bb_box):
+def back_to_ori_uv(cropped_uv, bb_box):
     """
     for cropped uv, back to origial uv to help do the uvd->xyz operation
     :return:
     """
-    N, T, V,_ = cropped_uv.size()
-    uv = (cropped_uv+1)*(bb_box[:, 2:].view(N, 1, 1, 2)/2.0)+bb_box[:, 0:2].view(N, 1, 1, 2)
+    N, T, V, _ = cropped_uv.size()
+    uv = (cropped_uv + 1) * (bb_box[:, 2:].view(N, 1, 1, 2) / 2.0) + bb_box[:, 0:2].view(N, 1, 1, 2)
     return uv
 
 
@@ -339,49 +364,50 @@ def get_uvd2xyz(uvd, gt_3D, cam):
 
     :return: root-relative xyz results
     """
-    N, T, V,_ = uvd.size()
+    N, T, V, _ = uvd.size()
 
     dec_out_all = uvd.view(-1, T, V, 3).clone()  # N*T*V*3
-    root = gt_3D[:, :, 0, :].unsqueeze(-2).repeat(1, 1, V, 1).clone()# N*T*V*3
+    root = gt_3D[:, :, 0, :].unsqueeze(-2).repeat(1, 1, V, 1).clone()  # N*T*V*3
     enc_in_all = uvd[:, :, :, :2].view(-1, T, V, 2).clone()  # N*T*V*2
 
-    cam_f_all = cam[..., :2].view(-1,1,1,2).repeat(1,T,V,1) # N*T*V*2
-    cam_c_all = cam[..., 2:4].view(-1,1,1,2).repeat(1,T,V,1)# N*T*V*2
+    cam_f_all = cam[..., :2].view(-1, 1, 1, 2).repeat(1, T, V, 1)  # N*T*V*2
+    cam_c_all = cam[..., 2:4].view(-1, 1, 1, 2).repeat(1, T, V, 1)  # N*T*V*2
 
     # change to global
-    z_global = dec_out_all[:, :, :, 2]# N*T*V
+    z_global = dec_out_all[:, :, :, 2]  # N*T*V
     z_global[:, :, 0] = root[:, :, 0, 2]
     z_global[:, :, 1:] = dec_out_all[:, :, 1:, 2] + root[:, :, 1:, 2]  # N*T*V
     z_global = z_global.unsqueeze(-1)  # N*T*V*1
-    
+
     uv = enc_in_all - cam_c_all  # N*T*V*2
     xy = uv * z_global.repeat(1, 1, 1, 2) / cam_f_all  # N*T*V*2
     xyz_global = torch.cat((xy, z_global), -1)  # N*T*V*3
-    xyz_offset = (xyz_global - xyz_global[:, :, 0, :].unsqueeze(-2).repeat(1, 1, V, 1))# N*T*V*3
+    xyz_offset = xyz_global - xyz_global[:, :, 0, :].unsqueeze(-2).repeat(1, 1, V, 1)  # N*T*V*3
 
     return xyz_offset
 
 
-def sym_penalty(dataset,keypoints,pred_out):
+def sym_penalty(dataset, keypoints, pred_out):
     """
     get penalty for the symmetry of human body
     :return:
     """
     loss_sym = 0
-    if dataset == 'h36m':
-        if keypoints.startswith('sh'):
-            left_bone = [(0,4),(4,5),(5,6),(8,10),(10,11),(11,12)]
-            right_bone = [(0,1),(1,2),(2,3),(8,13),(13,14),(14,15)]
+    if dataset == "h36m":
+        if keypoints.startswith("sh"):
+            left_bone = [(0, 4), (4, 5), (5, 6), (8, 10), (10, 11), (11, 12)]
+            right_bone = [(0, 1), (1, 2), (2, 3), (8, 13), (13, 14), (14, 15)]
         else:
-            left_bone = [(0,4),(4,5),(5,6),(8,11),(11,12),(12,13)]
-            right_bone = [(0,1),(1,2),(2,3),(8,14),(14,15),(15,16)]
-        for (i_left,j_left),(i_right,j_right) in zip(left_bone,right_bone):
-            left_part = pred_out[:,:,i_left]-pred_out[:,:,j_left]
+            left_bone = [(0, 4), (4, 5), (5, 6), (8, 11), (11, 12), (12, 13)]
+            right_bone = [(0, 1), (1, 2), (2, 3), (8, 14), (14, 15), (15, 16)]
+        for (i_left, j_left), (i_right, j_right) in zip(left_bone, right_bone):
+            left_part = pred_out[:, :, i_left] - pred_out[:, :, j_left]
             right_part = pred_out[:, :, i_right] - pred_out[:, :, j_right]
-            loss_sym += torch.mean(torch.norm(left_part, dim=- 1) - torch.norm(right_part, dim=- 1))
-    elif dataset.startswith('STB'):
+            loss_sym += torch.mean(torch.norm(left_part, dim=-1) - torch.norm(right_part, dim=-1))
+    elif dataset.startswith("STB"):
         loss_sym = 0
     return loss_sym
+
 
 def project_to_2d(X, camera_params):
     """
@@ -402,32 +428,38 @@ def project_to_2d(X, camera_params):
 
     f = camera_params[..., :2]
     c = camera_params[..., 2:4]
-    k = camera_params[..., 4:7] # B,1,3
-    p = camera_params[..., 7:] # B,1,2
+    k = camera_params[..., 4:7]  # B,1,3
+    p = camera_params[..., 7:]  # B,1,2
 
-    XX = torch.clamp(X[..., :2] / X[..., 2:], min=-1, max=1) # B,J,2
-    r2 = torch.sum(XX[..., :2] ** 2, dim=len(XX.shape) - 1, keepdim=True) # B, J, 1
+    XX = torch.clamp(X[..., :2] / X[..., 2:], min=-1, max=1)  # B,J,2
+    r2 = torch.sum(XX[..., :2] ** 2, dim=len(XX.shape) - 1, keepdim=True)  # B, J, 1
 
-    radial = 1 + torch.sum(k * torch.cat((r2, r2 ** 2, r2 ** 3), dim=len(r2.shape) - 1), dim=len(r2.shape) - 1,   # B,J,1
-                           keepdim=True)
-    tan = torch.sum(p * XX, dim=len(XX.shape) - 1, keepdim=True) # B,J,1
+    radial = 1 + torch.sum(
+        k * torch.cat((r2, r2**2, r2**3), dim=len(r2.shape) - 1),
+        dim=len(r2.shape) - 1,  # B,J,1
+        keepdim=True,
+    )
+    tan = torch.sum(p * XX, dim=len(XX.shape) - 1, keepdim=True)  # B,J,1
 
-    XXX = XX * (radial + tan) + p * r2 # B,J,2
+    XXX = XX * (radial + tan) + p * r2  # B,J,2
 
     return f * XXX + c
 
+
 def input_augmentation(input_2D, model):
-    joints_left = [4, 5, 6, 11, 12, 13] 
+    joints_left = [4, 5, 6, 11, 12, 13]
     joints_right = [1, 2, 3, 14, 15, 16]
 
     input_2D_non_flip = input_2D[:, 0]
     input_2D_flip = input_2D[:, 1]
 
     output_3D_non_flip = model(input_2D_non_flip)
-    output_3D_flip     = model(input_2D_flip)
+    output_3D_flip = model(input_2D_flip)
 
     output_3D_flip[:, :, :, 0] *= -1
-    output_3D_flip[:, :, joints_left + joints_right, :] = output_3D_flip[:, :, joints_right + joints_left, :] 
+    output_3D_flip[:, :, joints_left + joints_right, :] = output_3D_flip[
+        :, :, joints_right + joints_left, :
+    ]
 
     output_3D = (output_3D_non_flip + output_3D_flip) / 2
 
@@ -436,28 +468,30 @@ def input_augmentation(input_2D, model):
     return input_2D, output_3D
 
 
-import numpy as np
-import scipy.io
-import matplotlib.pyplot as plt
-import cv2
+import json
 import os
 import pickle
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.io
 import scipy.io as spio
-import json
 
 
 def loadmat(filename):
-    '''
+    """
     this function should be called instead of direct spio.loadmat
     as it cures the problem of not properly recovering python dictionaries
     from mat files. It calls the function check keys to cure all entries
     which are still mat-objects
-    '''
+    """
+
     def _check_keys(d):
-        '''
+        """
         checks if entries in dictionary are mat-objects. If yes
         todict is called to change them to nested dictionaries
-        '''
+        """
         for key in d:
             if isinstance(d[key], spio.matlab.mio5_params.mat_struct):
                 d[key] = _todict(d[key])
@@ -465,13 +499,14 @@ def loadmat(filename):
 
     def _has_struct(elem):
         """Determine if elem is an array and if any array item is a struct"""
-        return isinstance(elem, np.ndarray) and any(isinstance(
-                    e, scipy.io.matlab.mio5_params.mat_struct) for e in elem)
+        return isinstance(elem, np.ndarray) and any(
+            isinstance(e, scipy.io.matlab.mio5_params.mat_struct) for e in elem
+        )
 
     def _todict(matobj):
-        '''
+        """
         A recursive function which constructs from matobjects nested dictionaries
-        '''
+        """
         d = {}
         for strg in matobj._fieldnames:
             elem = matobj.__dict__[strg]
@@ -484,11 +519,11 @@ def loadmat(filename):
         return d
 
     def _tolist(ndarray):
-        '''
+        """
         A recursive function which constructs lists from cellarrays
         (which are loaded as numpy ndarrays), recursing into the elements
         if they contain matobjects.
-        '''
+        """
         elem_list = []
         for sub_elem in ndarray:
             if isinstance(sub_elem, spio.matlab.mio5_params.mat_struct):
@@ -498,10 +533,11 @@ def loadmat(filename):
             else:
                 elem_list.append(sub_elem)
         return elem_list
+
     data = scipy.io.loadmat(filename, struct_as_record=False, squeeze_me=True)
     return _check_keys(data)
+
 
 def get_GT_rotation(dataset, sample_infos):
     rotation = np.zeros(sample_infos.shape[0], 3, 3)
     aa = 1
-
