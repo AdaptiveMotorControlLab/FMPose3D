@@ -244,8 +244,9 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
 
     output_dir_3D = output_dir +'pose3D/'
     os.makedirs(output_dir_3D, exist_ok=True)
+    np.savez_compressed(os.path.join(output_dir_3D, f"{i:04d}_3D.npz"), pose3d=post_out)
     plt.savefig(output_dir_3D + str(('%04d'% i)) + '_3D.png', dpi=200, format='png', bbox_inches = 'tight')
-    
+    plt.close(fig)
 def get_pose3D(path, output_dir, type='image'):
     
     # args, _ = argparse.ArgumentParser().parse_known_args()
