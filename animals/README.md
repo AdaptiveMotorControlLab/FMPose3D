@@ -2,7 +2,7 @@
 
 # Animals
 
-In this part, the FMPose model is trained on Animal3D dataset and control_animal3D dataset.
+In this part, the FMPose model is trained on [Animal3D](https://xujiacong.github.io/Animal3D/) dataset and [Control_Animal3D](https://luoxue-star.github.io/AniMer_project_page/) dataset.
 ## Demo
 
 ### Testing on in-the-wild images (animals)
