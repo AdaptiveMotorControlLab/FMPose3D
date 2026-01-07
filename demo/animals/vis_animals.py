@@ -501,6 +501,15 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         cv2.imwrite(f'{output_dir_2D_img}{i:04d}_2d.png', img_copy)
         print(f"Saved 2D pose on image to {output_dir_2D_img}{i:04d}_2d.png")
 
+    ## Save 3D pose as npz
+    output_dir_3D = output_dir + 'pose3D/'
+    os.makedirs(output_dir_3D, exist_ok=True)
+    
+    # Save 3D pose data
+    npz_filename = output_dir_3D + str(('%04d' % i)) + '_3D.npz'
+    np.savez_compressed(npz_filename, pose_3d=post_out)
+    print(f"Saved 3D pose to {npz_filename}")
+    
     ## Save 3D visualization
     fig = plt.figure(figsize=(9.6, 5.4))
     gs = gridspec.GridSpec(1, 1)
@@ -508,8 +517,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     ax = plt.subplot(gs[0], projection='3d')
     show3Dpose(post_out, ax, color=(0/255, 176/255, 240/255), world=True, linewidth=2.5)
 
-    output_dir_3D = output_dir + 'pose3D/'
-    os.makedirs(output_dir_3D, exist_ok=True)
     plt.savefig(output_dir_3D + str(('%04d' % i)) + '_3D.png', dpi=200, format='png', bbox_inches='tight')
     plt.close(fig)
 
