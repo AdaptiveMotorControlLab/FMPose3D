@@ -8,7 +8,7 @@ sh_file='vis_animals.sh'
 # out_joints=26
 
 model_path='../../fmpose/animals/models/model_animal3d.py'
-saved_model_path='/home/xiaohang/Ti_workspace/projects/FMPose_animals/checkpoint/GPA_TrainBoth_TestCtrlAni3D_L5_lr1e-3_B13_20251113_232613/CFM_154_4403_best.pth'
+saved_model_path='./GPA_TrainBoth_TestCtrlAni3D_L5_lr1e-3_B13_20251113_232613/CFM_154_4403_best.pth'
 
 # path='./images/image_00068.jpg'  # single image
 input_images_folder='./images/'  # folder containing multiple images

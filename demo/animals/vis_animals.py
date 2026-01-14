@@ -385,13 +385,14 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
 
     input_2D = normalize_screen_coordinates(input_2D_no, w=img_size[1], h=img_size[0])
 
-    input_2D_aug = copy.deepcopy(input_2D)
-    input_2D_aug[:, :, 0] *= -1
-    input_2D_aug[:, joints_left + joints_right] = input_2D_aug[:, joints_right + joints_left]
-    input_2D = np.concatenate((np.expand_dims(input_2D, axis=0), np.expand_dims(input_2D_aug, axis=0)), 0)
+    # Remove TTA (Test-Time Augmentation) for better consistency
+    # Ensure input_2D has shape (1, J, 2) before conversion
+    if input_2D.ndim == 2:  # (J, 2)
+        input_2D = np.expand_dims(input_2D, axis=0)  # (1, J, 2)
     
-    input_2D = input_2D[np.newaxis, :, :, :, :]
-    input_2D = torch.from_numpy(input_2D.astype('float32')).cuda()
+    # Convert to tensor format matching visualize_animal_poses.py
+    input_2D = torch.from_numpy(input_2D.astype('float32')).cuda()  # (1, J, 2)
+    input_2D = input_2D.unsqueeze(0)  # (1, 1, J, 2)
 
     # Euler sampler for CFM
     def euler_sample(c_2d, y_local, steps, model_3d):
@@ -402,21 +403,15 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
             y_local = y_local + dt * v_s
         return y_local
     
-    ## Estimation
-    # print("input_2D.shape:", input_2D[:, 0].shape)
-    # print("input_2D:", input_2D[:, 0])  # Bugs -> fix:Nan
+    ## Estimation (without TTA for better results)
+    print("input_2D.shape:", input_2D.shape)
+    print("input_2D:", input_2D[0, 0])
     
-    y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
-    output_3D_non_flip = euler_sample(input_2D[:, 0], y, steps=args.sample_steps, model_3d=model)
+    # Single inference without flip augmentation
+    # Create 3D random noise with shape (1, 1, J, 3)
+    y = torch.randn(input_2D.size(0), input_2D.size(1), input_2D.size(2), 3).cuda()
+    output_3D = euler_sample(input_2D, y, steps=args.sample_steps, model_3d=model)
     
-    y_flip = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
-    output_3D_flip = euler_sample(input_2D[:, 1], y_flip, steps=args.sample_steps, model_3d=model)
-
-    output_3D_flip[:, :, :, 0] *= -1
-    output_3D_flip[:, :, joints_left + joints_right, :] = output_3D_flip[:, :, joints_right + joints_left, :]
-
-    output_3D = (output_3D_non_flip + output_3D_flip) / 2
-
     output_3D = output_3D[0:, args.pad].unsqueeze(1)
     # output_3D[:, :, 0, :] = 0
     post_out = output_3D[0, 0].cpu().detach().numpy()
@@ -481,6 +476,15 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         cv2.imwrite(f'{output_dir_2D_img}{i:04d}_2d.png', img_copy)
         print(f"Saved 2D pose on image to {output_dir_2D_img}{i:04d}_2d.png")
 
+    ## Save 3D pose as npz
+    output_dir_3D = output_dir + 'pose3D/'
+    os.makedirs(output_dir_3D, exist_ok=True)
+    
+    # Save 3D pose data
+    npz_filename = output_dir_3D + str(('%04d' % i)) + '_3D.npz'
+    np.savez_compressed(npz_filename, pose_3d=post_out)
+    print(f"Saved 3D pose to {npz_filename}")
+    
     ## Save 3D visualization
     fig = plt.figure(figsize=(9.6, 5.4))
     gs = gridspec.GridSpec(1, 1)
@@ -488,8 +492,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     ax = plt.subplot(gs[0], projection='3d')
     show3Dpose(post_out, ax, color=(0/255, 176/255, 240/255), world=True, linewidth=2.5)
 
-    output_dir_3D = output_dir + 'pose3D/'
-    os.makedirs(output_dir_3D, exist_ok=True)
     plt.savefig(output_dir_3D + str(('%04d' % i)) + '_3D.png', dpi=200, format='png', bbox_inches='tight')
     # Save raw 3D pose alongside the image
     pose_npz = Path(output_dir_3D) / f"{i:04d}_3D.npz"
