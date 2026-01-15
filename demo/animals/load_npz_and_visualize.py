@@ -253,8 +253,6 @@ def main():
                        help='Path to .npz file containing 3D pose data')
     parser.add_argument('--key', type=str, default=None,
                        help='Key name in NPZ file (auto-detect if not specified)')
-    parser.add_argument('--output', type=str, default='pose_3d_viewer.html',
-                       help='Output HTML file path')
     parser.add_argument('--no_skeleton', action='store_true',
                        help='Disable skeleton connections')
     parser.add_argument('--point_size', type=int, default=8,
@@ -271,6 +269,11 @@ def main():
         print(f"❌ Error: File not found: {args.npz_file}")
         return
     
+    # 生成输出 HTML 路径：与 npz 同目录且同名
+    npz_dir = os.path.dirname(args.npz_file)
+    npz_stem = os.path.splitext(os.path.basename(args.npz_file))[0]
+    output_html = os.path.join(npz_dir, f"{npz_stem}.html")
+
     # 加载 NPZ 文件
     pose_data, key = load_pose_from_npz(args.npz_file, args.key)
     
@@ -280,7 +283,7 @@ def main():
         visualize_multiple_frames(
             pose_data, 
             frame_indices=args.frame_indices,
-            output_html=args.output
+            output_html=output_html
         )
     else:
         # 单帧可视化
@@ -297,14 +300,14 @@ def main():
         )
         
         # 保存为 HTML
-        pyo.plot(fig, filename=args.output, auto_open=False)
-        print(f"\n✓ Interactive visualization saved to: {args.output}")
+        pyo.plot(fig, filename=output_html, auto_open=False)
+        print(f"\n✓ Interactive visualization saved to: {output_html}")
     
     # 显示使用说明
     print(f"\n🌐 To view the interactive HTML:")
-    print(f"  1. Open directly: {os.path.abspath(args.output)}")
+    print(f"  1. Open directly: {os.path.abspath(output_html)}")
     print(f"  2. Or start HTTP server: python -m http.server 8080")
-    print(f"  3. Then open: http://localhost:8080/{args.output}")
+    print(f"  3. Then open: http://localhost:8080/{os.path.basename(output_html)}")
     
     print("\n🎮 Interactive features:")
     print("  • Drag to rotate the 3D view")
