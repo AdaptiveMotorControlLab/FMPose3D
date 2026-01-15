@@ -29,20 +29,11 @@ def load_pose_from_npz(npz_file, key=None):
     
     # 列出所有可用的键
     print(f"✓ Available keys in NPZ file: {list(data.keys())}")
-    
+            
     if key is None:
-        # 尝试常见的键名
-        possible_keys = ['reconstruction', 'pose_3d', 'keypoints', 'positions_3d', 'data']
-        for k in possible_keys:
-            if k in data.keys():
-                key = k
-                print(f"📌 Auto-selected key: '{key}'")
-                break
-        
-        if key is None:
-            # 使用第一个键
-            key = list(data.keys())[0]
-            print(f"📌 Using first available key: '{key}'")
+        # 使用第一个键
+        key = list(data.keys())[0]
+        print(f"📌 Using first available key: '{key}'")
     
     pose_data = data[key]
     print(f"✓ Loaded data shape: {pose_data.shape}")
