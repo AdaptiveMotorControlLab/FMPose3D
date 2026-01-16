@@ -536,8 +536,3 @@ def loadmat(filename):
 
     data = scipy.io.loadmat(filename, struct_as_record=False, squeeze_me=True)
     return _check_keys(data)
-
-
-def get_GT_rotation(dataset, sample_infos):
-    rotation = np.zeros(sample_infos.shape[0], 3, 3)
-    aa = 1
