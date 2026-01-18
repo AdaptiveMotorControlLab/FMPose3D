@@ -252,12 +252,11 @@ if __name__ == "__main__":
 
     if args.create_file:
         # create backup folder
-        if args.debug and args.train == False:
+        if args.debug:
             args.checkpoint = "./debug/" + folder_name
-        if args.train:
+        elif args.train:
             args.checkpoint = "./checkpoint/" + folder_name
-
-        if args.train == False:
+        elif args.train == False:
             # create a new folder for the test results
             args.previous_dir = os.path.dirname(args.saved_model_path)
             args.checkpoint = os.path.join(args.previous_dir, folder_name)
