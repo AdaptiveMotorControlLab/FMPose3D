@@ -79,6 +79,10 @@ To run inference on Human3.6M:
 sh ./scripts/FMPose_test.sh
 ```
 
+## Experiments Animals
+
+For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
+
 ## Acknowledgement
 
 Our code is extended from the following repositories. We thank the authors for releasing the codes. 
