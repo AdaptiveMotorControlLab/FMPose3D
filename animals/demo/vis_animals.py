@@ -56,7 +56,7 @@ def compute_limb_regularization_matrix(gt_3d):
     Returns:
         R: 3x3 rotation matrix to align limbs to vertical
     """
-    # 定义腿部连接对 (起点, 终点)
+    # Define limb connection pairs (start, end)
     limb_connections = [
         (8, 14),   # left_front_thigh → left_front_knee
         (9, 15),   # right_front_thigh → right_front_knee
@@ -64,41 +64,41 @@ def compute_limb_regularization_matrix(gt_3d):
         (11, 17),  # right_back_thigh → right_back_knee
     ]
     
-    # 计算所有连接的方向向量
-    # 注意：这些连接是从近端（大腿/膝盖）到远端（爪子），方向是向下的
-    # 为了让它们朝向竖直向上，我们需要反转方向
+    # Compute direction vectors for all connections.
+    # These connections go from proximal (thigh/knee) to distal (paw), so they
+    # point downward; we reverse them to point upward.
     limb_vectors = []
     for start_idx, end_idx in limb_connections:
-        # 反转方向：从end到start（从爪子指向身体，即向上）
+        # Reverse direction: end -> start (from paw toward body, upward).
         vec = gt_3d[start_idx] - gt_3d[end_idx]
-        # 归一化
+        # Normalize.
         vec_norm = np.linalg.norm(vec)
-        if vec_norm > 1e-6:  # 避免除零
+        if vec_norm > 1e-6:  # Avoid division by zero.
             vec = vec / vec_norm
             limb_vectors.append(vec)
     
     if len(limb_vectors) == 0:
-        return np.eye(3)  # 如果没有有效向量，返回单位矩阵
+        return np.eye(3)  # No valid vectors, return identity.
     
-    # 计算平均方向
+    # Compute average direction.
     avg_direction = np.mean(limb_vectors, axis=0)
     avg_direction = avg_direction / (np.linalg.norm(avg_direction) + 1e-8)
     
-    # 目标方向：竖直向上 (0, 0, 1)
+    # Target direction: vertical up (0, 0, 1).
     target_direction = np.array([0.0, 0.0, 1.0])
     
-    # 计算旋转矩阵，将avg_direction对齐到target_direction
-    # 使用Rodrigues公式
+    # Compute rotation matrix to align avg_direction to target_direction.
+    # Use Rodrigues' rotation formula.
     v = np.cross(avg_direction, target_direction)
     c = np.dot(avg_direction, target_direction)
     
-    # 如果两个向量已经对齐或相反
+    # If the two vectors are already aligned or opposite.
     if np.linalg.norm(v) < 1e-6:
         if c > 0:
-            return np.eye(3)  # 已经对齐
+            return np.eye(3)  # Already aligned.
         else:
-            # 相反方向，旋转180度
-            # 找一个垂直轴
+            # Opposite direction, rotate 180 degrees.
+            # Choose a perpendicular axis.
             if abs(avg_direction[0]) < 0.9:
                 axis = np.array([1.0, 0.0, 0.0])
             else:
@@ -107,7 +107,7 @@ def compute_limb_regularization_matrix(gt_3d):
             axis = axis / np.linalg.norm(axis)
             return 2 * np.outer(axis, axis) - np.eye(3)
     
-    # Rodrigues旋转公式
+    # Rodrigues rotation formula.
     s = np.linalg.norm(v)
     kmat = np.array([[0, -v[2], v[1]],
                      [v[2], 0, -v[0]],
@@ -119,7 +119,7 @@ def compute_limb_regularization_matrix(gt_3d):
 
 def apply_regularization(pose_3d, R):
     """
-    应用正则化矩阵到3D姿态
+    Apply regularization matrix to 3D pose.
     
     Args:
         pose_3d: numpy array of shape (J, 3)
@@ -432,7 +432,7 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     #     print("\n=== Regularization Debug Info ===")
     #     print(f"Rotation matrix R:\n{R_reg}")
         
-    #     # 验证正则化后的平均方向
+    #     # Validate average limb direction after regularization.
     #     limb_connections = [
     #         (8, 14), (9, 15), (10, 16), (11, 17)
     #     ]
