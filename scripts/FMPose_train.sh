@@ -17,7 +17,6 @@ sh_file='scripts/FMPose_train.sh'
 folder_name=FMPose_Publish_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
 python3 scripts/FMPose_main.py \
-  --debug \
   --train \
   --dataset h36m \
   --frames ${frames} \
