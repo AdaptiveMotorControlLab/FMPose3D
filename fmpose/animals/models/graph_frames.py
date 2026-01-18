@@ -28,10 +28,10 @@ class Graph():
         self.dilation = dilation # 1
         self.seqlen = pad  # 1
         self.get_edge(layout)
-        self.hop_dis = get_hop_distance(self.num_node, self.edge, max_hop=max_hop) # [17,17], 相邻位1，本身为0，其他为inf
+        self.hop_dis = get_hop_distance(self.num_node, self.edge, max_hop=max_hop) # [17,17], adjacent=1, self=0, others=inf
 
         # get distance of each node to center
-        self.dist_center = self.get_distance_to_center(layout)  # dist_center 各个节点到joint7的距离s
+        self.dist_center = self.get_distance_to_center(layout)  # dist_center: distance from each node to joint 7
         self.get_adjacency(strategy)
 
     def get_distance_to_center(self,layout): 
@@ -78,7 +78,7 @@ class Graph():
         :param base:
         :return:
         """
-        return [((front) + i*self.num_node_each, (back)+ i*self.num_node_each) for i in range(self.seqlen) for (front, back) in base] # 把每一帧的关节点都连接起来
+        return [((front) + i*self.num_node_each, (back)+ i*self.num_node_each) for i in range(self.seqlen) for (front, back) in base] # Connect joints across frames.
 
 
     def basic_layout(self,neighbour_base, sym_base):
@@ -274,16 +274,16 @@ class Graph():
         else:
             raise ValueError("Do Not Exist This Strategy")
             
-def get_hop_distance(num_node, edge, max_hop=1): # 建立邻接矩阵,相邻则置0   
+def get_hop_distance(num_node, edge, max_hop=1): # Build adjacency matrix; neighbors set to 1.
     A = np.zeros((num_node, num_node))
     for i, j in edge:
         A[j, i] = 1
         A[i, j] = 1
     # compute hop steps
     hop_dis = np.zeros((num_node, num_node)) + np.inf
-    transfer_mat = [np.linalg.matrix_power(A, d) for d in range(max_hop + 1)]# GET [I,A]; matrix_power计算矩阵次方  0次方对角线全1，1次方不动
+    transfer_mat = [np.linalg.matrix_power(A, d) for d in range(max_hop + 1)]# GET [I, A]; matrix_power computes powers (0th -> identity, 1st -> A)
     arrive_mat = (np.stack(transfer_mat) > 0) # [2,17,17]
-    for d in range(max_hop, -1, -1): # preserve A(i,j) = 1 while A(i,i) = 0  相邻为1 对角为0
+    for d in range(max_hop, -1, -1): # preserve A(i,j)=1 while A(i,i)=0; neighbors=1, diagonal=0
         hop_dis[arrive_mat[d]] = d
     return hop_dis
 
