@@ -1,4 +1,4 @@
-#Train FMPose
+#Train FMPose3D
 layers=5
 lr=1e-3
 decay=0.98
@@ -13,10 +13,10 @@ frames=1
 channel_dim=512
 model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
 # model_path='./fmpose/models/model_GAMLP.py' # when the path is not empty, the model will be loaded from the local file path
-sh_file='scripts/FMPose_train.sh'
-folder_name=FMPose_Publish_layers${layers}_$(date +%Y%m%d_%H%M%S)
+sh_file='scripts/FMPose3D_train.sh'
+folder_name=FMPose3D_Publish_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
-python3 scripts/FMPose_main.py \
+python3 scripts/FMPose3D_main.py \
   --train \
   --dataset h36m \
   --frames ${frames} \
