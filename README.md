@@ -28,9 +28,9 @@ conda activate fmpose_3d
 ```bash
 git clone xxxx.git  # clone this repo
 # TestPyPI (pre-release/testing build)
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose==0.0.5
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose3d==0.0.5
 # Future Official PyPI release
-# pip install fmpose
+# pip install fmpose3d
 ```
 
 ## Demo 

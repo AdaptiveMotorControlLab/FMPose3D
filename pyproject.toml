@@ -54,7 +54,7 @@ include = ["fmpose*"]
 "*" = ["*.yaml", "*.cfg", "*.names"]
 
 [tool.setuptools.dynamic]
-version = {attr = "fmpose.__version__"}
+version = {attr = "fmpose3d.__version__"}
 
 [tool.black]
 line-length = 100
