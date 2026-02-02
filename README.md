@@ -1,8 +1,8 @@
-# FMPose: 3D Pose Estimation via Flow Matching
+# FMPose3D: monocular 3D Pose Estimation via Flow Matching
 
 This is the official implementation of the approach described in the paper:
 
-> [**FMPose: 3D Pose Estimation via Flow Matching**](xxx)            
+> [**FMPose3D: monocular 3D Pose Estimation via Flow Matching**](xxx)            
 > Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
@@ -11,7 +11,7 @@ This is the official implementation of the approach described in the paper:
 
 ## Set up a environment
 
-Make sure you have Python 3.10. You can set this up with:
+Make sure you have Python 3.10+. You can set this up with:
 ```bash
 conda create -n fmpose_3d python=3.10
 conda activate fmpose_3d
