@@ -9,7 +9,15 @@ This is the official implementation of the approach described in the paper:
 
 <p align="center"><img src="./images/predictions.jpg" width="95%" alt="" /></p>
 
-## Set up a environment
+
+## News!
+
+- [X] Feb 2026: FMPose3D is code and arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
+- [ ] Planned: This method will be integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
+
+## Installation
+
+### Set up an environment
 
 Make sure you have Python 3.10+. You can set this up with:
 ```bash
@@ -85,9 +93,11 @@ sh ./scripts/FMPose_test.sh
 
 For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
 
-## Acknowledgement
+## Acknowledgements
 
-Our code is extended from the following repositories. We thank the authors for releasing the codes. 
+We thank the Swiss National Science Foundation (SNSF Project # 320030-227871) and the Kavli Foundation for providing financial support for this project.
+
+Our code is extended from the following repositories. We thank the authors for releasing the code. 
 
 - [MHFormer](https://github.com/Vegetebird/MHFormer)
 - [StridedTransformer-Pose3D](https://github.com/Vegetebird/StridedTransformer-Pose3D)
