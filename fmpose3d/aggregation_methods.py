@@ -87,7 +87,7 @@ def aggregation_select_single_best_hypothesis_by_2D_error(args,
     return agg
 
 
-def aggregation_RPEA_weighted_by_2D_error(
+def aggregation_RPEA_joint_level(
     args, list_hypothesis, batch_cam, input_2D, gt_3D, topk=3
 ):
     """
