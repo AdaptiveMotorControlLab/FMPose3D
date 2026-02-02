@@ -13,8 +13,8 @@ import pandas as pd
 from PIL import Image
 import matplotlib.gridspec as gridspec
 import imageio
-from fmpose.animals.common.arguments import opts as parse_args
-from fmpose.common.camera import normalize_screen_coordinates, camera_to_world
+from fmpose3d.animals.common.arguments import opts as parse_args
+from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
 
 sys.path.append(os.getcwd())
 
@@ -37,7 +37,7 @@ if getattr(args, "model_path", ""):
     CFM = getattr(module, "Model")
 else:
     # Load model from installed fmpose package
-    from fmpose.models import Model as CFM
+    from fmpose3d.models import Model as CFM
 
 from deeplabcut.pose_estimation_pytorch.apis import superanimal_analyze_images
 

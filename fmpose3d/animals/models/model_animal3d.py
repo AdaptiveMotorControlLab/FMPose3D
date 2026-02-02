@@ -6,7 +6,7 @@ import torch.nn as nn
 from einops import rearrange
 from timm.models.layers import DropPath
 
-from fmpose.animals.models.graph_frames import Graph
+from fmpose3d.animals.models.graph_frames import Graph
 
 class TimeEmbedding(nn.Module):
     def __init__(self, dim: int, hidden_dim: int = 64):

@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import math
 from einops import rearrange
-from fmpose.models.graph_frames import Graph
+from fmpose3d.models.graph_frames import Graph
 from functools import partial
 from einops import rearrange, repeat
 from timm.models.layers import DropPath
