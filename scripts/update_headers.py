@@ -68,15 +68,37 @@ def should_skip_file(file_path):
 
 def has_header(content):
     """
-    Check if content already has the standard header.
+    Check if content already has the standard header or a valid variant.
     
     Args:
         content: File content to check
         
     Returns:
-        True if the file has the standard header, False otherwise
+        True if the file has the standard header or acceptable variant, False otherwise
     """
-    return STANDARD_HEADER.strip() in content
+    # Check for exact match
+    if STANDARD_HEADER.strip() in content:
+        return True
+    
+    # Check for header with additional content (like in sort.py)
+    # Header should contain the key elements
+    lines = content.split('\n')
+    if len(lines) < 3:
+        return False
+    
+    # Check if it starts with a docstring
+    if not lines[0].strip().startswith('"""'):
+        return False
+    
+    # Check for key header components in the first 15 lines
+    header_section = '\n'.join(lines[:15])
+    required_elements = [
+        'FMPose3D: monocular 3D Pose Estimation via Flow Matching',
+        'Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis',
+        'Licensed under Apache 2.0'
+    ]
+    
+    return all(elem in header_section for elem in required_elements)
 
 
 def needs_header_update(content):
@@ -216,9 +238,9 @@ def main():
     check_only = '--check' in sys.argv
     
     if len(sys.argv) > 1 and not sys.argv[1].startswith('--'):
-        root_dir = sys.argv[1]
+        root_dir = Path(sys.argv[1])
     else:
-        root_dir = os.getcwd()
+        root_dir = Path(os.getcwd())
     
     mode = "Checking" if check_only else "Processing"
     print(f"{mode} files for headers in: {root_dir}")
