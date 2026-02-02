@@ -12,12 +12,12 @@ from pathlib import Path
 
 # Define the old and new headers
 OLD_HEADER = '''"""
-FMPose: 3D Pose Estimation via Flow Matching
+FMPose3D: monocular 3D Pose Estimation via Flow Matching
 
 Official implementation of the paper:
-"FMPose: 3D Pose Estimation via Flow Matching"
+"FMPose3D: monocular 3D Pose Estimation via Flow Matching"
 by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
-Accepted by IEEE Transactions on Multimedia (TMM), 2025.
+Licensed under Apache 2.0
 """'''
 
 NEW_HEADER = '''"""
