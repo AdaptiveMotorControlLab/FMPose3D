@@ -1,5 +1,5 @@
 """
-Common utilities for FMPose.
+Common utilities for FMPose3D.
 """
 
 from .arguments import opts

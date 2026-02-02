@@ -76,7 +76,7 @@ The training logs, checkpoints, and related files of each training time will be 
 
 For training on Human3.6M:
 ```bash
-sh /scripts/FMPose_train.sh
+sh /scripts/FMPose3D_train.sh
 ```
 
 ### Inference
@@ -86,7 +86,7 @@ First, download the folder with pre-trained model from [here](https://drive.goog
 To run inference on Human3.6M:
 
 ```bash
-sh ./scripts/FMPose_test.sh
+sh ./scripts/FMPose3D_test.sh
 ```
 
 ## Experiments Animals

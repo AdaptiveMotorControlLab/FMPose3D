@@ -1,5 +1,5 @@
 """
-FMPose models.
+FMPose3D models.
 """
 
 from .graph_frames import Graph
