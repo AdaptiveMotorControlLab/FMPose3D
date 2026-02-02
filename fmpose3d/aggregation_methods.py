@@ -1,5 +1,5 @@
 import torch
-from fmpose.common.utils import project_to_2d
+from fmpose3d.common.utils import project_to_2d
 
 def average_aggregation(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)

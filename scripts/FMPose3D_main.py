@@ -9,10 +9,10 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
-from fmpose.common import opts, Human36mDataset, Fusion
-from fmpose.common.utils import *
+from fmpose3d.common import opts, Human36mDataset, Fusion
+from fmpose3d.common.utils import *
 
-from fmpose.aggregation_methods import aggregation_RPEA_weighted_by_2D_error
+from fmpose3d.aggregation_methods import aggregation_RPEA_weighted_by_2D_error
 
 args = opts().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -33,7 +33,7 @@ if getattr(args, "model_path", ""):
     CFM = getattr(module, "Model")
 else:
     # Load model from installed fmpose package
-    from fmpose.models import Model as CFM
+    from fmpose3d.models import Model as CFM
 
 
 def test_multi_hypothesis(

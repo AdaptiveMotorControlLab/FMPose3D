@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.optim as optim
-from fmpose.models import Model
+from fmpose3d.models import Model
 
 
 class Args:

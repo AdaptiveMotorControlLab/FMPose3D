@@ -2,9 +2,9 @@ import copy
 
 import numpy as np
 
-from fmpose.common.camera import normalize_screen_coordinates
-from fmpose.common.mocap_dataset import MocapDataset
-from fmpose.common.skeleton import Skeleton
+from fmpose3d.common.camera import normalize_screen_coordinates
+from fmpose3d.common.mocap_dataset import MocapDataset
+from fmpose3d.common.skeleton import Skeleton
 
 h36m_skeleton = Skeleton(
     parents=[

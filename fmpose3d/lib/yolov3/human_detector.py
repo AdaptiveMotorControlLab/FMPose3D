@@ -9,10 +9,10 @@ import random
 import pickle as pkl
 import argparse
 
-from fmpose.lib.yolov3.util import *
-from fmpose.lib.yolov3.darknet import Darknet
-from fmpose.lib.yolov3 import preprocess
-from fmpose.lib.checkpoint.download_checkpoints import get_checkpoint_path
+from fmpose3d.lib.yolov3.util import *
+from fmpose3d.lib.yolov3.darknet import Darknet
+from fmpose3d.lib.yolov3 import preprocess
+from fmpose3d.lib.checkpoint.download_checkpoints import get_checkpoint_path
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.join(cur_dir, '../../../')
