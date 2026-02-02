@@ -26,7 +26,7 @@ conda activate fmpose_3d
 ```
 <!-- test version -->
 ```bash
-git clone xxxx.git  # clone this repo
+git clone https://github.com/AdaptiveMotorControlLab/FMPose3D.git
 # TestPyPI (pre-release/testing build)
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose3d==0.0.7
 # Future Official PyPI release
