@@ -128,11 +128,40 @@ def add_or_update_header(file_path, check_only=False):
         lines = content.split('\n')
         if content.strip() and len(content.strip()) > 10:
             if not check_only:
+                # Handle special cases for header placement
+                new_lines = []
+                insert_index = 0
+                
                 # If file starts with shebang, keep it at the top
                 if lines[0].startswith('#!'):
-                    new_content = lines[0] + '\n' + STANDARD_HEADER + '\n\n' + '\n'.join(lines[1:])
+                    new_lines.append(lines[0])
+                    insert_index = 1
+                
+                # Check for 'from __future__' imports which must be very early
+                # Find the first non-comment, non-shebang, non-empty line
+                future_import_index = None
+                for i in range(insert_index, min(len(lines), 10)):
+                    line = lines[i].strip()
+                    if line.startswith('from __future__'):
+                        future_import_index = i
+                        break
+                    elif line and not line.startswith('#'):
+                        # Found a non-comment line that isn't a future import
+                        break
+                
+                if future_import_index is not None:
+                    # If there's a from __future__ import, add header AFTER it
+                    new_lines.extend(lines[insert_index:future_import_index+1])
+                    new_lines.append(STANDARD_HEADER)
+                    new_lines.append('')
+                    new_lines.extend(lines[future_import_index+1:])
                 else:
-                    new_content = STANDARD_HEADER + '\n\n' + content
+                    # Otherwise, add header at the beginning (after shebang if present)
+                    new_lines.append(STANDARD_HEADER)
+                    new_lines.append('')
+                    new_lines.extend(lines[insert_index:])
+                
+                new_content = '\n'.join(new_lines)
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(new_content)
