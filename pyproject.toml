@@ -28,7 +28,7 @@ dependencies = [
     "torchvision==0.19.1",
     "timm>=1.0.0",
     "einops==0.4.0",
-    "numpy==2.1.1",
+    "numpy>=1.18.5,<2.0",
     "tqdm>=4.60.0",
     "scipy>=1.7.0",
     "yacs>=0.1.8",
@@ -36,6 +36,8 @@ dependencies = [
     "numba>=0.56.0",
     "scikit-image>=0.19.0",
     "filterpy>=1.4.5",
+    "pandas>=1.0.1",
+    "deeplabcut==3.0.0rc13",
 ]
 
 [project.optional-dependencies]
