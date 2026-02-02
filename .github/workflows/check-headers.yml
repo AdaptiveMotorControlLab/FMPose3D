@@ -1,0 +1,36 @@
+---
+name: Check File Headers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-headers:
+    name: Check Python file headers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Check headers
+        run: |
+          python scripts/update_headers.py --check
+        continue-on-error: false
+
+      - name: Provide fix instructions
+        if: failure()
+        run: |
+          echo "::error::Some files are missing proper headers."
+          echo "To fix this, run: python scripts/update_headers.py"
+          echo "Then commit the changes."
