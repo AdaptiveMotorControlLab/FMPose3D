@@ -12,7 +12,7 @@ from tqdm import tqdm
 from fmpose3d.common import opts, Human36mDataset, Fusion
 from fmpose3d.common.utils import *
 
-from fmpose3d.aggregation_methods import aggregation_RPEA_weighted_by_2D_error
+from fmpose3d.aggregation_methods import aggregation_RPEA_joint_level
 
 args = opts().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -121,7 +121,7 @@ def test_multi_hypothesis(
                 output_3D_s[:, :, 0, :] = 0
                 list_hypothesis.append(output_3D_s)
 
-            output_3D_s = aggregation_RPEA_weighted_by_2D_error(args,
+            output_3D_s = aggregation_RPEA_joint_level(args,
                 list_hypothesis, batch_cam, input_2D_nonflip, gt_3D, args.topk
             )
 
