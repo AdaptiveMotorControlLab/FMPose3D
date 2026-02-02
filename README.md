@@ -1,17 +1,25 @@
-# FMPose: 3D Pose Estimation via Flow Matching
+# FMPose3D: monocular 3D Pose Estimation via Flow Matching
 
 This is the official implementation of the approach described in the paper:
 
-> [**FMPose: 3D Pose Estimation via Flow Matching**](xxx)            
+> [**FMPose3D: monocular 3D Pose Estimation via Flow Matching**](xxx)            
 > Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
 
 <p align="center"><img src="./images/predictions.jpg" width="95%" alt="" /></p>
 
-## Set up a environment
 
-Make sure you have Python 3.10. You can set this up with:
+## News!
+
+- [X] Feb 2026: FMPose3D is code and arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
+- [ ] Planned: This method will be integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
+
+## Installation
+
+### Set up an environment
+
+Make sure you have Python 3.10+. You can set this up with:
 ```bash
 conda create -n fmpose_3d python=3.10
 conda activate fmpose_3d
@@ -20,9 +28,9 @@ conda activate fmpose_3d
 ```bash
 git clone xxxx.git  # clone this repo
 # TestPyPI (pre-release/testing build)
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose==0.0.5
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose3d==0.0.7
 # Future Official PyPI release
-# pip install fmpose
+# pip install fmpose3d
 ```
 
 ## Demo 
@@ -68,7 +76,7 @@ The training logs, checkpoints, and related files of each training time will be 
 
 For training on Human3.6M:
 ```bash
-sh /scripts/FMPose_train.sh
+sh /scripts/FMPose3D_train.sh
 ```
 
 ### Inference
@@ -78,16 +86,18 @@ First, download the folder with pre-trained model from [here](https://drive.goog
 To run inference on Human3.6M:
 
 ```bash
-sh ./scripts/FMPose_test.sh
+sh ./scripts/FMPose3D_test.sh
 ```
 
 ## Experiments Animals
 
 For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
 
-## Acknowledgement
+## Acknowledgements
 
-Our code is extended from the following repositories. We thank the authors for releasing the codes. 
+We thank the Swiss National Science Foundation (SNSF Project # 320030-227871) and the Kavli Foundation for providing financial support for this project.
+
+Our code is extended from the following repositories. We thank the authors for releasing the code. 
 
 - [MHFormer](https://github.com/Vegetebird/MHFormer)
 - [StridedTransformer-Pose3D](https://github.com/Vegetebird/StridedTransformer-Pose3D)

@@ -10,9 +10,9 @@ Licensed under Apache 2.0
 import numpy as np
 import torch.utils.data as data
 
-from fmpose.common.camera import normalize_screen_coordinates, world_to_camera
-from fmpose.common.generator import ChunkedGenerator
-from fmpose.common.utils import deterministic_random
+from fmpose3d.common.camera import normalize_screen_coordinates, world_to_camera
+from fmpose3d.common.generator import ChunkedGenerator
+from fmpose3d.common.utils import deterministic_random
 
 
 class Fusion(data.Dataset):

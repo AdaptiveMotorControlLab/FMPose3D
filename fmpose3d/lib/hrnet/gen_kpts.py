@@ -24,22 +24,22 @@ import torch.backends.cudnn as cudnn
 import cv2
 import copy
 
-from fmpose.lib.hrnet.lib.utils.utilitys import plot_keypoint, PreProcess, write, load_json
-from fmpose.lib.hrnet.lib.config import cfg, update_config
-from fmpose.lib.hrnet.lib.utils.transforms import *
-from fmpose.lib.hrnet.lib.utils.inference import get_final_preds
-from fmpose.lib.hrnet.lib.models import pose_hrnet
+from fmpose3d.lib.hrnet.lib.utils.utilitys import plot_keypoint, PreProcess, write, load_json
+from fmpose3d.lib.hrnet.lib.config import cfg, update_config
+from fmpose3d.lib.hrnet.lib.utils.transforms import *
+from fmpose3d.lib.hrnet.lib.utils.inference import get_final_preds
+from fmpose3d.lib.hrnet.lib.models import pose_hrnet
 
 cfg_dir = osp.join(osp.dirname(osp.abspath(__file__)), 'experiments') + '/'
 
 # Auto-download checkpoints if missing and get checkpoint paths
-from fmpose.lib.checkpoint.download_checkpoints import ensure_checkpoints, get_checkpoint_path
+from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints, get_checkpoint_path
 ensure_checkpoints()
 
 # Loading human detector model
-from fmpose.lib.yolov3.human_detector import load_model as yolo_model
-from fmpose.lib.yolov3.human_detector import yolo_human_det as yolo_det
-from fmpose.lib.sort.sort import Sort
+from fmpose3d.lib.yolov3.human_detector import load_model as yolo_model
+from fmpose3d.lib.yolov3.human_detector import yolo_human_det as yolo_det
+from fmpose3d.lib.sort.sort import Sort
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')

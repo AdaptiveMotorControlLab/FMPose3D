@@ -8,7 +8,7 @@ Licensed under Apache 2.0
 """
 
 import torch
-from fmpose.common.utils import project_to_2d
+from fmpose3d.common.utils import project_to_2d
 
 def average_aggregation(list_hypothesis):
     return torch.mean(torch.stack(list_hypothesis), dim=0)
@@ -96,7 +96,7 @@ def aggregation_select_single_best_hypothesis_by_2D_error(args,
     return agg
 
 
-def aggregation_RPEA_weighted_by_2D_error(
+def aggregation_RPEA_joint_level(
     args, list_hypothesis, batch_cam, input_2D, gt_3D, topk=3
 ):
     """

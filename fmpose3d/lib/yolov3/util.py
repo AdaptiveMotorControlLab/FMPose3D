@@ -13,8 +13,8 @@ import torch
 import numpy as np
 import cv2
 import os.path as osp
-from fmpose.lib.yolov3.bbox import bbox_iou
-from fmpose.lib.checkpoint.download_checkpoints import get_checkpoint_dir
+from fmpose3d.lib.yolov3.bbox import bbox_iou
+from fmpose3d.lib.checkpoint.download_checkpoints import get_checkpoint_dir
 
 
 def get_path(cur_file):

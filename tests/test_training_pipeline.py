@@ -10,7 +10,7 @@ Licensed under Apache 2.0
 import pytest
 import torch
 import torch.optim as optim
-from fmpose.models import Model
+from fmpose3d.models import Model
 
 
 class Args:
@@ -46,7 +46,7 @@ def optimizer(model):
 def sample_batch(device):
     """Create a sample batch for training.
     
-    Shapes based on FMPose_main.py train function:
+    Shapes based on FMPose3D_main.py train function:
     - input_2D: (B, F, J, 2) - 2D pose input
     - gt_3D: (B, F, J, 3) - 3D pose ground truth
     """

@@ -17,8 +17,8 @@ import cv2
 import os
 import sys
 
-from fmpose.lib.yolov3.util import convert2cpu as cpu
-from fmpose.lib.yolov3.util import predict_transform
+from fmpose3d.lib.yolov3.util import convert2cpu as cpu
+from fmpose3d.lib.yolov3.util import predict_transform
 
 
 class test_net(nn.Module):
