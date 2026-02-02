@@ -11,6 +11,8 @@ jobs:
   check-headers:
     name: Check Python file headers
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
