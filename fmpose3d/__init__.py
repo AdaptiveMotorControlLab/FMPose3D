@@ -7,7 +7,7 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-__version__ = "0.0.4"
+__version__ = "0.0.7"
 __author__ = "Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis"
 __license__ = "Apache 2.0"
 
