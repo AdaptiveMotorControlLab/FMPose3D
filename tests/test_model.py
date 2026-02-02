@@ -9,7 +9,7 @@ Licensed under Apache 2.0
 
 import pytest
 import torch
-from fmpose.models import Model
+from fmpose3d.models import Model
 
 class Args:
     """Mock args for model configuration."""

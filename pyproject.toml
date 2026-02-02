@@ -3,24 +3,22 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fmpose"
+name = "fmpose3d"
 readme = "README.md"
 requires-python = ">=3.8"
 dynamic = ["version"]
-license = {text = "MIT"}
+license = {text = "Apache 2.0"}
 authors = [
     {name = "Ti Wang", email = "ti.wang@epfl.ch"},
     {name = "Xiaohang Yu"},
-    {name = "Mackenzie Weygandt Mathis"},
+    {name = "Mackenzie Weygandt Mathis",  email = "mackenzie.mathis@epfl.ch"},
 ]
 keywords = ["pose estimation", "3D pose", "flow matching", "computer vision"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -30,7 +28,7 @@ dependencies = [
     "torchvision==0.19.1",
     "timm>=1.0.0",
     "einops==0.4.0",
-    "numpy==2.1.1",
+    "numpy>=1.18.5,<2.0",
     "tqdm>=4.60.0",
     "scipy>=1.7.0",
     "yacs>=0.1.8",
@@ -38,6 +36,8 @@ dependencies = [
     "numba>=0.56.0",
     "scikit-image>=0.19.0",
     "filterpy>=1.4.5",
+    "pandas>=1.0.1",
+    "deeplabcut==3.0.0rc13",
 ]
 
 [project.optional-dependencies]
@@ -56,7 +56,7 @@ include = ["fmpose*"]
 "*" = ["*.yaml", "*.cfg", "*.names"]
 
 [tool.setuptools.dynamic]
-version = {attr = "fmpose.__version__"}
+version = {attr = "fmpose3d.__version__"}
 
 [tool.black]
 line-length = 100

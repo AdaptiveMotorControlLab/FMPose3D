@@ -15,9 +15,9 @@ import datetime
 import numpy as np
 from tqdm import tqdm
 import torch.optim as optim
-from fmpose.animals.common.arguments import opts as parse_args
-from fmpose.animals.common.utils import *
-from fmpose.animals.common.animal3d_dataset import TrainDataset
+from fmpose3d.animals.common.arguments import opts as parse_args
+from fmpose3d.animals.common.utils import *
+from fmpose3d.animals.common.animal3d_dataset import TrainDataset
 import time
 
 args = parse_args().parse()
@@ -39,7 +39,7 @@ if getattr(args, "model_path", ""):
     CFM = getattr(module, "Model")
 else:
     # Load model from installed fmpose package
-    from fmpose.animals.models import Model as CFM
+    from fmpose3d.animals.models import Model as CFM
      
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)

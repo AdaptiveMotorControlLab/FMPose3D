@@ -7,7 +7,7 @@ sh_file='vis_animals.sh'
 # n_joints=26
 # out_joints=26
 
-model_path='../../fmpose/animals/models/model_animal3d.py'
+model_path='../pre_trained_models/animal3d_pretrained_weights/model_animal3d.py'
 saved_model_path='../pre_trained_models/animal3d_pretrained_weights/CFM_154_4403_best.pth'
 
 # path='./images/image_00068.jpg'  # single image

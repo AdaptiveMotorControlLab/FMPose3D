@@ -15,7 +15,7 @@ import torch.nn as nn
 from einops import rearrange
 from timm.models.layers import DropPath
 
-from fmpose.animals.models.graph_frames import Graph
+from fmpose3d.animals.models.graph_frames import Graph
 
 class TimeEmbedding(nn.Module):
     def __init__(self, dim: int, hidden_dim: int = 64):
@@ -148,7 +148,7 @@ class Block(nn.Module):
         x = res2 + self.drop_path(x)
         return x
 
-class FMPose(nn.Module):
+class FMPose3D(nn.Module):
     def __init__(self, depth, embed_dim, channels_dim, tokens_dim, adj, drop_rate=0.10, length=27):
         super().__init__()
         drop_path_rate = 0.2
@@ -219,7 +219,7 @@ class Model(nn.Module):
         self.encoder_pose_2d = encoder(2, args.channel//2, args.channel//2-self.t_embed_dim//2)
         self.encoder_y_t = encoder(3, args.channel//2, args.channel//2-self.t_embed_dim//2)
         
-        self.FMPose = FMPose(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints) # 256
+        self.FMPose3D = FMPose3D(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints) # 256
         self.pred_mu = decoder(args.channel, args.channel//2, 3)
         
     def forward(self, pose_2d, y_t, t):
@@ -238,7 +238,7 @@ class Model(nn.Module):
         in_emb = rearrange(in_emb, 'b f j c -> (b f) j c').contiguous() # (B*F,J,in)
 
         # encoder -> model -> regression head
-        h = self.FMPose(in_emb)
+        h = self.FMPose3D(in_emb)
         v = self.pred_mu(h)                                  # (B*F,J,3)
         
         v = rearrange(v, '(b f) j c -> b f j c', b=b, f=f).contiguous() # (B,F,J,3)

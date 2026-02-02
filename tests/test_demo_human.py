@@ -34,8 +34,8 @@ def test_output_dir(tmp_path):
 def test_2d_pose_estimation(test_image_path, test_output_dir):
     """Test that 2D pose estimation runs and produces output."""
     # Import here to avoid import issues at collection time
-    from fmpose.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
-    from fmpose.lib.preprocess import h36m_coco_format, revise_kpts
+    from fmpose3d.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
+    from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
     
     # Run 2D pose estimation
     keypoints, scores = hrnet_pose(test_image_path, det_dim=416, num_peroson=1, gen_output=True, type='image')
@@ -61,9 +61,9 @@ def test_2d_pose_estimation(test_image_path, test_output_dir):
 def test_demo_pipeline_runs(test_image_path):
     """Test that the full demo pipeline can be imported and key components work."""
     # Test imports
-    from fmpose.lib.hrnet.gen_kpts import gen_video_kpts
-    from fmpose.lib.preprocess import h36m_coco_format, revise_kpts
-    from fmpose.models import Model
+    from fmpose3d.lib.hrnet.gen_kpts import gen_video_kpts
+    from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
+    from fmpose3d.models import Model
     
     assert gen_video_kpts is not None
     assert h36m_coco_format is not None

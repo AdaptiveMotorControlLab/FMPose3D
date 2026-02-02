@@ -19,12 +19,12 @@ import copy
 sys.path.append(os.getcwd())
 
 # Auto-download checkpoint files if missing
-from fmpose.lib.checkpoint.download_checkpoints import ensure_checkpoints
+from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints
 ensure_checkpoints()
 
-from fmpose.lib.preprocess import h36m_coco_format, revise_kpts
-from fmpose.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
-from fmpose.common.arguments import opts as parse_args
+from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
+from fmpose3d.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
+from fmpose3d.common.arguments import opts as parse_args
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -39,7 +39,7 @@ if getattr(args, 'model_path', ''):
     spec.loader.exec_module(module)
     CFM = getattr(module, 'Model')
     
-from fmpose.common.camera import *
+from fmpose3d.common.camera import *
 
 import matplotlib
 import matplotlib.pyplot as plt 

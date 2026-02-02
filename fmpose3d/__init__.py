@@ -7,15 +7,15 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-__version__ = "0.0.5"
+__version__ = "0.0.7"
 __author__ = "Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis"
-__license__ = "MIT"
+__license__ = "Apache 2.0"
 
 # Import key components for easy access
 from .aggregation_methods import (
     average_aggregation,
     aggregation_select_single_best_hypothesis_by_2D_error,
-    aggregation_RPEA_weighted_by_2D_error,
+    aggregation_RPEA_joint_level,
 )
 
 # Import 2D pose detection utilities
@@ -27,7 +27,7 @@ __all__ = [
     # Aggregation methods
     "average_aggregation",
     "aggregation_select_single_best_hypothesis_by_2D_error",
-    "aggregation_RPEA_weighted_by_2D_error",
+    "aggregation_RPEA_joint_level",
     # 2D pose detection
     "gen_video_kpts",
     "h36m_coco_format",
