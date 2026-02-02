@@ -1,15 +1,15 @@
 """
-FMPose3D: 3D Pose Estimation via Flow Matching
+FMPose3D: monocular 3D Pose Estimation via Flow Matching
 
 Official implementation of the paper:
-"FMPose3D: 3D Pose Estimation via Flow Matching"
+"FMPose3D: monocular 3D Pose Estimation via Flow Matching"
 by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
-Accepted by IEEE Transactions on Multimedia (TMM), 2025.
+Licensed under Apache 2.0
 """
 
 __version__ = "0.0.5"
 __author__ = "Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis"
-__license__ = "MIT"
+__license__ = "Apache 2.0"
 
 # Import key components for easy access
 from .aggregation_methods import (
