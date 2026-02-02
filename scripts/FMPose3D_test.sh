@@ -1,7 +1,7 @@
 #inference
 layers=5
 batch_size=1024
-sh_file='scripts/FMPose_test.sh'
+sh_file='scripts/FMPose3D_test.sh'
 weight_softmax_tau=1.0
 num_hypothesis_list=1
 eval_multi_steps=3
@@ -15,7 +15,7 @@ model_path='pre_trained_models/fmpose_detected2d/model_GAMLP.py'
 saved_model_path='pre_trained_models/fmpose_detected2d/FMpose_36_4972_best.pth'
 
 #Test CFM
-python3 scripts/FMPose_main.py \
+python3 scripts/FMPose3D_main.py \
 --reload \
 --topk ${topk} \
 --exp_temp ${exp_temp} \

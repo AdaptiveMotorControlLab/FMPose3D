@@ -1,5 +1,5 @@
 """
-Animal-specific components for FMPose.
+Animal-specific components for FMPose3D.
 """
 
 __all__ = [
