@@ -36,24 +36,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build and publish to Test PyPI
-        if: ${{ (github.ref != 'refs/heads/main') && (github.event.label.name == 'release') }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
-        run: |
-          make dist
-          ls dist/
-          tar tvf dist/fmpose3d-*.tar.gz
-          python3 -m twine upload --verbose --repository testpypi dist/*
-
       - name: Build and publish to PyPI
         if: ${{ github.event_name == 'push' }}
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_API_KEY }}
         run: |
-          make dist
+          pip install build twine
+          python3 -m build
           ls dist/
-          tar tvf dist/fmpose3d-*.tar.gz
           python3 -m twine upload --verbose dist/*
