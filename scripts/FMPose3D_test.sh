@@ -2,7 +2,6 @@
 layers=5
 batch_size=1024
 sh_file='scripts/FMPose3D_test.sh'
-weight_softmax_tau=1.0
 num_hypothesis_list=1
 eval_multi_steps=3
 topk=8
@@ -19,7 +18,6 @@ python3 scripts/FMPose3D_main.py \
 --reload \
 --topk ${topk} \
 --exp_temp ${exp_temp} \
---weight_softmax_tau ${weight_softmax_tau} \
 --folder_name ${folder_name} \
 --model_weights_path "${model_weights_path}" \
 --model_path "${model_path}" \
