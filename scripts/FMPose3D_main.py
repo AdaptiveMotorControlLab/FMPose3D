@@ -267,36 +267,29 @@ if __name__ == "__main__":
             args.checkpoint = "./checkpoint/" + folder_name
         elif args.train == False:
             # create a new folder for the test results
-            args.previous_dir = os.path.dirname(args.saved_model_path)
+            args.previous_dir = os.path.dirname(args.model_weights_path)
             args.checkpoint = os.path.join(args.previous_dir, folder_name)
 
         if not os.path.exists(args.checkpoint):
             os.makedirs(args.checkpoint)
 
         # backup files
-        # import shutil
-        # file_name = os.path.basename(__file__)
-        # shutil.copyfile(
-        #     src=file_name,
-        #     dst=os.path.join(args.checkpoint, args.create_time + "_" + file_name),
-        # )
-        # shutil.copyfile(
-        #     src="common/arguments.py",
-        #     dst=os.path.join(args.checkpoint, args.create_time + "_arguments.py"),
-        # )
-        # if getattr(args, "model_path", ""):
-        #     model_src_path = os.path.abspath(args.model_path)
-        #     model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-        #     shutil.copyfile(
-        #         src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name)
-        #     )
-        # shutil.copyfile(
-        #     src="common/utils.py",
-        #     dst=os.path.join(args.checkpoint, args.create_time + "_utils.py"),
-        # )
-        # sh_base = os.path.basename(args.sh_file)
-        # dst_name = f"{args.create_time}_" + sh_base
-        # shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
+        import shutil
+        script_path = os.path.abspath(__file__)
+        script_name = os.path.basename(script_path)
+        shutil.copyfile(
+            src=script_path,
+            dst=os.path.join(args.checkpoint, args.create_time + "_" + script_name),
+        )
+        if getattr(args, "model_path", ""):
+            model_src_path = os.path.abspath(args.model_path)
+            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+            shutil.copyfile(
+                src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name)
+            )
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(
             format="%(asctime)s %(message)s",
@@ -347,7 +340,7 @@ if __name__ == "__main__":
 
     if args.reload:
         model_dict = model["CFM"].state_dict()
-        model_path = args.saved_model_path
+        model_path = args.model_weights_path
         print(model_path)
         pre_dict = torch.load(model_path)
         for name, key in model_dict.items():
