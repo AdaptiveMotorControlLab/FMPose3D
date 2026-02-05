@@ -50,15 +50,27 @@ plt.switch_backend('agg')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-def show2Dpose(kps, img):
-    connections = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
-                   [5, 6], [0, 7], [7, 8], [8, 9], [9, 10],
-                   [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]]
+# Shared skeleton definition so 2D/3D segment colors match
+SKELETON_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
+    [5, 6], [0, 7], [7, 8], [8, 9], [9, 10],
+    [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]
+]
+# LR mask for skeleton segments: True -> left color, False -> right color
+SKELETON_LR = np.array(
+    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+    dtype=bool,
+)
 
-    LR = np.array([0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0], dtype=bool)
+def show2Dpose(kps, img):
+    connections = SKELETON_CONNECTIONS
+    LR = SKELETON_LR
 
     lcolor = (255, 0, 0)
     rcolor = (0, 0, 255)
+    # lcolor = (240, 176, 0)
+    # rcolor = (240, 176, 0)
+    
     thickness = 3
 
     for j,c in enumerate(connections):
@@ -67,8 +79,8 @@ def show2Dpose(kps, img):
         start = list(start)
         end = list(end)
         cv2.line(img, (start[0], start[1]), (end[0], end[1]), lcolor if LR[j] else rcolor, thickness)
-        cv2.circle(img, (start[0], start[1]), thickness=-1, color=(0, 255, 0), radius=3)
-        cv2.circle(img, (end[0], end[1]), thickness=-1, color=(0, 255, 0), radius=3)
+        # cv2.circle(img, (start[0], start[1]), thickness=-1, color=(0, 255, 0), radius=3)
+        # cv2.circle(img, (end[0], end[1]), thickness=-1, color=(0, 255, 0), radius=3)
 
     return img
 
@@ -77,11 +89,13 @@ def show3Dpose(vals, ax):
 
     lcolor=(0,0,1)
     rcolor=(1,0,0)
-
-    I = np.array( [0, 0, 1, 4, 2, 5, 0, 7,  8,  8, 14, 15, 11, 12, 8,  9])
-    J = np.array( [1, 4, 2, 5, 3, 6, 7, 8, 14, 11, 15, 16, 12, 13, 9, 10])
-
-    LR = np.array([0, 1, 0, 1, 0, 1, 0, 0, 0,   1,  0,  0,  1,  1, 0, 0], dtype=bool)
+    # lcolor=(0/255, 176/255, 240/255)
+    # rcolor=(0/255, 176/255, 240/255)
+    
+    
+    I = np.array([c[0] for c in SKELETON_CONNECTIONS])
+    J = np.array([c[1] for c in SKELETON_CONNECTIONS])
+    LR = SKELETON_LR
 
     for i in np.arange( len(I) ):
         x, y, z = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
@@ -336,7 +350,7 @@ def get_pose3D(path, output_dir, type='image'):
         ## save
         output_dir_pose = output_dir +'pose/'
         os.makedirs(output_dir_pose, exist_ok=True)
-        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.jpg', dpi=200, bbox_inches = 'tight')
+        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.png', dpi=200, bbox_inches = 'tight')
 
 
 if __name__ == "__main__":
