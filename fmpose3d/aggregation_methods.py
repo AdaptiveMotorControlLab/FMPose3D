@@ -166,17 +166,13 @@ def aggregation_RPEA_joint_level(
     dist[:, :, 0] = 0.0
 
     # Convert 2D losses to weights using softmax over top-k hypotheses per joint
-    tau = float(getattr(args, "weight_softmax_tau", 1.0))
     H = dist.size(1)
     k = int(getattr(args, "topk", None))
-    # print("k:", k)
-    # k = int(H//2)+1
     k = max(1, min(k, H))
 
     # top-k smallest distances along hypothesis dim
     topk_vals, topk_idx = torch.topk(dist, k=k, dim=1, largest=False)  # (B,k,J)
 
-    # Weight calculation method ; weight_method = 'exp'
     temp = args.exp_temp
     max_safe_val = temp * 20
     topk_vals_clipped = torch.clamp(topk_vals, max=max_safe_val)
