@@ -1,12 +1,12 @@
 # FMPose3D: monocular 3D pose estimation via flow matching
 
 ![Version](https://img.shields.io/badge/python_version-3.10-purple)
-[![PyPI version](https://badge.fury.io/py/fmpose3d.svg)](https://badge.fury.io/py/fmpose3d)
+[![PyPI version](https://badge.fury.io/py/fmpose3d.svg?icon=si%3Apython)](https://badge.fury.io/py/fmpose3d)
 [![License: LApache 2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://www.gnu.org/licenses/apach2.0)
 
-This is the official implementation of the approach described in the paper:
+This is the official implementation of the approach described in the preprint:
 
-[**FMPose3D: monocular 3D Pose Estimation via Flow Matching**](xxx)            
+[**FMPose3D: monocular 3D pose estimation via flow matching**](http://arxiv.org/abs/2602.05755)            
 Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
@@ -15,13 +15,13 @@ Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 ## 🚀 TL;DR
 
-FMPose3D replaces slow diffusion models for monocular 3D pose estimation with fast Flow Matching, generating multiple plausible 3D poses via an ODE in just a few steps, then aggregates them using a reprojection-based Bayesian module (RPEA) for accurate predictions, achieving state-of-the-art results on human and animal 3D pose benchmarks.
+FMPose3D creates a 3D pose from a single 2D image. It leverages fast Flow Matching, generating multiple plausible 3D poses via an ODE in just a few steps, then aggregates them using a reprojection-based Bayesian module (RPEA) for accurate predictions, achieving state-of-the-art results on human and animal 3D pose benchmarks.
 
 
 
 ## News!
 
-- [X] Feb 2026: FMPose3D code and arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
+- [X] Feb 2026: the FMPose3D code and our arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
 - [ ] Planned: This method will be integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
 
 ## Installation
@@ -32,17 +32,11 @@ Make sure you have Python 3.10+. You can set this up with:
 ```bash
 conda create -n fmpose_3d python=3.10
 conda activate fmpose_3d
-```
-<!-- test version -->
-```bash
-git clone https://github.com/AdaptiveMotorControlLab/FMPose3D.git
-# TestPyPI (pre-release/testing build)
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ fmpose3d==0.0.7
-# Future Official PyPI release
-# pip install fmpose3d
+
+pip install fmpose3d
 ```
 
-## Demo 
+## Demos
 
 ### Testing on in-the-wild images (humans)
 
@@ -98,9 +92,23 @@ To run inference on Human3.6M:
 sh ./scripts/FMPose3D_test.sh
 ```
 
-## Experiments Animals
+## Experiments on non-human animals
 
 For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
+
+## Citation 
+
+```
+@misc{wang2026fmpose3dmonocular3dpose,
+      title={FMPose3D: monocular 3D pose estimation via flow matching}, 
+      author={Ti Wang and Xiaohang Yu and Mackenzie Weygandt Mathis},
+      year={2026},
+      eprint={2602.05755},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2602.05755}, 
+}
+```
 
 ## Acknowledgements
 
