@@ -57,7 +57,7 @@ sh vis_in_the_wild.sh
 ```
 The predictions will be saved to folder `demo/predictions`.
 
-<p align="center"><img src="./images/demo.jpg" width="95%" alt="" /></p>
+<p align="center"><img src="./images/demo.gif" width="95%" alt="" /></p>
 
 ## Training and Inference
 
