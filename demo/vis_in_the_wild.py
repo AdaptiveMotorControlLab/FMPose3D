@@ -285,7 +285,7 @@ def get_pose3D(path, output_dir, type='image'):
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    model_path = args.saved_model_path
+    model_path = args.model_weights_path
     print(model_path)
     pre_dict = torch.load(model_path)
     for name, key in model_dict.items():
