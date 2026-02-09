@@ -78,7 +78,7 @@ def test_multi_hypothesis(
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(
+        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_variable(
             split, [input_2D, gt_3D, batch_cam, scale, bb_box]
         )
 
@@ -165,7 +165,7 @@ def train(opt, train_loader, model, optimizer):
 
     for i, data in enumerate(tqdm(train_loader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(
+        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_variable(
             split, [input_2D, gt_3D, batch_cam, scale, bb_box]
         )
 
@@ -335,14 +335,16 @@ if __name__ == "__main__":
             pin_memory=True,
         )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model["CFM"] = CFM(args).cuda()
+    model["CFM"] = CFM(args).to(device)
 
     if args.reload:
         model_dict = model["CFM"].state_dict()
         model_path = args.model_weights_path
         print(model_path)
-        pre_dict = torch.load(model_path)
+        pre_dict = torch.load(model_path, map_location=device, weights_only=True)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
         model["CFM"].load_state_dict(model_dict)
