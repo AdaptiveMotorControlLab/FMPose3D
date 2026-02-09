@@ -264,8 +264,10 @@ if __name__ == '__main__':
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size,
                                                       shuffle=False, num_workers=int(args.workers), pin_memory=True)    
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model['CFM'] = CFM(args).cuda()
+    model['CFM'] = CFM(args).to(device)
 
     if args.reload:
         model_dict = model['CFM'].state_dict()

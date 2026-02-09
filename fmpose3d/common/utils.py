@@ -186,15 +186,16 @@ class AccumLoss(object):
 
 
 def get_varialbe(split, target):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num = len(target)
     var = []
     if split == "train":
         for i in range(num):
-            temp = target[i].requires_grad_(False).contiguous().type(torch.cuda.FloatTensor)
+            temp = target[i].requires_grad_(False).contiguous().float().to(device)
             var.append(temp)
     else:
         for i in range(num):
-            temp = target[i].contiguous().cuda().type(torch.cuda.FloatTensor)
+            temp = target[i].contiguous().float().to(device)
             var.append(temp)
 
     return var
