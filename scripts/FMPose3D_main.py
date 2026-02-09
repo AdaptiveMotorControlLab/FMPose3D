@@ -78,7 +78,7 @@ def test_multi_hypothesis(
 
     for i, data in enumerate(tqdm(dataLoader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(
+        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_variable(
             split, [input_2D, gt_3D, batch_cam, scale, bb_box]
         )
 
@@ -165,7 +165,7 @@ def train(opt, train_loader, model, optimizer):
 
     for i, data in enumerate(tqdm(train_loader, 0)):
         batch_cam, gt_3D, input_2D, action, subject, scale, bb_box, cam_ind = data
-        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_varialbe(
+        [input_2D, gt_3D, batch_cam, scale, bb_box] = get_variable(
             split, [input_2D, gt_3D, batch_cam, scale, bb_box]
         )
 

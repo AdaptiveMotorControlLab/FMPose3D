@@ -185,7 +185,7 @@ class AccumLoss(object):
         self.avg = self.sum / self.count
 
 
-def get_varialbe(split, target):
+def get_variable(split, target):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num = len(target)
     var = []
