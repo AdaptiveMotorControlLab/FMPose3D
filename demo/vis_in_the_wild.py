@@ -213,7 +213,8 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     
     input_2D = input_2D[np.newaxis, :, :, :, :]
 
-    input_2D = torch.from_numpy(input_2D.astype('float32')).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    input_2D = torch.from_numpy(input_2D.astype('float32')).to(device)
 
     N = input_2D.size(0)
 
@@ -229,10 +230,10 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     
     ## estimation
     
-    y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
+    y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3, device=device)
     output_3D_non_flip = euler_sample(input_2D[:, 0], y, steps=args.sample_steps, model_3d=model)
     
-    y_flip = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
+    y_flip = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3, device=device)
     output_3D_flip = euler_sample(input_2D[:, 1], y_flip, steps=args.sample_steps, model_3d=model)
 
     output_3D_flip[:, :, :, 0] *= -1
@@ -280,8 +281,10 @@ def get_pose3D(path, output_dir, type='image'):
     # args.type = type 
 
     ## Reload 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model['CFM'] = CFM(args).cuda()
+    model['CFM'] = CFM(args).to(device)
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()

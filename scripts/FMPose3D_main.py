@@ -335,8 +335,10 @@ if __name__ == "__main__":
             pin_memory=True,
         )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model["CFM"] = CFM(args).cuda()
+    model["CFM"] = CFM(args).to(device)
 
     if args.reload:
         model_dict = model["CFM"].state_dict()
