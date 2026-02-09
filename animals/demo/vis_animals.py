@@ -8,7 +8,6 @@ Licensed under Apache 2.0
 """
 
 # SuperAnimal Demo: https://github.com/DeepLabCut/DeepLabCut/blob/main/examples/COLAB/COLAB_YOURDATA_SuperAnimal.ipynb
-import sys
 import os
 import numpy as np
 import glob
@@ -24,8 +23,6 @@ import matplotlib.gridspec as gridspec
 import imageio
 from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
-
-sys.path.append(os.getcwd())
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
