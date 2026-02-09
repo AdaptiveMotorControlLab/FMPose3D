@@ -7,8 +7,6 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-import sys
-sys.path.append("..")
 import torch
 import torch.nn as nn
 import math

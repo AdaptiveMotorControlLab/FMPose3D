@@ -7,7 +7,6 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-import sys
 import cv2
 import os 
 import numpy as np
@@ -15,8 +14,6 @@ import torch
 import glob
 from tqdm import tqdm
 import copy
-
-sys.path.append(os.getcwd())
 
 # Auto-download checkpoint files if missing
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints
