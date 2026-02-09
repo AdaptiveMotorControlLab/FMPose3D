@@ -22,6 +22,7 @@ class ModelConfig:
     """Model architecture configuration."""
 
     model: str = ""
+    model_type: str = "fmpose3d"
     layers: int = 3
     channel: int = 512
     d_hid: int = 1024
@@ -31,7 +32,6 @@ class ModelConfig:
     in_channels: int = 2
     out_channels: int = 3
     frames: int = 1
-    model_path: str = ""
     """Optional: load model class from a specific file path."""
 
 
