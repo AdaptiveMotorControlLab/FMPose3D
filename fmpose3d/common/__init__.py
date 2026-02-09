@@ -22,7 +22,7 @@ from .utils import (
     save_top_N_models,
     test_calculation,
     print_error,
-    get_varialbe,
+    get_variable,
 )
 
 __all__ = [
@@ -36,6 +36,6 @@ __all__ = [
     "save_top_N_models",
     "test_calculation",
     "print_error",
-    "get_varialbe",
+    "get_variable",
 ]
 

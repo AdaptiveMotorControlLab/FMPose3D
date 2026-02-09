@@ -75,7 +75,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         #  gt_3D shape: torch.Size([B, J, 4]) (x,y,z + homogeneous coordinate)
         gt_3D = gt_3D[:,:,:3]  # only use x,y,z for 3D ground truth
         
-        # [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
+        # [input_2D, gt_3D, batch_cam, vis_3D] = get_variable(split, [input_2D, gt_3D, batch_cam, vis_3D])
         
         # unsqueeze frame dimension
         input_2D = input_2D.unsqueeze(1)  # (B,F,J,C)
