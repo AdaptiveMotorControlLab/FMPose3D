@@ -6,7 +6,7 @@
 
 This is the official implementation of the approach described in the preprint:
 
-[**FMPose3D: monocular 3D pose estimation via flow matching**](http://arxiv.org/abs/2602.05755)            
+[**FMPose3D: monocular 3D pose estimation via flow matching**](https://arxiv.org/abs/2602.05755)            
 Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
