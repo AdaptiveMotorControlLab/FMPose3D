@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/python_version-3.10-purple)
 [![PyPI version](https://badge.fury.io/py/fmpose3d.svg?icon=si%3Apython)](https://badge.fury.io/py/fmpose3d)
-[![License: LApache 2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://www.gnu.org/licenses/apach2.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 This is the official implementation of the approach described in the preprint:
 
@@ -79,7 +79,7 @@ The training logs, checkpoints, and related files of each training time will be 
 
 For training on Human3.6M:
 ```bash
-sh /scripts/FMPose3D_train.sh
+sh ./scripts/FMPose3D_train.sh
 ```
 
 ### Inference
