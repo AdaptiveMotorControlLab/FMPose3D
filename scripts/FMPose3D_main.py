@@ -342,7 +342,7 @@ if __name__ == "__main__":
         model_dict = model["CFM"].state_dict()
         model_path = args.model_weights_path
         print(model_path)
-        pre_dict = torch.load(model_path)
+        pre_dict = torch.load(model_path, weights_only=True)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
         model["CFM"].load_state_dict(model_dict)
