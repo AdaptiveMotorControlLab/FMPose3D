@@ -15,7 +15,7 @@ import math
 from einops import rearrange
 from fmpose3d.models.graph_frames import Graph
 from functools import partial
-from einops import rearrange, repeat
+from einops import rearrange
 from timm.models.layers import DropPath
 
 class TimeEmbedding(nn.Module):
@@ -36,8 +36,6 @@ class TimeEmbedding(nn.Module):
         b, f = t.shape[0], t.shape[1]
         half_dim = self.dim // 2
      
-        # Gaussian Fourier features: sin(2π B t), cos(2π B t)
-        # t: (B,F,1,1) -> (B,F,1,1,1) -> broadcast with (1,1,1,1,half_dim)
         angles = (2 * math.pi) * t.to(torch.float32).unsqueeze(-1) * self.B.view(1, 1, 1, 1, half_dim)
         sin = torch.sin(angles)
         cos = torch.cos(angles)
@@ -206,13 +204,13 @@ class decoder(nn.Module):
         self.fc1 = nn.Linear(dim_in, dim_hid)
         self.act = act_layer()
         self.drop = nn.Dropout(drop) if drop > 0 else nn.Identity()
-        self.fc5 = nn.Linear(dim_hid, dim_out)
+        self.fc2= nn.Linear(dim_hid, dim_out)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.act(x)
         x = self.drop(x)
-        x = self.fc5(x)
+        x = self.fc2(x)
         return x
 
 class Model(nn.Module):
@@ -223,10 +221,10 @@ class Model(nn.Module):
         # Register as buffer (not parameter) to follow module device automatically
         self.register_buffer('A', torch.tensor(self.graph.A, dtype=torch.float32))
 
-        self.t_embed_dim = 16
+        self.t_embed_dim = 32
         self.time_embed = TimeEmbedding(self.t_embed_dim, hidden_dim=64)
-        self.encoder_pose_2d = encoder(2, args.channel//2, args.channel//2-self.t_embed_dim//2)
-        self.encoder_y_t = encoder(3, args.channel//2, args.channel//2-self.t_embed_dim//2)
+        
+        self.encoder = encoder(2 + 3 + self.t_embed_dim, args.channel//2, args.channel)
         
         self.FMPose3D = FMPose3D(args.layers, args.channel, args.d_hid, args.token_dim, self.A, length=args.n_joints) # 256
         self.pred_mu = decoder(args.channel, args.channel//2, 3)
@@ -235,24 +233,16 @@ class Model(nn.Module):
         # pose_2d: (B,F,J,2)  y_t: (B,F,J,3)  t: (B,F,1,1)
         b, f, j, _ = pose_2d.shape
         
-        # Ensure t has the correct shape (B,F,1,1)
-        if t.shape[1] == 1 and f > 1:
-            t = t.expand(b, f, 1, 1).contiguous()
-        
         # build time embedding
         t_emb = self.time_embed(t) # (B,F,t_dim)
         t_emb = t_emb.unsqueeze(2).expand(b, f, j, self.t_embed_dim).contiguous()  # (B,F,J,t_dim)
 
-        pose_2d_emb = self.encoder_pose_2d(pose_2d)
-        y_t_emb = self.encoder_y_t(y_t)
+        x_in = torch.cat([pose_2d, y_t, t_emb], dim=-1)           # (B,F,J,2+3+t_dim)
+        x_in = rearrange(x_in, 'b f j c -> (b f) j c').contiguous() # (B*F,J,in)
         
-        in_emb = torch.cat([pose_2d_emb, y_t_emb, t_emb], dim=-1)           # (B,F,J,dim)
-        in_emb = rearrange(in_emb, 'b f j c -> (b f) j c').contiguous() # (B*F,J,in)
-
-        # encoder -> model -> regression head
-        h = self.FMPose3D(in_emb)
-        v = self.pred_mu(h)                                  # (B*F,J,3)
-        
+        in_emb = self.encoder(x_in)
+        features = self.FMPose3D(in_emb)
+        v = self.pred_mu(features)                                  # (B*F,J,3)
         v = rearrange(v, '(b f) j c -> b f j c', b=b, f=f).contiguous() # (B,F,J,3)
         return v
     
