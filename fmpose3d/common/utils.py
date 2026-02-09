@@ -15,7 +15,6 @@ import shutil
 
 import numpy as np
 import torch
-from torch.autograd import Variable
 
 def deterministic_random(min_value, max_value, data):
     digest = hashlib.sha256(data.encode()).digest()
@@ -191,15 +190,11 @@ def get_varialbe(split, target):
     var = []
     if split == "train":
         for i in range(num):
-            temp = (
-                Variable(target[i], requires_grad=False)
-                .contiguous()
-                .type(torch.cuda.FloatTensor)
-            )
+            temp = target[i].requires_grad_(False).contiguous().type(torch.cuda.FloatTensor)
             var.append(temp)
     else:
         for i in range(num):
-            temp = Variable(target[i]).contiguous().cuda().type(torch.cuda.FloatTensor)
+            temp = target[i].contiguous().cuda().type(torch.cuda.FloatTensor)
             var.append(temp)
 
     return var
