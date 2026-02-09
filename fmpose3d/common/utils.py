@@ -15,7 +15,6 @@ import shutil
 
 import numpy as np
 import torch
-from torch.autograd import Variable
 
 def deterministic_random(min_value, max_value, data):
     digest = hashlib.sha256(data.encode()).digest()
@@ -186,20 +185,17 @@ class AccumLoss(object):
         self.avg = self.sum / self.count
 
 
-def get_varialbe(split, target):
+def get_variable(split, target):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num = len(target)
     var = []
     if split == "train":
         for i in range(num):
-            temp = (
-                Variable(target[i], requires_grad=False)
-                .contiguous()
-                .type(torch.cuda.FloatTensor)
-            )
+            temp = target[i].requires_grad_(False).contiguous().float().to(device)
             var.append(temp)
     else:
         for i in range(num):
-            temp = Variable(target[i]).contiguous().cuda().type(torch.cuda.FloatTensor)
+            temp = target[i].contiguous().float().to(device)
             var.append(temp)
 
     return var
