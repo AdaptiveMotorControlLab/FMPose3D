@@ -272,7 +272,7 @@ if __name__ == '__main__':
         # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
         model_path = args.saved_model_path
         print(model_path)
-        pre_dict = torch.load(model_path)
+        pre_dict = torch.load(model_path, weights_only=True)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
         model['CFM'].load_state_dict(model_dict)
