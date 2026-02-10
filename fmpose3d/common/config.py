@@ -20,7 +20,11 @@ from typing import List
 @dataclass
 class ModelConfig:
     """Model architecture configuration."""
+    model_type: str = "fmpose3d"
 
+
+@dataclass
+class FMPose3DConfig(ModelConfig):
     model: str = ""
     model_type: str = "fmpose3d"
     layers: int = 3
@@ -142,6 +146,20 @@ class OutputConfig:
 
 
 @dataclass
+class Pose2DConfig:
+    """2D pose estimator configuration."""
+    pose2d_model: str = "hrnet"
+
+
+@dataclass
+class HRNetConfig(Pose2DConfig):
+    """HRNet 2D pose detector configuration."""
+    pose2d_model: str = "hrnet"
+    det_dim: int = 416 # YOLO input dimension (HRNet-specific).
+    num_persons: int = 1 # Maximum number of persons to estimate per frame.
+
+
+@dataclass
 class DemoConfig:
     """Demo / inference configuration."""
 
@@ -174,14 +192,15 @@ _SUB_CONFIG_CLASSES = {
     "checkpoint_cfg": CheckpointConfig,
     "refinement_cfg": RefinementConfig,
     "output_cfg": OutputConfig,
+    "pose2d_cfg": Pose2DConfig,
     "demo_cfg": DemoConfig,
     "runtime_cfg": RuntimeConfig,
 }
 
 
 @dataclass
-class FMPoseConfig:
-    """Top-level configuration for FMPose3D.
+class PipelineConfig:
+    """Top-level configuration for FMPose3D pipeline.
 
     Groups related settings into sub-configs::
 
@@ -189,7 +208,7 @@ class FMPoseConfig:
         config.training_cfg.lr
     """
 
-    model_cfg: ModelConfig = field(default_factory=ModelConfig)
+    model_cfg: ModelConfig = field(default_factory=FMPose3DConfig)
     dataset_cfg: DatasetConfig = field(default_factory=DatasetConfig)
     training_cfg: TrainingConfig = field(default_factory=TrainingConfig)
     inference_cfg: InferenceConfig = field(default_factory=InferenceConfig)
@@ -197,19 +216,20 @@ class FMPoseConfig:
     checkpoint_cfg: CheckpointConfig = field(default_factory=CheckpointConfig)
     refinement_cfg: RefinementConfig = field(default_factory=RefinementConfig)
     output_cfg: OutputConfig = field(default_factory=OutputConfig)
+    pose2d_cfg: Pose2DConfig = field(default_factory=HRNetConfig)
     demo_cfg: DemoConfig = field(default_factory=DemoConfig)
     runtime_cfg: RuntimeConfig = field(default_factory=RuntimeConfig)
 
     # -- construction from argparse namespace ---------------------------------
 
     @classmethod
-    def from_namespace(cls, ns) -> "FMPoseConfig":
-        """Build a :class:`FMPoseConfig` from an ``argparse.Namespace``
+    def from_namespace(cls, ns) -> "PipelineConfig":
+        """Build a :class:`PipelineConfig` from an ``argparse.Namespace``
 
         Example::
 
             args = opts().parse()
-            cfg = FMPoseConfig.from_namespace(args)
+            cfg = PipelineConfig.from_namespace(args)
         """
         raw = vars(ns) if hasattr(ns, "__dict__") else dict(ns)
 
@@ -217,10 +237,14 @@ class FMPoseConfig:
             names = {f.name for f in fields(dc_class)}
             return dc_class(**{k: v for k, v in src.items() if k in names})
 
-        return cls(**{
-            group_name: _pick(dc_class, raw)
-            for group_name, dc_class in _SUB_CONFIG_CLASSES.items()
-        })
+        kwargs = {}
+        for group_name, dc_class in _SUB_CONFIG_CLASSES.items():
+            if group_name == "model_cfg" and raw.get("model_type", "fmpose3d") == "fmpose3d":
+                dc_class = FMPose3DConfig
+            elif group_name == "pose2d_cfg" and raw.get("pose2d_model", "hrnet") == "hrnet":
+                dc_class = HRNetConfig
+            kwargs[group_name] = _pick(dc_class, raw)
+        return cls(**kwargs)
 
     # -- utilities ------------------------------------------------------------
 
