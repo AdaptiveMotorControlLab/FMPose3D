@@ -38,8 +38,9 @@ if getattr(args, "model_path", ""):
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
 else:
-    # Load model from installed fmpose package
-    from fmpose3d.animals.models import Model as CFM
+    # Load model from registered model registry
+    from fmpose3d.models import get_model
+    CFM = get_model(args.model_type)
      
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)
@@ -97,7 +98,6 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # Root joint should already be [0,0,0]
             gt_3D = gt_3D.clone()
             gt_3D[:, :, args.root_joint] = 0
-            
             
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
