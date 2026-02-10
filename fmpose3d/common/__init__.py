@@ -13,8 +13,11 @@ Common utilities for FMPose.
 
 from .arguments import opts
 from .config import (
-    FMPoseConfig,
+    PipelineConfig,
     ModelConfig,
+    FMPose3DConfig,
+    HRNetConfig,
+    Pose2DConfig,
     DatasetConfig,
     TrainingConfig,
     InferenceConfig,
@@ -40,7 +43,10 @@ from .utils import (
 
 __all__ = [
     "opts",
-    "FMPoseConfig",
+    "PipelineConfig",
+    "FMPose3DConfig",
+    "HRNetConfig",
+    "Pose2DConfig",
     "ModelConfig",
     "DatasetConfig",
     "TrainingConfig",

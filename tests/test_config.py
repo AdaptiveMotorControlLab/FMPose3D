@@ -13,8 +13,8 @@ import math
 import pytest
 
 from fmpose3d.common.config import (
-    FMPoseConfig,
-    ModelConfig,
+    PipelineConfig,
+    FMPose3DConfig,
     DatasetConfig,
     TrainingConfig,
     InferenceConfig,
@@ -33,19 +33,18 @@ from fmpose3d.common.config import (
 # ---------------------------------------------------------------------------
 
 
-class TestModelConfig:
+class TestFMPose3DConfig:
     def test_defaults(self):
-        cfg = ModelConfig()
+        cfg = FMPose3DConfig()
         assert cfg.layers == 3
         assert cfg.channel == 512
         assert cfg.d_hid == 1024
         assert cfg.n_joints == 17
         assert cfg.out_joints == 17
         assert cfg.frames == 1
-        assert cfg.model_path == ""
 
     def test_custom_values(self):
-        cfg = ModelConfig(layers=5, channel=256, n_joints=26)
+        cfg = FMPose3DConfig(layers=5, channel=256, n_joints=26)
         assert cfg.layers == 5
         assert cfg.channel == 256
         assert cfg.n_joints == 26
@@ -167,15 +166,15 @@ class TestRuntimeConfig:
 
 
 # ---------------------------------------------------------------------------
-# FMPoseConfig
+# PipelineConfig
 # ---------------------------------------------------------------------------
 
 
-class TestFMPoseConfig:
+class TestPipelineConfig:
     def test_default_construction(self):
         """All sub-configs are initialised with their defaults."""
-        cfg = FMPoseConfig()
-        assert isinstance(cfg.model_cfg, ModelConfig)
+        cfg = PipelineConfig()
+        assert isinstance(cfg.model_cfg, FMPose3DConfig)
         assert isinstance(cfg.dataset_cfg, DatasetConfig)
         assert isinstance(cfg.training_cfg, TrainingConfig)
         assert isinstance(cfg.inference_cfg, InferenceConfig)
@@ -188,8 +187,8 @@ class TestFMPoseConfig:
 
     def test_partial_construction(self):
         """Supplying only some sub-configs leaves the rest at defaults."""
-        cfg = FMPoseConfig(
-            model_cfg=ModelConfig(layers=5),
+        cfg = PipelineConfig(
+            model_cfg=FMPose3DConfig(layers=5),
             training_cfg=TrainingConfig(lr=2e-4),
         )
         assert cfg.model_cfg.layers == 5
@@ -200,21 +199,21 @@ class TestFMPoseConfig:
 
     def test_sub_config_mutation(self):
         """Mutating a sub-config field is reflected on the config."""
-        cfg = FMPoseConfig()
+        cfg = PipelineConfig()
         cfg.training_cfg.lr = 0.01
         assert cfg.training_cfg.lr == pytest.approx(0.01)
 
     def test_sub_config_replacement(self):
         """Replacing an entire sub-config works."""
-        cfg = FMPoseConfig()
-        cfg.model_cfg = ModelConfig(layers=10, channel=1024)
+        cfg = PipelineConfig()
+        cfg.model_cfg = FMPose3DConfig(layers=10, channel=1024)
         assert cfg.model_cfg.layers == 10
         assert cfg.model_cfg.channel == 1024
 
     # -- to_dict --------------------------------------------------------------
 
     def test_to_dict_returns_flat_dict(self):
-        cfg = FMPoseConfig()
+        cfg = PipelineConfig()
         d = cfg.to_dict()
         assert isinstance(d, dict)
         # Spot-check keys from different groups
@@ -225,8 +224,8 @@ class TestFMPoseConfig:
         assert "gpu" in d
 
     def test_to_dict_reflects_custom_values(self):
-        cfg = FMPoseConfig(
-            model_cfg=ModelConfig(layers=7),
+        cfg = PipelineConfig(
+            model_cfg=FMPose3DConfig(layers=7),
             aggregation_cfg=AggregationConfig(topk=5),
         )
         d = cfg.to_dict()
@@ -235,7 +234,7 @@ class TestFMPoseConfig:
 
     def test_to_dict_no_duplicate_keys(self):
         """Every field name should be unique across all sub-configs."""
-        cfg = FMPoseConfig()
+        cfg = PipelineConfig()
         d = cfg.to_dict()
         all_field_names = []
         for dc_class in _SUB_CONFIG_CLASSES.values():
@@ -249,8 +248,9 @@ class TestFMPoseConfig:
 
     def test_from_namespace_basic(self):
         ns = argparse.Namespace(
-            # ModelConfig
+            # FMPose3DConfig
             model="test_model",
+            model_type="fmpose3d",
             layers=5,
             channel=256,
             d_hid=512,
@@ -260,7 +260,6 @@ class TestFMPoseConfig:
             in_channels=2,
             out_channels=3,
             frames=3,
-            model_path="/tmp/model.py",
             # DatasetConfig
             dataset="rat7m",
             keypoints="cpn",
@@ -339,7 +338,7 @@ class TestFMPoseConfig:
             single=True,
             reload_3d=False,
         )
-        cfg = FMPoseConfig.from_namespace(ns)
+        cfg = PipelineConfig.from_namespace(ns)
 
         # Verify a sample from each group
         assert cfg.model_cfg.layers == 5
@@ -363,7 +362,7 @@ class TestFMPoseConfig:
         ns = argparse.Namespace(
             layers=3, channel=512, unknown_field="should_be_ignored",
         )
-        cfg = FMPoseConfig.from_namespace(ns)
+        cfg = PipelineConfig.from_namespace(ns)
         assert cfg.model_cfg.layers == 3
         assert cfg.model_cfg.channel == 512
         assert not hasattr(cfg, "unknown_field")
@@ -371,7 +370,7 @@ class TestFMPoseConfig:
     def test_from_namespace_partial_namespace(self):
         """A namespace missing some fields uses dataclass defaults for those."""
         ns = argparse.Namespace(layers=10, gpu="2")
-        cfg = FMPoseConfig.from_namespace(ns)
+        cfg = PipelineConfig.from_namespace(ns)
         assert cfg.model_cfg.layers == 10
         assert cfg.runtime_cfg.gpu == "2"
         # Unset fields keep defaults
@@ -385,7 +384,7 @@ class TestFMPoseConfig:
         ns = argparse.Namespace(
             layers=8, channel=1024, dataset="animal3d", lr=2e-4, topk=7, gpu="3",
         )
-        cfg = FMPoseConfig.from_namespace(ns)
+        cfg = PipelineConfig.from_namespace(ns)
         d = cfg.to_dict()
         assert d["layers"] == 8
         assert d["channel"] == 1024
@@ -396,10 +395,9 @@ class TestFMPoseConfig:
 
     def test_to_dict_after_mutation(self):
         """to_dict reflects in-place mutations on sub-configs."""
-        cfg = FMPoseConfig()
+        cfg = PipelineConfig()
         cfg.training_cfg.lr = 0.123
         cfg.model_cfg.layers = 99
         d = cfg.to_dict()
         assert d["lr"] == pytest.approx(0.123)
         assert d["layers"] == 99
-
