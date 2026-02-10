@@ -75,7 +75,7 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
         #  gt_3D shape: torch.Size([B, J, 4]) (x,y,z + homogeneous coordinate)
         gt_3D = gt_3D[:,:,:3]  # only use x,y,z for 3D ground truth
         
-        # [input_2D, gt_3D, batch_cam, vis_3D] = get_varialbe(split, [input_2D, gt_3D, batch_cam, vis_3D])
+        # [input_2D, gt_3D, batch_cam, vis_3D] = get_variable(split, [input_2D, gt_3D, batch_cam, vis_3D])
         
         # unsqueeze frame dimension
         input_2D = input_2D.unsqueeze(1)  # (B,F,J,C)
@@ -264,15 +264,17 @@ if __name__ == '__main__':
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size,
                                                       shuffle=False, num_workers=int(args.workers), pin_memory=True)    
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model['CFM'] = CFM(args).cuda()
+    model['CFM'] = CFM(args).to(device)
 
     if args.reload:
         model_dict = model['CFM'].state_dict()
         # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
         model_path = args.saved_model_path
         print(model_path)
-        pre_dict = torch.load(model_path)
+        pre_dict = torch.load(model_path, weights_only=True, map_location=device)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
         model['CFM'].load_state_dict(model_dict)

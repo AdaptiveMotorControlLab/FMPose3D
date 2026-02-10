@@ -208,3 +208,4 @@ if __name__=="__main__":
     graph = Graph('hm36_gt', 'spatial', 1)
     print(graph.A.shape)
     # print(graph)
+
