@@ -16,6 +16,44 @@ import shutil
 import numpy as np
 import torch
 
+
+def euler_sample(
+    c_2d: torch.Tensor,
+    y: torch.Tensor,
+    steps: int,
+    model: torch.nn.Module,
+) -> torch.Tensor:
+    """Euler ODE sampler for Conditional Flow Matching at test time.
+
+    Integrates the learned velocity field from *t = 0* to *t = 1* using
+    ``steps`` uniform Euler steps.
+
+    Parameters
+    ----------
+    c_2d : Tensor
+        2-D conditioning input, shape ``(B, F, J, 2)``.
+    y : Tensor
+        Initial noise sample (same spatial dims as ``c_2d`` but with 3
+        output channels), shape ``(B, F, J, 3)``.
+    steps : int
+        Number of Euler integration steps.
+    model : nn.Module
+        The velocity-prediction network ``v(c_2d, y, t)``.
+
+    Returns
+    -------
+    Tensor
+        The denoised 3-D prediction, same shape as *y*.
+    """
+    dt = 1.0 / steps
+    for s in range(steps):
+        t_s = torch.full(
+            (c_2d.size(0), 1, 1, 1), s * dt, device=c_2d.device, dtype=c_2d.dtype
+        )
+        v_s = model(c_2d, y, t_s)
+        y = y + dt * v_s
+    return y
+
 def deterministic_random(min_value, max_value, data):
     digest = hashlib.sha256(data.encode()).digest()
     raw_value = int.from_bytes(digest[:4], byteorder="little", signed=False)
