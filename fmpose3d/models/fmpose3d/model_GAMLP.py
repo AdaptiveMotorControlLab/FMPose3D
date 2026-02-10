@@ -11,7 +11,8 @@ import torch
 import torch.nn as nn
 import math
 from einops import rearrange
-from fmpose3d.models.graph_frames import Graph
+from fmpose3d.models.fmpose3d.graph_frames import Graph
+from fmpose3d.models.base_model import BaseModel, register_model
 from functools import partial
 from einops import rearrange
 from timm.models.layers import DropPath
@@ -211,9 +212,10 @@ class decoder(nn.Module):
         x = self.fc2(x)
         return x
 
-class Model(nn.Module):
+@register_model("fmpose3d")
+class Model(BaseModel):
     def __init__(self, args):
-        super().__init__()
+        super().__init__(args)
         ## GCN
         self.graph = Graph('hm36_gt', 'spatial', pad=1)
         # Register as buffer (not parameter) to follow module device automatically
@@ -265,3 +267,4 @@ if __name__ == "__main__":
     t = torch.randn(1, 1, 1, 1, device=device)
     v = model(x, y_t, t)
     print(v.shape) 
+

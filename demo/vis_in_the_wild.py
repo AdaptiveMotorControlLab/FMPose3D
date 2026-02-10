@@ -25,17 +25,10 @@ from fmpose3d.common.arguments import opts as parse_args
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-if getattr(args, 'model_path', ''):
-    import importlib.util
-    import pathlib
-    model_abspath = os.path.abspath(args.model_path)
-    module_name = pathlib.Path(model_abspath).stem
-    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    CFM = getattr(module, 'Model')
-    
+
+from fmpose3d.models import get_model
+CFM = get_model(args.model_type)
+
 from fmpose3d.common.camera import *
 
 import matplotlib

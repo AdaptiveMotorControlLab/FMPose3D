@@ -12,6 +12,19 @@ Common utilities for FMPose.
 """
 
 from .arguments import opts
+from .config import (
+    FMPoseConfig,
+    ModelConfig,
+    DatasetConfig,
+    TrainingConfig,
+    InferenceConfig,
+    AggregationConfig,
+    CheckpointConfig,
+    RefinementConfig,
+    OutputConfig,
+    DemoConfig,
+    RuntimeConfig,
+)
 from .h36m_dataset import Human36mDataset
 from .load_data_hm36 import Fusion
 from .utils import (
@@ -27,6 +40,17 @@ from .utils import (
 
 __all__ = [
     "opts",
+    "FMPoseConfig",
+    "ModelConfig",
+    "DatasetConfig",
+    "TrainingConfig",
+    "InferenceConfig",
+    "AggregationConfig",
+    "CheckpointConfig",
+    "RefinementConfig",
+    "OutputConfig",
+    "DemoConfig",
+    "RuntimeConfig",
     "Human36mDataset",
     "Fusion",
     "mpjpe_cal",
