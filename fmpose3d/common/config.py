@@ -153,10 +153,29 @@ class Pose2DConfig:
 
 @dataclass
 class HRNetConfig(Pose2DConfig):
-    """HRNet 2D pose detector configuration."""
+    """HRNet 2D pose detector configuration.
+
+    Attributes
+    ----------
+    det_dim : int
+        YOLO input resolution for human detection (default 416).
+    num_persons : int
+        Maximum number of persons to estimate per frame (default 1).
+    thred_score : float
+        YOLO object-confidence threshold (default 0.30).
+    hrnet_cfg_file : str
+        Path to the HRNet YAML experiment config.  When left empty the
+        bundled ``w48_384x288_adam_lr1e-3.yaml`` is used.
+    hrnet_weights_path : str
+        Path to the HRNet ``.pth`` checkpoint.  When left empty the
+        auto-downloaded ``pose_hrnet_w48_384x288.pth`` is used.
+    """
     pose2d_model: str = "hrnet"
-    det_dim: int = 416 # YOLO input dimension (HRNet-specific).
-    num_persons: int = 1 # Maximum number of persons to estimate per frame.
+    det_dim: int = 416
+    num_persons: int = 1
+    thred_score: float = 0.30
+    hrnet_cfg_file: str = ""
+    hrnet_weights_path: str = ""
 
 
 @dataclass
