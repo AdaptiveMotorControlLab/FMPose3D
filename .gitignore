@@ -45,3 +45,8 @@ htmlcov/
 *.pkl
 *.h5
 *.ckpt
+
+# Excluded directories
+pre_trained_models/
+demo/predictions/
+demo/images/

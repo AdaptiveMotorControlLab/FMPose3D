@@ -11,10 +11,10 @@ epochs=80
 num_saved_models=3
 frames=1
 channel_dim=512
-model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
-# model_path='./fmpose/models/model_GAMLP.py' # when the path is not empty, the model will be loaded from the local file path
+model_path="" # when the path is empty, the model will be loaded from the installed fmpose3d package
+# model_path='./models/model_GAMLP.py' # when the path is not empty, the model will be loaded from the local file path
 sh_file='scripts/FMPose3D_train.sh'
-folder_name=FMPose3D_Publish_layers${layers}_$(date +%Y%m%d_%H%M%S)
+folder_name=FMPose3D_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
 python3 scripts/FMPose3D_main.py \
   --train \

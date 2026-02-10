@@ -15,7 +15,44 @@ import shutil
 
 import numpy as np
 import torch
-from torch.autograd import Variable
+
+
+def euler_sample(
+    c_2d: torch.Tensor,
+    y: torch.Tensor,
+    steps: int,
+    model: torch.nn.Module,
+) -> torch.Tensor:
+    """Euler ODE sampler for Conditional Flow Matching at test time.
+
+    Integrates the learned velocity field from *t = 0* to *t = 1* using
+    ``steps`` uniform Euler steps.
+
+    Parameters
+    ----------
+    c_2d : Tensor
+        2-D conditioning input, shape ``(B, F, J, 2)``.
+    y : Tensor
+        Initial noise sample (same spatial dims as ``c_2d`` but with 3
+        output channels), shape ``(B, F, J, 3)``.
+    steps : int
+        Number of Euler integration steps.
+    model : nn.Module
+        The velocity-prediction network ``v(c_2d, y, t)``.
+
+    Returns
+    -------
+    Tensor
+        The denoised 3-D prediction, same shape as *y*.
+    """
+    dt = 1.0 / steps
+    for s in range(steps):
+        t_s = torch.full(
+            (c_2d.size(0), 1, 1, 1), s * dt, device=c_2d.device, dtype=c_2d.dtype
+        )
+        v_s = model(c_2d, y, t_s)
+        y = y + dt * v_s
+    return y
 
 def deterministic_random(min_value, max_value, data):
     digest = hashlib.sha256(data.encode()).digest()
@@ -186,20 +223,17 @@ class AccumLoss(object):
         self.avg = self.sum / self.count
 
 
-def get_varialbe(split, target):
+def get_variable(split, target):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num = len(target)
     var = []
     if split == "train":
         for i in range(num):
-            temp = (
-                Variable(target[i], requires_grad=False)
-                .contiguous()
-                .type(torch.cuda.FloatTensor)
-            )
+            temp = target[i].requires_grad_(False).contiguous().float().to(device)
             var.append(temp)
     else:
         for i in range(num):
-            temp = Variable(target[i]).contiguous().cuda().type(torch.cuda.FloatTensor)
+            temp = target[i].contiguous().float().to(device)
             var.append(temp)
 
     return var

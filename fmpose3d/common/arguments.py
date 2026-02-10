@@ -53,7 +53,6 @@ class opts:
         self.parser.add_argument("-s", "--stride", default=1, type=int)
         self.parser.add_argument("--gpu", default="0", type=str, help="")
         self.parser.add_argument("--train", action="store_true")
-        # self.parser.add_argument('--test', action='store_true')
         self.parser.add_argument("--test", type=int, default=1)  #
         self.parser.add_argument("--nepoch", type=int, default=41)  #
         self.parser.add_argument(
@@ -75,13 +74,15 @@ class opts:
         self.parser.add_argument("--model_dir", type=str, default="")
         # Optional: load model class from a specific file path
         self.parser.add_argument("--model_path", type=str, default="")
+        # Model registry name (e.g. "fmpose3d"); used instead of --model_path
+        self.parser.add_argument("--model_type", type=str, default="fmpose3d")
+        self.parser.add_argument("--model_weights_path", type=str, default="")
 
         self.parser.add_argument("--post_refine_reload", action="store_true")
         self.parser.add_argument("--checkpoint", type=str, default="")
         self.parser.add_argument(
             "--previous_dir", type=str, default="./pre_trained_model/pretrained"
         )
-        self.parser.add_argument("--saved_model_path", type=str, default="")
 
         self.parser.add_argument("--n_joints", type=int, default=17)
         self.parser.add_argument("--out_joints", type=int, default=17)
@@ -148,7 +149,6 @@ class opts:
         # uncertainty-aware aggregation threshold factor
 
         self.parser.add_argument("--topk", type=int, default=3)
-        self.parser.add_argument("--weight_softmax_tau", type=float, default=1.0)
         self.parser.add_argument("--exp_temp", type=float, default=0.002)
         self.parser.add_argument("--mode", type=str, default="exp")
 

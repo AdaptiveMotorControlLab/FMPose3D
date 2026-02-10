@@ -7,7 +7,6 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-import sys
 import cv2
 import os 
 import numpy as np
@@ -15,8 +14,6 @@ import torch
 import glob
 from tqdm import tqdm
 import copy
-
-sys.path.append(os.getcwd())
 
 # Auto-download checkpoint files if missing
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints
@@ -28,17 +25,10 @@ from fmpose3d.common.arguments import opts as parse_args
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-if getattr(args, 'model_path', ''):
-    import importlib.util
-    import pathlib
-    model_abspath = os.path.abspath(args.model_path)
-    module_name = pathlib.Path(model_abspath).stem
-    spec = importlib.util.spec_from_file_location(module_name, model_abspath)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    CFM = getattr(module, 'Model')
-    
+
+from fmpose3d.models import get_model
+CFM = get_model(args.model_type)
+
 from fmpose3d.common.camera import *
 
 import matplotlib
@@ -50,15 +40,27 @@ plt.switch_backend('agg')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-def show2Dpose(kps, img):
-    connections = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
-                   [5, 6], [0, 7], [7, 8], [8, 9], [9, 10],
-                   [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]]
+# Shared skeleton definition so 2D/3D segment colors match
+SKELETON_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
+    [5, 6], [0, 7], [7, 8], [8, 9], [9, 10],
+    [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]
+]
+# LR mask for skeleton segments: True -> left color, False -> right color
+SKELETON_LR = np.array(
+    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+    dtype=bool,
+)
 
-    LR = np.array([0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0], dtype=bool)
+def show2Dpose(kps, img):
+    connections = SKELETON_CONNECTIONS
+    LR = SKELETON_LR
 
     lcolor = (255, 0, 0)
     rcolor = (0, 0, 255)
+    # lcolor = (240, 176, 0)
+    # rcolor = (240, 176, 0)
+    
     thickness = 3
 
     for j,c in enumerate(connections):
@@ -67,8 +69,8 @@ def show2Dpose(kps, img):
         start = list(start)
         end = list(end)
         cv2.line(img, (start[0], start[1]), (end[0], end[1]), lcolor if LR[j] else rcolor, thickness)
-        cv2.circle(img, (start[0], start[1]), thickness=-1, color=(0, 255, 0), radius=3)
-        cv2.circle(img, (end[0], end[1]), thickness=-1, color=(0, 255, 0), radius=3)
+        # cv2.circle(img, (start[0], start[1]), thickness=-1, color=(0, 255, 0), radius=3)
+        # cv2.circle(img, (end[0], end[1]), thickness=-1, color=(0, 255, 0), radius=3)
 
     return img
 
@@ -77,11 +79,13 @@ def show3Dpose(vals, ax):
 
     lcolor=(0,0,1)
     rcolor=(1,0,0)
-
-    I = np.array( [0, 0, 1, 4, 2, 5, 0, 7,  8,  8, 14, 15, 11, 12, 8,  9])
-    J = np.array( [1, 4, 2, 5, 3, 6, 7, 8, 14, 11, 15, 16, 12, 13, 9, 10])
-
-    LR = np.array([0, 1, 0, 1, 0, 1, 0, 0, 0,   1,  0,  0,  1,  1, 0, 0], dtype=bool)
+    # lcolor=(0/255, 176/255, 240/255)
+    # rcolor=(0/255, 176/255, 240/255)
+    
+    
+    I = np.array([c[0] for c in SKELETON_CONNECTIONS])
+    J = np.array([c[1] for c in SKELETON_CONNECTIONS])
+    LR = SKELETON_LR
 
     for i in np.arange( len(I) ):
         x, y, z = [np.array( [vals[I[i], j], vals[J[i], j]] ) for j in range(3)]
@@ -199,7 +203,8 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     
     input_2D = input_2D[np.newaxis, :, :, :, :]
 
-    input_2D = torch.from_numpy(input_2D.astype('float32')).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    input_2D = torch.from_numpy(input_2D.astype('float32')).to(device)
 
     N = input_2D.size(0)
 
@@ -215,10 +220,10 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     
     ## estimation
     
-    y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
+    y = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3, device=device)
     output_3D_non_flip = euler_sample(input_2D[:, 0], y, steps=args.sample_steps, model_3d=model)
     
-    y_flip = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3).cuda()
+    y_flip = torch.randn(input_2D.size(0), input_2D.size(2), input_2D.size(3), 3, device=device)
     output_3D_flip = euler_sample(input_2D[:, 1], y_flip, steps=args.sample_steps, model_3d=model)
 
     output_3D_flip[:, :, :, 0] *= -1
@@ -266,14 +271,16 @@ def get_pose3D(path, output_dir, type='image'):
     # args.type = type 
 
     ## Reload 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model['CFM'] = CFM(args).cuda()
+    model['CFM'] = CFM(args).to(device)
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    model_path = args.saved_model_path
+    model_path = args.model_weights_path
     print(model_path)
-    pre_dict = torch.load(model_path)
+    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
     for name, key in model_dict.items():
         model_dict[name] = pre_dict[name]
     model['CFM'].load_state_dict(model_dict)
@@ -336,7 +343,7 @@ def get_pose3D(path, output_dir, type='image'):
         ## save
         output_dir_pose = output_dir +'pose/'
         os.makedirs(output_dir_pose, exist_ok=True)
-        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.jpg', dpi=200, bbox_inches = 'tight')
+        plt.savefig(output_dir_pose + str(('%04d'% i)) + '_pose.png', dpi=200, bbox_inches = 'tight')
 
 
 if __name__ == "__main__":

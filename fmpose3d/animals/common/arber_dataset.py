@@ -12,7 +12,6 @@ import gc
 import glob
 import os
 import random
-import sys
 
 import cv2
 import matplotlib.pyplot as plt
@@ -23,10 +22,8 @@ from torch import from_numpy as FN
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-sys.path.append(os.path.dirname(sys.path[0]))
-
-from common.camera import normalize_screen_coordinates
-from common.lifter3d import load_camera_params, load_h5_keypoints
+from fmpose3d.common.camera import normalize_screen_coordinates
+from fmpose3d.animals.common.lifter3d import load_camera_params, load_h5_keypoints
 
 
 class ArberDataset(Dataset):

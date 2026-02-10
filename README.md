@@ -2,11 +2,11 @@
 
 ![Version](https://img.shields.io/badge/python_version-3.10-purple)
 [![PyPI version](https://badge.fury.io/py/fmpose3d.svg?icon=si%3Apython)](https://badge.fury.io/py/fmpose3d)
-[![License: LApache 2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://www.gnu.org/licenses/apach2.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 This is the official implementation of the approach described in the preprint:
 
-[**FMPose3D: monocular 3D pose estimation via flow matching**](http://arxiv.org/abs/2602.05755)            
+[**FMPose3D: monocular 3D pose estimation via flow matching**](https://arxiv.org/abs/2602.05755)            
 Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
@@ -51,7 +51,7 @@ sh vis_in_the_wild.sh
 ```
 The predictions will be saved to folder `demo/predictions`.
 
-<p align="center"><img src="./images/demo.jpg" width="95%" alt="" /></p>
+<p align="center"><img src="./images/demo.gif" width="95%" alt="" /></p>
 
 ## Training and Inference
 
@@ -79,7 +79,7 @@ The training logs, checkpoints, and related files of each training time will be 
 
 For training on Human3.6M:
 ```bash
-sh /scripts/FMPose3D_train.sh
+sh ./scripts/FMPose3D_train.sh
 ```
 
 ### Inference

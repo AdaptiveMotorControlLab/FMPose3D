@@ -8,7 +8,6 @@ Licensed under Apache 2.0
 """
 
 # SuperAnimal Demo: https://github.com/DeepLabCut/DeepLabCut/blob/main/examples/COLAB/COLAB_YOURDATA_SuperAnimal.ipynb
-import sys
 import os
 import numpy as np
 import glob
@@ -24,8 +23,6 @@ import matplotlib.gridspec as gridspec
 import imageio
 from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
-
-sys.path.append(os.getcwd())
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -334,13 +331,15 @@ def get_pose3D(path, output_dir, type='image'):
     print(f"args.n_joints: {args.n_joints}, args.out_joints: {args.out_joints}")
     
     ## Reload model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = {}
-    model['CFM'] = CFM(args).cuda()
+    model['CFM'] = CFM(args).to(device)
     
     model_dict = model['CFM'].state_dict()
     model_path = args.saved_model_path
     print(f"Loading model from: {model_path}")
-    pre_dict = torch.load(model_path)
+    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
     for name, key in model_dict.items():
         model_dict[name] = pre_dict[name]
     model['CFM'].load_state_dict(model_dict)
@@ -400,7 +399,8 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         input_2D = np.expand_dims(input_2D, axis=0)  # (1, J, 2)
     
     # Convert to tensor format matching visualize_animal_poses.py
-    input_2D = torch.from_numpy(input_2D.astype('float32')).cuda()  # (1, J, 2)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    input_2D = torch.from_numpy(input_2D.astype('float32')).to(device)  # (1, J, 2)
     input_2D = input_2D.unsqueeze(0)  # (1, 1, J, 2)
 
     # Euler sampler for CFM
@@ -418,7 +418,7 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
     
     # Single inference without flip augmentation
     # Create 3D random noise with shape (1, 1, J, 3)
-    y = torch.randn(input_2D.size(0), input_2D.size(1), input_2D.size(2), 3).cuda()
+    y = torch.randn(input_2D.size(0), input_2D.size(1), input_2D.size(2), 3, device=device)
     output_3D = euler_sample(input_2D, y, steps=args.sample_steps, model_3d=model)
     
     output_3D = output_3D[0:, args.pad].unsqueeze(1)
