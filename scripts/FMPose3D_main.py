@@ -41,8 +41,9 @@ if getattr(args, "model_path", ""):
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
 else:
-    # Load model from installed fmpose package
-    from fmpose3d.models import Model as CFM
+    # Load model from registered model registry
+    from fmpose3d.models import get_model
+    CFM = get_model(args.model_type)
 
 
 def test_multi_hypothesis(
@@ -281,12 +282,6 @@ if __name__ == "__main__":
             src=script_path,
             dst=os.path.join(args.checkpoint, args.create_time + "_" + script_name),
         )
-        if getattr(args, "model_path", ""):
-            model_src_path = os.path.abspath(args.model_path)
-            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-            shutil.copyfile(
-                src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name)
-            )
         sh_base = os.path.basename(args.sh_file)
         dst_name = f"{args.create_time}_" + sh_base
         shutil.copyfile(src=args.sh_file, dst=os.path.join(args.checkpoint, dst_name))
