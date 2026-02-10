@@ -18,6 +18,24 @@ from .aggregation_methods import (
     aggregation_RPEA_joint_level,
 )
 
+# Configuration dataclasses
+from .common.config import (
+    FMPose3DConfig,
+    HRNetConfig,
+    InferenceConfig,
+    ModelConfig,
+    PipelineConfig,
+)
+
+# High-level inference API
+from .fmpose3d import (
+    FMPose3DInference,
+    HRNetEstimator,
+    Pose2DResult,
+    Pose3DResult,
+    Source,
+)
+
 # Import 2D pose detection utilities
 from .lib.hrnet.gen_kpts import gen_video_kpts
 from .lib.hrnet.hrnet import HRNetPose2d
@@ -25,6 +43,18 @@ from .lib.preprocess import h36m_coco_format, revise_kpts
 
 # Make commonly used classes/functions available at package level
 __all__ = [
+    # Inference API
+    "FMPose3DInference",
+    "HRNetEstimator",
+    "Pose2DResult",
+    "Pose3DResult",
+    "Source",
+    # Configuration
+    "FMPose3DConfig",
+    "HRNetConfig",
+    "InferenceConfig",
+    "ModelConfig",
+    "PipelineConfig",
     # Aggregation methods
     "average_aggregation",
     "aggregation_select_single_best_hypothesis_by_2D_error",
