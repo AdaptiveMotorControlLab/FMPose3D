@@ -42,8 +42,9 @@ if getattr(args, "model_path", ""):
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
 else:
-    # Load model from installed fmpose package
-    from fmpose3d.models import Model as CFM
+    # Load model from registered model registry
+    from fmpose3d.models import get_model
+    CFM = get_model(args.model_type)
 
 from deeplabcut.pose_estimation_pytorch.apis import superanimal_analyze_images
 
