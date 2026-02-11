@@ -31,12 +31,18 @@ _FMPOSE3D_DEFAULTS: Dict[str, Dict] = {
         "out_joints": 17,
         "dataset": "h36m",
         "sample_steps": 3,
+        "joints_left": [4, 5, 6, 11, 12, 13],
+        "joints_right": [1, 2, 3, 14, 15, 16],
+        "root_joint": 0,
     },
     "fmpose3d_animals": {
         "n_joints": 26,
         "out_joints": 26,
         "dataset": "animal3d",
         "sample_steps": 3,
+        "joints_left": [0, 3, 5, 8, 10, 12, 14, 16, 20, 22],
+        "joints_right": [1, 4, 6, 9, 11, 13, 15, 17, 21, 23],
+        "root_joint": 7,
     },
 }
 
@@ -53,6 +59,9 @@ class FMPose3DConfig(ModelConfig):
     token_dim: int = 256
     n_joints: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
     out_joints: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    joints_left: List[int] = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    joints_right: List[int] = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    root_joint: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
     in_channels: int = 2
     out_channels: int = 3
     frames: int = 1
@@ -208,6 +217,33 @@ class HRNetConfig(Pose2DConfig):
 
 
 @dataclass
+class SuperAnimalConfig(Pose2DConfig):
+    """DeepLabCut SuperAnimal 2D pose detector configuration.
+
+    Uses the DeepLabCut ``superanimal_analyze_images`` API to detect
+    animal keypoints in the quadruped80K format, then maps them to the
+    Animal3D 26-keypoint layout expected by the ``fmpose3d_animals``
+    3D lifter.
+
+    Attributes
+    ----------
+    superanimal_name : str
+        Name of the SuperAnimal model (default ``"superanimal_quadruped"``).
+    sa_model_name : str
+        Backbone architecture (default ``"hrnet_w32"``).
+    detector_name : str
+        Object detector used for animal bounding boxes.
+    max_individuals : int
+        Maximum number of individuals to detect per image (default 1).
+    """
+    pose2d_model: str = "superanimal"
+    superanimal_name: str = "superanimal_quadruped"
+    sa_model_name: str = "hrnet_w32"
+    detector_name: str = "fasterrcnn_resnet50_fpn_v2"
+    max_individuals: int = 1
+
+
+@dataclass
 class DemoConfig:
     """Demo / inference configuration."""
 
@@ -287,8 +323,12 @@ class PipelineConfig:
         for group_name, dc_class in _SUB_CONFIG_CLASSES.items():
             if group_name == "model_cfg" and raw.get("model_type", 'fmpose3d') in _FMPOSE3D_DEFAULTS:
                 dc_class = FMPose3DConfig
-            elif group_name == "pose2d_cfg" and raw.get("pose2d_model", "hrnet") == "hrnet":
-                dc_class = HRNetConfig
+            elif group_name == "pose2d_cfg":
+                p2d = raw.get("pose2d_model", "hrnet")
+                if p2d == "superanimal":
+                    dc_class = SuperAnimalConfig
+                elif p2d == "hrnet":
+                    dc_class = HRNetConfig
             kwargs[group_name] = _pick(dc_class, raw)
         return cls(**kwargs)
 
