@@ -250,7 +250,7 @@ class TestPipelineConfig:
         ns = argparse.Namespace(
             # FMPose3DConfig
             model="test_model",
-            model_type="fmpose3d",
+            model_type="fmpose3d_humans",
             layers=5,
             channel=256,
             d_hid=512,
