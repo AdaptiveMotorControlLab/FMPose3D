@@ -11,7 +11,7 @@ epochs=80
 num_saved_models=3
 frames=1
 channel_dim=512
-model_type='fmpose3d' # use registered model by default
+model_type='fmpose3d_humans' # use registered model by default
 sh_file='scripts/FMPose3D_train.sh'
 folder_name=FMPose3D_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
