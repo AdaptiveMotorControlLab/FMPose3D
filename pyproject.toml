@@ -66,6 +66,11 @@ target-version = ['py38', 'py39', 'py310']
 profile = "black"
 line_length = 100
 
+[tool.pytest.ini_options]
+markers = [
+    "functional: marks tests that require pretrained weights (deselect with '-m \"not functional\"')",
+]
+
 [tool.codespell]
 skip = '.git,*.pdf,*.svg,*.css,*.txt,*.pth'
 check-hidden = true
