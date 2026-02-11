@@ -9,8 +9,7 @@ Licensed under Apache 2.0
 
 import math
 from dataclasses import dataclass, field, fields, asdict
-from typing import List
-
+from typing import Dict, List
 
 # ---------------------------------------------------------------------------
 # Dataclass configuration groups
@@ -20,24 +19,63 @@ from typing import List
 @dataclass
 class ModelConfig:
     """Model architecture configuration."""
-    model_type: str = "fmpose3d"
+    model_type: str = "fmpose3d_humans"
 
+
+# Per-model-type defaults for fields marked with INFER_FROM_MODEL_TYPE.
+# Also consumed by PipelineConfig.for_model_type to set cross-config
+# values (dataset, sample_steps, etc.).
+_FMPOSE3D_DEFAULTS: Dict[str, Dict] = {
+    "fmpose3d_humans": {
+        "n_joints": 17,
+        "out_joints": 17,
+        "dataset": "h36m",
+        "sample_steps": 3,
+        "joints_left": [4, 5, 6, 11, 12, 13],
+        "joints_right": [1, 2, 3, 14, 15, 16],
+        "root_joint": 0,
+    },
+    "fmpose3d_animals": {
+        "n_joints": 26,
+        "out_joints": 26,
+        "dataset": "animal3d",
+        "sample_steps": 5,
+        "joints_left": [0, 3, 5, 8, 10, 12, 14, 16, 20, 22],
+        "joints_right": [1, 4, 6, 9, 11, 13, 15, 17, 21, 23],
+        "root_joint": 7,
+    },
+}
+
+# Sentinel object for defaults that are inferred from the model type.
+INFER_FROM_MODEL_TYPE = object()
 
 @dataclass
 class FMPose3DConfig(ModelConfig):
+    model_type: str = "fmpose3d_humans"
     model: str = ""
-    model_type: str = "fmpose3d"
-    layers: int = 3
+    layers: int = 5
     channel: int = 512
     d_hid: int = 1024
     token_dim: int = 256
-    n_joints: int = 17
-    out_joints: int = 17
+    n_joints: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    out_joints: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    joints_left: List[int] = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    joints_right: List[int] = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
+    root_joint: int = INFER_FROM_MODEL_TYPE  # type: ignore[assignment]
     in_channels: int = 2
     out_channels: int = 3
     frames: int = 1
-    """Optional: load model class from a specific file path."""
 
+    def __post_init__(self):
+        defaults = _FMPOSE3D_DEFAULTS.get(self.model_type)
+        if defaults is None:
+            supported = ", ".join(sorted(_FMPOSE3D_DEFAULTS))
+            raise ValueError(
+                f"Unknown model_type {self.model_type!r}; supported: {supported}"
+            )
+        for f in fields(self):
+            if getattr(self, f.name) is INFER_FROM_MODEL_TYPE:
+                setattr(self, f.name, defaults[f.name])
 
 @dataclass
 class DatasetConfig:
@@ -179,6 +217,33 @@ class HRNetConfig(Pose2DConfig):
 
 
 @dataclass
+class SuperAnimalConfig(Pose2DConfig):
+    """DeepLabCut SuperAnimal 2D pose detector configuration.
+
+    Uses the DeepLabCut ``superanimal_analyze_images`` API to detect
+    animal keypoints in the quadruped80K format, then maps them to the
+    Animal3D 26-keypoint layout expected by the ``fmpose3d_animals``
+    3D lifter.
+
+    Attributes
+    ----------
+    superanimal_name : str
+        Name of the SuperAnimal model (default ``"superanimal_quadruped"``).
+    sa_model_name : str
+        Backbone architecture (default ``"hrnet_w32"``).
+    detector_name : str
+        Object detector used for animal bounding boxes.
+    max_individuals : int
+        Maximum number of individuals to detect per image (default 1).
+    """
+    pose2d_model: str = "superanimal"
+    superanimal_name: str = "superanimal_quadruped"
+    sa_model_name: str = "hrnet_w32"
+    detector_name: str = "fasterrcnn_resnet50_fpn_v2"
+    max_individuals: int = 1
+
+
+@dataclass
 class DemoConfig:
     """Demo / inference configuration."""
 
@@ -239,8 +304,6 @@ class PipelineConfig:
     demo_cfg: DemoConfig = field(default_factory=DemoConfig)
     runtime_cfg: RuntimeConfig = field(default_factory=RuntimeConfig)
 
-    # -- construction from argparse namespace ---------------------------------
-
     @classmethod
     def from_namespace(cls, ns) -> "PipelineConfig":
         """Build a :class:`PipelineConfig` from an ``argparse.Namespace``
@@ -258,10 +321,14 @@ class PipelineConfig:
 
         kwargs = {}
         for group_name, dc_class in _SUB_CONFIG_CLASSES.items():
-            if group_name == "model_cfg" and raw.get("model_type", "fmpose3d") == "fmpose3d":
+            if group_name == "model_cfg" and raw.get("model_type", 'fmpose3d_humans') in _FMPOSE3D_DEFAULTS:
                 dc_class = FMPose3DConfig
-            elif group_name == "pose2d_cfg" and raw.get("pose2d_model", "hrnet") == "hrnet":
-                dc_class = HRNetConfig
+            elif group_name == "pose2d_cfg":
+                p2d = raw.get("pose2d_model", "hrnet")
+                if p2d == "superanimal":
+                    dc_class = SuperAnimalConfig
+                elif p2d == "hrnet":
+                    dc_class = HRNetConfig
             kwargs[group_name] = _pick(dc_class, raw)
         return cls(**kwargs)
 

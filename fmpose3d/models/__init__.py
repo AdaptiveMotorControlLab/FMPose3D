@@ -15,6 +15,8 @@ from .base_model import BaseModel, register_model, get_model, list_models
 
 # Import model subpackages so their @register_model decorators execute.
 from .fmpose3d import Graph, Model
+# Import animal models so their @register_model decorators execute.
+from fmpose3d.animals import models as _animal_models  # noqa: F401
 
 __all__ = [
     "BaseModel",

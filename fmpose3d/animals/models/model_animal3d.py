@@ -16,6 +16,7 @@ from einops import rearrange
 from timm.models.layers import DropPath
 
 from fmpose3d.animals.models.graph_frames import Graph
+from fmpose3d.models.base_model import BaseModel, register_model
 
 class TimeEmbedding(nn.Module):
     def __init__(self, dim: int, hidden_dim: int = 64):
@@ -207,9 +208,10 @@ class decoder(nn.Module):
         x = self.fc5(x)
         return x
 
-class Model(nn.Module):
+@register_model("fmpose3d_animals")
+class Model(BaseModel):
     def __init__(self, args):
-        super().__init__()
+        super().__init__(args)
 
         self.graph = Graph('animal3d', 'spatial', pad=1)
         self.register_buffer('A', torch.tensor(self.graph.A, dtype=torch.float32))

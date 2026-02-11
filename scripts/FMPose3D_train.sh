@@ -11,8 +11,7 @@ epochs=80
 num_saved_models=3
 frames=1
 channel_dim=512
-model_path="" # when the path is empty, the model will be loaded from the installed fmpose3d package
-# model_path='./models/model_GAMLP.py' # when the path is not empty, the model will be loaded from the local file path
+model_type='fmpose3d_humans' # use registered model by default
 sh_file='scripts/FMPose3D_train.sh'
 folder_name=FMPose3D_layers${layers}_$(date +%Y%m%d_%H%M%S)
 
@@ -20,6 +19,7 @@ python3 scripts/FMPose3D_main.py \
   --train \
   --dataset h36m \
   --frames ${frames} \
+  --model_type "${model_type}" \
   ${model_path:+--model_path "$model_path"} \
   --gpu ${gpu_id} \
   --batch_size ${batch_size} \
