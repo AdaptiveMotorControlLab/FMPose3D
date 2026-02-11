@@ -5,7 +5,7 @@ sample_steps=3
 batch_size=1
 sh_file='vis_in_the_wild.sh'
 
-model_type='fmpose3d'
+model_type='fmpose3d_humans'
 model_weights_path='../pre_trained_models/fmpose3d_h36m/FMpose3D_pretrained_weights.pth'
 
 target_path='./images/'  # folder containing multiple images
