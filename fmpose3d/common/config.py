@@ -19,14 +19,14 @@ from typing import Dict, List
 @dataclass
 class ModelConfig:
     """Model architecture configuration."""
-    model_type: str = "fmpose3d"
+    model_type: str = "fmpose3d_humans"
 
 
 # Per-model-type defaults for fields marked with INFER_FROM_MODEL_TYPE.
 # Also consumed by PipelineConfig.for_model_type to set cross-config
 # values (dataset, sample_steps, etc.).
 _FMPOSE3D_DEFAULTS: Dict[str, Dict] = {
-    "fmpose3d": {
+    "fmpose3d_humans": {
         "n_joints": 17,
         "out_joints": 17,
         "dataset": "h36m",
@@ -39,7 +39,7 @@ _FMPOSE3D_DEFAULTS: Dict[str, Dict] = {
         "n_joints": 26,
         "out_joints": 26,
         "dataset": "animal3d",
-        "sample_steps": 3,
+        "sample_steps": 5,
         "joints_left": [0, 3, 5, 8, 10, 12, 14, 16, 20, 22],
         "joints_right": [1, 4, 6, 9, 11, 13, 15, 17, 21, 23],
         "root_joint": 7,
@@ -51,7 +51,7 @@ INFER_FROM_MODEL_TYPE = object()
 
 @dataclass
 class FMPose3DConfig(ModelConfig):
-    model_type: str = "fmpose3d"
+    model_type: str = "fmpose3d_humans"
     model: str = ""
     layers: int = 5
     channel: int = 512
@@ -321,7 +321,7 @@ class PipelineConfig:
 
         kwargs = {}
         for group_name, dc_class in _SUB_CONFIG_CLASSES.items():
-            if group_name == "model_cfg" and raw.get("model_type", 'fmpose3d') in _FMPOSE3D_DEFAULTS:
+            if group_name == "model_cfg" and raw.get("model_type", 'fmpose3d_humans') in _FMPOSE3D_DEFAULTS:
                 dc_class = FMPose3DConfig
             elif group_name == "pose2d_cfg":
                 p2d = raw.get("pose2d_model", "hrnet")
