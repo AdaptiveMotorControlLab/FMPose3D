@@ -36,6 +36,9 @@ from .fmpose3d import (
     Source,
 )
 
+# Model registry
+from .models import BaseModel, register_model, get_model, list_models
+
 # Import 2D pose detection utilities
 from .lib.hrnet.gen_kpts import gen_video_kpts
 from .lib.hrnet.hrnet import HRNetPose2d
@@ -59,6 +62,11 @@ __all__ = [
     "average_aggregation",
     "aggregation_select_single_best_hypothesis_by_2D_error",
     "aggregation_RPEA_joint_level",
+    # Model registry
+    "BaseModel",
+    "register_model",
+    "get_model",
+    "list_models",
     # 2D pose detection
     "HRNetPose2d",
     "gen_video_kpts",
