@@ -2,16 +2,14 @@ layers=5
 batch_size=13
 lr=1e-3
 gpu_id=0
-eval_sample_steps=3
+eval_sample_steps=5
 num_saved_models=3
 frames=1
 large_decay_epoch=15
 lr_decay_large=0.75
-n_joints=26
-out_joints=26
 epochs=300
-# model_path='models/model_animals.py'
-model_path="" # when the path is empty, the model will be loaded from the installed fmpose package
+model_type='fmpose3d_animals'
+# model_path="" # set to a local file path to override the registry
 # root path denotes the path to the original dataset
 root_path="./dataset/"
 train_dataset_paths=(
@@ -32,7 +30,7 @@ python ./scripts/main_animal3d.py \
   --test 1 \
   --batch_size ${batch_size} \
   --lr ${lr} \
-  ${model_path:+--model_path "$model_path"} \
+  --model_type "${model_type}" \
   --folder_name ${folder_name} \
   --layers ${layers} \
   --gpu ${gpu_id} \

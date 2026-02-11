@@ -50,3 +50,4 @@ htmlcov/
 pre_trained_models/
 demo/predictions/
 demo/images/
+**/predictions/

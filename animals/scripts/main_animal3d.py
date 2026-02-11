@@ -38,8 +38,9 @@ if getattr(args, "model_path", ""):
     spec.loader.exec_module(module)
     CFM = getattr(module, "Model")
 else:
-    # Load model from installed fmpose package
-    from fmpose3d.animals.models import Model as CFM
+    # Load model from registered model registry
+    from fmpose3d.models import get_model
+    CFM = get_model(args.model_type)
      
 def train(opt, actions, train_loader, model, optimizer, epoch):
     return step('train', opt, actions, train_loader, model, optimizer, epoch)
@@ -97,7 +98,6 @@ def step(split, args, actions, dataLoader, model, optimizer=None, epoch=None, st
             # Root joint should already be [0,0,0]
             gt_3D = gt_3D.clone()
             gt_3D[:, :, args.root_joint] = 0
-            
             
             # Conditional Flow Matching training
             # gt_3D, input_2D shape: (B,F,J,C)
@@ -217,21 +217,18 @@ if __name__ == '__main__':
             os.makedirs(args.checkpoint)
 
         # backup files
-        # import shutil
-        # file_path = os.path.abspath(__file__)
-        # file_name = os.path.basename(file_path)
-        # shutil.copyfile(src=file_path, dst=os.path.join(args.checkpoint, args.create_time + "_" + file_name))
-        # shutil.copyfile(src=os.path.abspath("common/arguments.py"), dst=os.path.join(args.checkpoint, args.create_time + "_arguments.py"))
-        # # backup the selected model file (from --model_path if provided)
-        # if getattr(args, 'model_path', ''):
-        #     model_src_path = os.path.abspath(args.model_path)
-        #     model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
-        #     shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
-        # # shutil.copyfile(src="common/utils.py", dst = os.path.join(args.checkpoint, args.create_time + "_utils.py"))
-        # sh_base = os.path.basename(args.sh_file)
-        # dst_name = f"{args.create_time}_" + sh_base
-        # sh_src = os.path.abspath(args.sh_file)
-        # shutil.copyfile(src=sh_src, dst=os.path.join(args.checkpoint, dst_name))
+        import shutil
+        file_path = os.path.abspath(__file__)
+        file_name = os.path.basename(file_path)
+        shutil.copyfile(src=file_path, dst=os.path.join(args.checkpoint, args.create_time + "_" + file_name))
+        if getattr(args, 'model_path', ''):
+            model_src_path = os.path.abspath(args.model_path)
+            model_dst_name = f"{args.create_time}_" + os.path.basename(model_src_path)
+            shutil.copyfile(src=model_src_path, dst=os.path.join(args.checkpoint, model_dst_name))
+        sh_base = os.path.basename(args.sh_file)
+        dst_name = f"{args.create_time}_" + sh_base
+        sh_src = os.path.abspath(args.sh_file)
+        shutil.copyfile(src=sh_src, dst=os.path.join(args.checkpoint, dst_name))
 
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S', \
             filename=os.path.join(args.checkpoint, 'train.log'), level=logging.INFO)

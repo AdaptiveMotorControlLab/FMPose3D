@@ -10,7 +10,7 @@ In this part, the FMPose3D model is trained on [Animal3D](https://xujiacong.gith
 This visualization script is designed for single-frame based model, allowing you to easily run 3D animal pose estimation on any single image.
 
 Before testing, make sure you have the pre-trained model ready.
-You may either use the model trained by your own or download ours from [here](https://drive.google.com/drive/folders/1fMKVaYziwFkAnFrtQZmoPOTfe7Hkl2at?usp=sharing) and place it in the `./pre_trained_models` directory.
+You may either use the model trained by your own or download ours from [here](https://drive.google.com/drive/folders/1kL4aOyWNq0o9zB0rSTRM8KYgkySVmUTk?usp=drive_link) and place it in the `./pre_trained_models` directory.
 
 Next, put your test images into folder `demo/images`. Then run the visualization script:
 ```bash

@@ -212,7 +212,7 @@ class decoder(nn.Module):
         x = self.fc2(x)
         return x
 
-@register_model("fmpose3d")
+@register_model("fmpose3d_humans")
 class Model(BaseModel):
     def __init__(self, args):
         super().__init__(args)
