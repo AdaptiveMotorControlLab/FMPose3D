@@ -74,8 +74,8 @@ class opts:
         self.parser.add_argument("--model_dir", type=str, default="")
         # Optional: load model class from a specific file path
         self.parser.add_argument("--model_path", type=str, default="")
-        # Model registry name (e.g. "fmpose3d"); used instead of --model_path
-        self.parser.add_argument("--model_type", type=str, default="fmpose3d")
+        # Model registry name (e.g. "fmpose3d_humans"); used instead of --model_path
+        self.parser.add_argument("--model_type", type=str, default="fmpose3d_humans")
         self.parser.add_argument("--model_weights_path", type=str, default="")
 
         self.parser.add_argument("--post_refine_reload", action="store_true")
