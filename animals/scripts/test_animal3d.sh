@@ -21,11 +21,11 @@ train_dataset_paths=(
   "./dataset/control_animal3dlatest/train.json"
 )
 test_dataset_paths=(
-  "./dataset/animal3d/test.json"
+  "./dataset/control_animal3dlatest/test.json"
 )
 
 folder_name="TestCtrlAni3D_L${layers}_lr${lr}_B${batch_size}_$(date +%Y%m%d_%H%M%S)"
-sh_file='scripts/animals/test_animal3d.sh'
+sh_file='scripts/test_animal3d.sh'
 
 python ./scripts/main_animal3d.py \
   --root_path ${root_path} \
