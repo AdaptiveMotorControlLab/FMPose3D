@@ -10,7 +10,7 @@ mode='exp'
 exp_temp=0.005
 folder_name=test_s${eval_multi_steps}_${mode}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
 
-model_type='fmpose3d'
+model_type='fmpose3d_humans'
 model_weights_path='./pre_trained_models/fmpose3d_h36m/FMpose3D_pretrained_weights.pth'
 
 #Test
