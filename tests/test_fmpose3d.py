@@ -1,4 +1,12 @@
-"""Tests for fmpose3d/fmpose3d.py — the high-level inference API.
+"""
+FMPose3D: monocular 3D Pose Estimation via Flow Matching
+
+Official implementation of the paper:
+"FMPose3D: monocular 3D Pose Estimation via Flow Matching"
+by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
+Licensed under Apache 2.0
+
+Tests for fmpose3d/fmpose3d.py — the high-level inference API.
 
 Organised into:
   * Unit tests for individual components (no pretrained weights needed).
