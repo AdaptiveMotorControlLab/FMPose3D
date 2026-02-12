@@ -24,7 +24,8 @@ from fmpose3d.common.config import (
     FMPose3DConfig,
     HRNetConfig,
     InferenceConfig,
-    ModelConfig,
+    SupportedModel,
+    SuperAnimalConfig,
 )
 from fmpose3d.models import get_model
 
@@ -107,6 +108,334 @@ class HRNetEstimator:
         return keypoints, scores
 
 
+# Quadruped80K → Animal3D (26 keypoints) mapping table.
+# -1 entries are filled by linear interpolation (see _INTERPOLATION_RULES).
+_QUADRUPED80K_TO_ANIMAL3D: list[int] = [
+    10, 5, -1, 26, 29, 30, 35, 22, 24, 27, 31, 32,
+    -1, -1, 25, 28, 33, 34, 15, 23, 11, 6, 4, 3, 0, -1,
+]
+
+# For each -1 target index, the two source indices to average.
+_INTERPOLATION_RULES: dict[int, tuple[int, int]] = {
+    2: (3, 4),
+    12: (24, 19),
+    13: (27, 19),
+    25: (22, 23),
+}
+
+
+class SuperAnimalEstimator:
+    """2D pose estimator for animals: DeepLabCut SuperAnimal.
+
+    Uses the ``superanimal_analyze_images`` API from DeepLabCut to
+    predict quadruped keypoints, then maps them to the 26-joint
+    Animal3D layout expected by the ``fmpose3d_animals`` 3D lifter.
+
+    Parameters
+    ----------
+    cfg : SuperAnimalConfig
+        Estimator settings (``superanimal_name``, ``max_individuals``, ...).
+    """
+
+    def __init__(self, cfg: SuperAnimalConfig | None = None) -> None:
+        self.cfg = cfg or SuperAnimalConfig()
+
+    def setup_runtime(self) -> None:
+        """No-op -- DeepLabCut loads models on first call."""
+
+    def predict(
+        self, frames: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Estimate 2D keypoints from image frames in Animal3D format.
+
+        The method writes *frames* to a temporary directory, runs
+        ``superanimal_analyze_images``, and maps the resulting
+        quadruped80K keypoints to Animal3D's 26-keypoint layout.
+
+        Parameters
+        ----------
+        frames : ndarray
+            BGR image frames, shape ``(N, H, W, C)``.
+
+        Returns
+        -------
+        keypoints : ndarray
+            Animal3D-format 2D keypoints, shape ``(1, N, 26, 2)``.
+            The first axis is always 1 (single individual).
+        scores : ndarray
+            Placeholder confidence scores (all ones),
+            shape ``(1, N, 26)``.
+        """
+        import cv2
+        import tempfile
+        from deeplabcut.pose_estimation_pytorch.apis import (
+            superanimal_analyze_images,
+        )
+
+        cfg = self.cfg
+        num_frames = frames.shape[0]
+        all_mapped: list[np.ndarray] = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write each frame as an image so DLC can read it.
+            paths: list[str] = []
+            for idx in range(num_frames):
+                p = str(Path(tmpdir) / f"frame_{idx:06d}.png")
+                cv2.imwrite(p, frames[idx])
+                paths.append(p)
+
+            # Run DeepLabCut on each frame individually (the API
+            # expects a single image path).
+            for img_path in paths:
+                predictions = superanimal_analyze_images(
+                    superanimal_name=cfg.superanimal_name,
+                    model_name=cfg.sa_model_name,
+                    detector_name=cfg.detector_name,
+                    images=img_path,
+                    max_individuals=cfg.max_individuals,
+                    out_folder=tmpdir,
+                )
+                # predictions: {image_path: {"bodyparts": (N_ind, K, 3), ...}}
+                for _path, payload in predictions.items():
+                    bodyparts = payload.get("bodyparts")
+                    if bodyparts is None:
+                        # No detection -- fill with zeros.
+                        all_mapped.append(np.zeros((1, 26, 2), dtype="float32"))
+                        continue
+                    xy = bodyparts[..., :2]  # (N_ind, K, 2)
+                    mapped = self._map_keypoints(xy)
+                    # Take only the first individual.
+                    all_mapped.append(mapped[:1])
+
+        # Stack along frame axis → (1, N, 26, 2)
+        kpts = np.stack(all_mapped, axis=1)  # (1, N, 26, 2)
+        scores = np.ones(kpts.shape[:3], dtype="float32")  # (1, N, 26)
+        return kpts, scores
+
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _map_keypoints(xy: np.ndarray) -> np.ndarray:
+        """Map keypoints from the quadruped80K dataset format (see: DeepLabCut model zoo:
+        https://huggingface.co/mwmathis/DeepLabCutModelZoo-SuperAnimal-Quadruped)
+        to the FMPose3D 3d animal 26-joint layout.
+
+        Parameters
+        ----------
+        xy : ndarray
+            Source keypoints, shape ``(num_individuals, K_src, 2)``.
+
+        Returns
+        -------
+        mapped : ndarray
+            Mapped keypoints, shape ``(num_individuals, 26, 2)``.
+        """
+        num_ind, num_src, _ = xy.shape
+        num_tgt = len(_QUADRUPED80K_TO_ANIMAL3D)
+        mapped = np.full((num_ind, num_tgt, 2), np.nan, dtype="float32")
+
+        for tgt_idx, src_idx in enumerate(_QUADRUPED80K_TO_ANIMAL3D):
+            if src_idx != -1 and src_idx < num_src:
+                mapped[:, tgt_idx, :] = xy[:, src_idx, :]
+            elif src_idx == -1 and tgt_idx in _INTERPOLATION_RULES:
+                s1, s2 = _INTERPOLATION_RULES[tgt_idx]
+                if s1 < num_src and s2 < num_src:
+                    mapped[:, tgt_idx, :] = (xy[:, s1, :] + xy[:, s2, :]) / 2.0
+
+        return mapped
+
+
+# ---------------------------------------------------------------------------
+# Limb regularisation (animal post-processing)
+# ---------------------------------------------------------------------------
+
+
+# Limb connections used for vertical alignment (thigh → knee).
+_ANIMAL_LIMB_CONNECTIONS: list[tuple[int, int]] = [
+    (8, 14),   # left_front_thigh → left_front_knee
+    (9, 15),   # right_front_thigh → right_front_knee
+    (10, 16),  # left_back_thigh → left_back_knee
+    (11, 17),  # right_back_thigh → right_back_knee
+]
+
+
+def compute_limb_regularization_matrix(
+    pose_3d: np.ndarray,
+    limb_connections: list[tuple[int, int]] = _ANIMAL_LIMB_CONNECTIONS,
+) -> np.ndarray:
+    """Compute a rotation that aligns average limb direction to vertical.
+
+    The limb vectors are taken as *proximal - distal* (pointing upward)
+    and averaged.  A Rodrigues rotation is computed to map the result
+    onto ``(0, 0, 1)``.
+
+    This is primarily intended for visualization and canonicalization of
+    upright poses.
+
+    .. note:: **Limitations**
+
+       * The function assumes a stable "up" limb direction and may produce
+         poor results for poses where this assumption does not hold (e.g.
+         lying down, jumping, or other non-upright orientations).
+       * The rotation is computed independently per frame with no temporal
+         smoothing or prior, so it can be unstable across frames and may
+         cause flickering in video sequences.
+
+       If these assumptions do not match your data, consider using the raw
+       predicted pose and implementing custom regularization logic suited
+       to your use-case.
+
+    Parameters
+    ----------
+    pose_3d : ndarray
+        3D pose, shape ``(J, 3)``.
+    limb_connections : list of (int, int)
+        Pairs ``(start, end)`` defining each limb.
+
+    Returns
+    -------
+    R : ndarray
+        ``(3, 3)`` rotation matrix.
+    """
+    limb_vectors: list[np.ndarray] = []
+    for start_idx, end_idx in limb_connections:
+        vec = pose_3d[start_idx] - pose_3d[end_idx]
+        norm = np.linalg.norm(vec)
+        if norm > 1e-6:
+            limb_vectors.append(vec / norm)
+
+    if len(limb_vectors) == 0:
+        return np.eye(3)
+
+    avg = np.mean(limb_vectors, axis=0)
+    avg = avg / (np.linalg.norm(avg) + 1e-8)
+    target = np.array([0.0, 0.0, 1.0])
+
+    v = np.cross(avg, target)
+    c = np.dot(avg, target)
+
+    if np.linalg.norm(v) < 1e-6:
+        if c > 0:
+            return np.eye(3)
+        # Opposite -- 180-degree rotation around a perpendicular axis.
+        axis = np.array([1.0, 0.0, 0.0]) if abs(avg[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+        axis = axis - avg * np.dot(axis, avg)
+        axis = axis / np.linalg.norm(axis)
+        return 2 * np.outer(axis, axis) - np.eye(3)
+
+    s = np.linalg.norm(v)
+    kmat = np.array([[0, -v[2], v[1]],
+                     [v[2], 0, -v[0]],
+                     [-v[1], v[0], 0]])
+    return np.eye(3) + kmat + kmat @ kmat * ((1 - c) / (s ** 2))
+
+
+def apply_limb_regularization(pose_3d: np.ndarray, R: np.ndarray) -> np.ndarray:
+    """Apply a rotation matrix to a 3D pose.
+
+    Parameters
+    ----------
+    pose_3d : ndarray, shape ``(J, 3)``
+    R : ndarray, shape ``(3, 3)``
+
+    Returns
+    -------
+    ndarray, shape ``(J, 3)``
+    """
+    return (R @ pose_3d.T).T
+
+
+# ---------------------------------------------------------------------------
+# Post-processors
+# ---------------------------------------------------------------------------
+
+
+class HumanPostProcessor:
+    """Post-process a raw 3D pose for the human pipeline.
+
+    Zeros the root joint to make the pose root-relative, then
+    optionally applies a ``camera_to_world`` rotation.
+    """
+
+    def __call__(
+        self,
+        raw_output: torch.Tensor,
+        *,
+        camera_rotation: np.ndarray | None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return ``(pose_3d, pose_world)`` each of shape ``(J, 3)``.
+
+        Parameters
+        ----------
+        raw_output : torch.Tensor
+            Model output for one frame, shape ``(1, 1, J, 3)``.
+        camera_rotation : ndarray or None
+            Length-4 quaternion for ``camera_to_world``.
+        """
+        raw_output[:, :, 0, :] = 0  # root-relative
+        pose_3d = raw_output[0, 0].cpu().detach().numpy()
+        if camera_rotation is not None:
+            pose_world = camera_to_world(pose_3d, R=camera_rotation, t=0)
+            pose_world[:, 2] -= np.min(pose_world[:, 2])
+        else:
+            pose_world = pose_3d.copy()
+        return pose_3d, pose_world
+
+
+class AnimalPostProcessor:
+    """Post-process a raw 3D pose for the animal pipeline.
+
+    Applies limb regularisation (rotates the pose so that average limb
+    direction is vertical).  No root zeroing, no ``camera_to_world``.
+    """
+
+    def __call__(
+        self,
+        raw_output: torch.Tensor,
+        *,
+        camera_rotation: np.ndarray | None,
+        limb_regularization: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return ``(pose_3d, pose_world)`` each of shape ``(J, 3)``.
+
+        Parameters
+        ----------
+        raw_output : torch.Tensor
+            Model output for one frame, shape ``(1, 1, J, 3)``.
+        camera_rotation : ndarray or None
+            Ignored (accepted for interface compatibility).
+        """
+        pose_3d = raw_output[0, 0].cpu().detach().numpy()
+        R_reg = (
+            compute_limb_regularization_matrix(pose_3d) if limb_regularization
+            else np.eye(3)
+        )
+        pose_world = apply_limb_regularization(pose_3d, R_reg)
+        return pose_3d, pose_world
+
+
+# ---------------------------------------------------------------------------
+# Default component resolver
+# ---------------------------------------------------------------------------
+
+
+def _default_components(
+    model_cfg: FMPose3DConfig,
+) -> tuple[
+    HRNetEstimator | SuperAnimalEstimator,
+    HumanPostProcessor | AnimalPostProcessor,
+]:
+    """Return the default ``(estimator_2d, postprocessor)`` for *model_cfg*.
+
+    This is the **only** place in the module where ``model_type`` is
+    inspected to choose pipeline components.  Adding a third pipeline
+    means adding one branch here (or turning this into a registry).
+    """
+    if model_cfg.model_type == SupportedModel.FMPOSE3D_ANIMALS:
+        return SuperAnimalEstimator(), AnimalPostProcessor()
+    return HRNetEstimator(), HumanPostProcessor()
+
+
 # ---------------------------------------------------------------------------
 # Result containers
 # ---------------------------------------------------------------------------
@@ -114,24 +443,37 @@ class HRNetEstimator:
 
 @dataclass
 class Pose2DResult:
-    """Container returned by :meth:`FMPose3DInference.prepare_2d`."""
+    """Container returned by :meth:`FMPose3DInference.prepare_2d`.
+
+    ``J`` is 17 for the human (H36M) pipeline and 26 for the animal
+    (Animal3D) pipeline.
+    """
 
     keypoints: np.ndarray
-    """H36M-format 2D keypoints, shape ``(num_persons, num_frames, 17, 2)``."""
+    """2D keypoints, shape ``(num_persons, num_frames, J, 2)``."""
     scores: np.ndarray
-    """Per-joint confidence scores, shape ``(num_persons, num_frames, 17)``."""
+    """Per-joint confidence scores, shape ``(num_persons, num_frames, J)``."""
     image_size: tuple[int, int] = (0, 0)
     """``(height, width)`` of the source frames."""
 
 
 @dataclass
 class Pose3DResult:
-    """Container returned by :meth:`FMPose3DInference.pose_3d`."""
+    """Container returned by :meth:`FMPose3DInference.pose_3d`.
+
+    ``J`` is 17 for the human (H36M) pipeline and 26 for the animal
+    (Animal3D) pipeline.
+    """
 
     poses_3d: np.ndarray
-    """Root-relative 3D poses, shape ``(num_frames, 17, 3)``."""
+    """Root-relative 3D poses, shape ``(num_frames, J, 3)``."""
     poses_3d_world: np.ndarray
-    """World-coordinate 3D poses, shape ``(num_frames, 17, 3)``."""
+    """Post-processed 3D poses, shape ``(num_frames, J, 3)``.
+
+    For human poses this contains world-coordinate poses (after
+    ``camera_to_world``).  For animal poses this contains the
+    limb-regularised output.
+    """
 
 
 #: Accepted source types for :meth:`FMPose3DInference.predict`.
@@ -161,20 +503,34 @@ class _IngestedInput:
 # ---------------------------------------------------------------------------
 
 
+# FIXME @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
+SKIP_WEIGHTS_VALIDATION = object() # sentinel value to indicate that the weights should not be validated
+
 class FMPose3DInference:
     """High-level, two-step inference API for FMPose3D.
 
-    Typical workflow::
+    Supports both **human** (``model_type="fmpose3d_humans"``, 17 H36M joints)
+    and **animal** (``model_type="fmpose3d_animals"``, 26 Animal3D joints)
+    pipelines.  The skeleton layout, 2D estimator, and post-processing
+    are chosen automatically from the model configuration.
+
+    Typical workflow (human)::
 
         api = FMPose3DInference(model_weights_path="weights.pth")
         result_2d = api.prepare_2d("photo.jpg")
         result_3d = api.pose_3d(result_2d.keypoints, image_size=(H, W))
 
+    Typical workflow (animal)::
+
+        api = FMPose3DInference.for_animals(model_weights_path="animal_weights.pth")
+        result_2d = api.prepare_2d("dog.jpg")
+        result_3d = api.pose_3d(result_2d.keypoints, image_size=(H, W))
+
     Parameters
     ----------
-    model_cfg : ModelConfig, optional
-        Model architecture settings (layers, channels, …).
-        Defaults to :class:`~fmpose3d.common.config.FMPose3DConfig` defaults.
+    model_cfg : FMPose3DConfig, optional
+        Model architecture settings (layers, channels, joints, …).
+        Defaults to ``FMPose3DConfig()`` (human, 17 H36M joints).
     inference_cfg : InferenceConfig, optional
         Inference settings (sample_steps, test_augmentation, …).
         Defaults to :class:`~fmpose3d.common.config.InferenceConfig` defaults.
@@ -183,11 +539,14 @@ class FMPose3DInference:
         If empty the model is created but **not** loaded with weights.
     device : str or torch.device, optional
         Compute device.  ``None`` (default) picks CUDA when available.
+    estimator_2d : HRNetEstimator or SuperAnimalEstimator, optional
+        2D pose estimator.  When ``None`` (default), one is created
+        automatically based on ``model_cfg.model_type``.
+    postprocessor : HumanPostProcessor or AnimalPostProcessor, optional
+        Post-processor applied to each raw 3D pose.  When ``None``
+        (default), one is created automatically based on
+        ``model_cfg.model_type``.
     """
-
-    # H36M joint indices for left / right flip augmentation
-    _JOINTS_LEFT: list[int] = [4, 5, 6, 11, 12, 13]
-    _JOINTS_RIGHT: list[int] = [1, 2, 3, 14, 15, 16]
 
     _IMAGE_EXTENSIONS: set[str] = {
         ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp",
@@ -199,22 +558,80 @@ class FMPose3DInference:
 
     def __init__(
         self,
-        model_cfg: ModelConfig | None = None,
+        model_cfg: FMPose3DConfig | None = None,
         inference_cfg: InferenceConfig | None = None,
-        model_weights_path: str = "",
+        model_weights_path: str | Path | None = SKIP_WEIGHTS_VALIDATION,
         device: str | torch.device | None = None,
+        *,
+        estimator_2d: HRNetEstimator | SuperAnimalEstimator | None = None,
+        postprocessor: HumanPostProcessor | AnimalPostProcessor | None = None,
     ) -> None:
         self.model_cfg = model_cfg or FMPose3DConfig()
         self.inference_cfg = inference_cfg or InferenceConfig()
         self.model_weights_path = model_weights_path
 
+        # Validate model weights path (download if needed)
+        self._resolve_model_weights_path()
+
+        # Skeleton configuration from the model config.
+        self._joints_left: list[int] = list(self.model_cfg.joints_left)
+        self._joints_right: list[int] = list(self.model_cfg.joints_right)
+        self._root_joint: int = self.model_cfg.root_joint
+
+        # Pipeline components -- resolved from config or overridden explicitly.
+        default_est, default_pp = _default_components(self.model_cfg)
+        self._estimator_2d: HRNetEstimator | SuperAnimalEstimator = (
+            estimator_2d or default_est
+        )
+        self._postprocessor: HumanPostProcessor | AnimalPostProcessor = (
+            postprocessor or default_pp
+        )
+
         # Resolve device and padding configuration
         self._device: torch.device | None = self._resolve_device(device)
         self._pad: int = self._resolve_pad()
 
-        # Lazy-loaded models  (populated by setup_runtime)
+        # Lazy-loaded 3D lifting model (populated by setup_runtime)
         self._model_3d: torch.nn.Module | None = None
-        self._estimator_2d: HRNetEstimator | None = None
+
+    # ------------------------------------------------------------------
+    # Convenience constructors
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def for_animals(
+        cls,
+        model_weights_path: str = SKIP_WEIGHTS_VALIDATION,
+        *,
+        device: str | torch.device | None = None,
+        inference_cfg: InferenceConfig | None = None,
+    ) -> "FMPose3DInference":
+        """Create an instance configured for **animal** pose estimation.
+
+        Sets ``model_type="fmpose3d_animals"`` (26-joint Animal3D
+        skeleton) and disables flip test-time augmentation by default,
+        matching the behaviour of ``animals/demo/vis_animals.py``.
+
+        Parameters
+        ----------
+        model_weights_path : str
+            Path to the animal model checkpoint.
+        device : str or torch.device, optional
+            Compute device.
+        inference_cfg : InferenceConfig, optional
+            Override inference settings.  When ``None`` (default),
+            ``test_augmentation`` is set to ``False``.
+        """
+        if inference_cfg is None:
+            inference_cfg = InferenceConfig(test_augmentation=False)
+        return cls(
+            model_cfg=FMPose3DConfig(model_type=SupportedModel.FMPOSE3D_ANIMALS),
+            inference_cfg=inference_cfg,
+            model_weights_path=model_weights_path,
+            device=device,
+            estimator_2d=SuperAnimalEstimator(),
+            postprocessor=AnimalPostProcessor(),
+        )
 
     def setup_runtime(self) -> None:
         """Initialise all runtime components on first use.
@@ -284,10 +701,12 @@ class FMPose3DInference:
         source: Source,
         progress: ProgressCallback | None = None,
     ) -> Pose2DResult:
-        """Estimate 2D poses using HRNet + YOLO.
+        """Estimate 2D poses from images.
 
-        The estimator is set up lazily by :meth:`setup_runtime` on first
-        call.
+        For human models this uses HRNet + YOLO (17 H36M joints); for
+        animal models this uses DeepLabCut SuperAnimal (26 Animal3D
+        joints).  The estimator is set up lazily by
+        :meth:`setup_runtime` on first call.
 
         Parameters
         ----------
@@ -303,9 +722,9 @@ class FMPose3DInference:
         Returns
         -------
         Pose2DResult
-            H36M-format 2D keypoints and per-joint scores.  The result
-            also carries ``image_size`` so it can be forwarded directly
-            to :meth:`pose_3d`.
+            2D keypoints and per-joint scores.  The result also carries
+            ``image_size`` so it can be forwarded directly to
+            :meth:`pose_3d`.
         """
         ingested = self._ingest_input(source)
         self.setup_runtime()
@@ -332,32 +751,35 @@ class FMPose3DInference:
     ) -> Pose3DResult:
         """Lift 2D keypoints to 3D using the flow-matching model.
 
-        The pipeline exactly mirrors ``demo/vis_in_the_wild.py``'s
-        ``get_3D_pose_from_image``: normalise screen coordinates, build a
-        flip-augmented conditioning pair, run two independent Euler ODE
-        integrations (each with its own noise sample), un-flip and average,
-        zero the root joint, then convert to world coordinates.
+        **Human pipeline** (``model_type="fmpose3d_humans"``):
+        Mirrors ``demo/vis_in_the_wild.py`` -- normalise screen
+        coordinates, flip-augmented TTA, Euler ODE sampling, zero the
+        root joint, ``camera_to_world``.
+
+        **Animal pipeline** (``model_type="fmpose3d_animals"``):
+        Mirrors ``animals/demo/vis_animals.py`` -- normalise screen
+        coordinates, single-pass (no TTA), Euler ODE sampling, limb
+        regularisation (no root zeroing, no ``camera_to_world``).
 
         Parameters
         ----------
         keypoints_2d : ndarray
             2D keypoints returned by :meth:`prepare_2d`.  Accepted shapes:
 
-            * ``(num_persons, num_frames, 17, 2)`` – first person is used.
-            * ``(num_frames, 17, 2)`` – treated as a single person.
+            * ``(num_persons, num_frames, J, 2)`` -- first person is used.
+            * ``(num_frames, J, 2)`` -- treated as a single person.
         image_size : tuple of (int, int)
             ``(height, width)`` of the source image / video frames.
         camera_rotation : ndarray or None
             Length-4 quaternion for the camera-to-world rotation applied
             to produce ``poses_3d_world``.  Defaults to the rotation used
             in the official demo.  Pass ``None`` to skip the transform
-            (``poses_3d_world`` will equal ``poses_3d``).
+            (``poses_3d_world`` will equal ``poses_3d``).  **Ignored**
+            for the animal pipeline (limb regularisation is applied
+            instead).
         seed : int or None
             If given, ``torch.manual_seed(seed)`` is called before
-            sampling so that results are fully reproducible.  Use the
-            same seed in the demo script (by inserting
-            ``torch.manual_seed(seed)`` before the ``torch.randn`` calls)
-            to obtain bit-identical results.
+            sampling so that results are fully reproducible.
         progress : ProgressCallback or None
             Optional ``(current_step, total_steps)`` callback invoked
             after each frame is lifted to 3D.
@@ -365,21 +787,18 @@ class FMPose3DInference:
         Returns
         -------
         Pose3DResult
-            Root-relative and world-coordinate 3D poses.
+            Root-relative and post-processed 3D poses.
         """
         self.setup_runtime()
         model = self._model_3d
         h, w = image_size
         steps = self.inference_cfg.sample_steps
-        use_flip = self.inference_cfg.test_augmentation
-        jl = self._JOINTS_LEFT
-        jr = self._JOINTS_RIGHT
 
         # Optional deterministic seeding
         if seed is not None:
             torch.manual_seed(seed)
 
-        # Normalise input shape to (num_frames, 17, 2)
+        # Normalise input shape to (num_frames, J, 2)
         if keypoints_2d.ndim == 4:
             kpts = keypoints_2d[0]  # first person
         elif keypoints_2d.ndim == 3:
@@ -397,77 +816,95 @@ class FMPose3DInference:
             progress(0, num_frames)
 
         for i in range(num_frames):
-            frame_kpts = kpts[i : i + 1]  # (1, 17, 2)
-
-            # Normalise to [-1, 1] range  (same as demo)
-            normed = normalize_screen_coordinates(frame_kpts, w=w, h=h)
-
-            if use_flip:
-                # -- build flip-augmented conditioning (matches demo exactly) --
-                normed_flip = copy.deepcopy(normed)
-                normed_flip[:, :, 0] *= -1
-                normed_flip[:, jl + jr] = normed_flip[:, jr + jl]
-                input_2d = np.concatenate(
-                    (np.expand_dims(normed, axis=0), np.expand_dims(normed_flip, axis=0)),
-                    0,
-                )  # (2, F, J, 2)
-                input_2d = input_2d[np.newaxis, :, :, :, :]  # (1, 2, F, J, 2)
-                input_t = torch.from_numpy(input_2d.astype("float32")).to(self.device)
-
-                # -- two independent Euler ODE runs (matches demo exactly) --
-                y = torch.randn(
-                    input_t.size(0), input_t.size(2), input_t.size(3), 3,
-                    device=self.device,
-                )
-                output_3d_non_flip = euler_sample(
-                    input_t[:, 0], y, steps, model,
-                )
-
-                y_flip = torch.randn(
-                    input_t.size(0), input_t.size(2), input_t.size(3), 3,
-                    device=self.device,
-                )
-                output_3d_flip = euler_sample(
-                    input_t[:, 1], y_flip, steps, model,
-                )
-
-                # -- un-flip & average (matches demo exactly) --
-                output_3d_flip[:, :, :, 0] *= -1
-                output_3d_flip[:, :, jl + jr, :] = output_3d_flip[
-                    :, :, jr + jl, :
-                ]
-
-                output = (output_3d_non_flip + output_3d_flip) / 2
-            else:
-                input_2d = normed[np.newaxis]  # (1, F, J, 2)
-                input_t = torch.from_numpy(input_2d.astype("float32")).to(self.device)
-                y = torch.randn(
-                    input_t.size(0), input_t.size(1), input_t.size(2), 3,
-                    device=self.device,
-                )
-                output = euler_sample(input_t, y, steps, model)
-
-            # Extract single-frame result → (17, 3)  (matches demo exactly)
-            output = output[0:, self._pad].unsqueeze(1)
-            output[:, :, 0, :] = 0  # root-relative
-            pose_np = output[0, 0].cpu().detach().numpy()
-            all_poses_3d.append(pose_np)
-
-            # Camera-to-world transform  (matches demo exactly)
-            if camera_rotation is not None:
-                pose_world = camera_to_world(pose_np, R=camera_rotation, t=0)
-                pose_world[:, 2] -= np.min(pose_world[:, 2])
-            else:
-                pose_world = pose_np.copy()
+            normed = normalize_screen_coordinates(kpts[i : i + 1], w=w, h=h)
+            raw_output = self._run_euler_sample(normed, model, steps)
+            pose_3d_np, pose_world = self._postprocessor(
+                raw_output, camera_rotation=camera_rotation,
+            )
+            all_poses_3d.append(pose_3d_np)
             all_poses_world.append(pose_world)
 
             if progress:
                 progress(i + 1, num_frames)
 
-        poses_3d = np.stack(all_poses_3d, axis=0)  # (num_frames, 17, 3)
-        poses_world = np.stack(all_poses_world, axis=0)  # (num_frames, 17, 3)
+        return Pose3DResult(
+            poses_3d=np.stack(all_poses_3d, axis=0),
+            poses_3d_world=np.stack(all_poses_world, axis=0),
+        )
 
-        return Pose3DResult(poses_3d=poses_3d, poses_3d_world=poses_world)
+    # ------------------------------------------------------------------
+    # Private helpers – sampling & post-processing
+    # ------------------------------------------------------------------
+
+    def _run_euler_sample(
+        self,
+        normed: np.ndarray,
+        model: torch.nn.Module,
+        steps: int,
+    ) -> torch.Tensor:
+        """Run one Euler ODE sample, optionally with flip-TTA.
+
+        Parameters
+        ----------
+        normed : ndarray
+            Normalised 2D keypoints for a single frame, shape
+            ``(1, J, 2)``.
+        model : torch.nn.Module
+            The 3D lifting model.
+        steps : int
+            Number of Euler integration steps.
+
+        Returns
+        -------
+        torch.Tensor
+            Raw model output, shape ``(1, 1, J, 3)`` (after extracting
+            the centre frame and adding a singleton dim).
+        """
+        jl = self._joints_left
+        jr = self._joints_right
+
+        if self.inference_cfg.test_augmentation:
+            # Build flip-augmented conditioning pair.
+            normed_flip = copy.deepcopy(normed)
+            normed_flip[:, :, 0] *= -1
+            normed_flip[:, jl + jr] = normed_flip[:, jr + jl]
+            input_2d = np.concatenate(
+                (np.expand_dims(normed, axis=0),
+                 np.expand_dims(normed_flip, axis=0)),
+                0,
+            )  # (2, F, J, 2)
+            input_2d = input_2d[np.newaxis, :, :, :, :]  # (1, 2, F, J, 2)
+            input_t = torch.from_numpy(input_2d.astype("float32")).to(self.device)
+
+            # Two independent Euler ODE runs.
+            y = torch.randn(
+                input_t.size(0), input_t.size(2), input_t.size(3), 3,
+                device=self.device,
+            )
+            output_non_flip = euler_sample(input_t[:, 0], y, steps, model)
+
+            y_flip = torch.randn(
+                input_t.size(0), input_t.size(2), input_t.size(3), 3,
+                device=self.device,
+            )
+            output_flip = euler_sample(input_t[:, 1], y_flip, steps, model)
+
+            # Un-flip & average.
+            output_flip[:, :, :, 0] *= -1
+            output_flip[:, :, jl + jr, :] = output_flip[:, :, jr + jl, :]
+
+            output = (output_non_flip + output_flip) / 2
+        else:
+            input_2d = normed[np.newaxis]  # (1, F, J, 2)
+            input_t = torch.from_numpy(input_2d.astype("float32")).to(self.device)
+            y = torch.randn(
+                input_t.size(0), input_t.size(1), input_t.size(2), 3,
+                device=self.device,
+            )
+            output = euler_sample(input_t, y, steps, model)
+
+        # Extract the centre frame → (1, 1, J, 3).
+        return output[0:, self._pad].unsqueeze(1)
 
     # ------------------------------------------------------------------
     # Private helpers – device & padding
@@ -488,11 +925,9 @@ class FMPose3DInference:
     # Private helpers – model loading
     # ------------------------------------------------------------------
 
-    def _setup_estimator_2d(self) -> HRNetEstimator:
-        """Initialise the HRNet 2D pose estimator on first use."""
-        if self._estimator_2d is None:
-            self._estimator_2d = HRNetEstimator()
-        return self._estimator_2d
+    def _setup_estimator_2d(self) -> None:
+        """Load the 2D estimator's runtime resources (safe to call repeatedly)."""
+        self._estimator_2d.setup_runtime()
 
     def _setup_model(self) -> torch.nn.Module:
         """Initialise the 3D lifting model on first use."""
@@ -509,34 +944,45 @@ class FMPose3DInference:
         state-dict keys and pull matching entries from the checkpoint so that
         extra keys in the checkpoint are silently ignored.
         """
-        if not self.model_weights_path:
-            raise ValueError(
-                "No model weights path provided. Pass 'model_weights_path' "
-                "to the FMPose3DInference constructor."
-            )
-        weights = Path(self.model_weights_path)
-        if not weights.exists():
-            raise ValueError(
-                f"Model weights file not found: {weights}. "
-                "Please provide a valid path to a .pth checkpoint file in the "
-                "FMPose3DInference constructor."
-            )
         if self._model_3d is None:
             raise ValueError("Model not initialised. Call setup_runtime() first.")
-        pre_dict = torch.load(
-            self.model_weights_path,
+        weights = self._resolve_model_weights_path()
+        state_dict = torch.load(
+            weights,
             weights_only=True,
             map_location=self.device,
         )
-        model_dict = self._model_3d.state_dict()
-        for name in model_dict:
-            if name in pre_dict:
-                model_dict[name] = pre_dict[name]
-        self._model_3d.load_state_dict(model_dict)
+        self._model_3d.load_state_dict(state_dict)
 
     # ------------------------------------------------------------------
     # Private helpers – input resolution
     # ------------------------------------------------------------------
+
+    def _resolve_model_weights_path(self) -> None:
+        # TODO @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
+        if self.model_weights_path is SKIP_WEIGHTS_VALIDATION:
+            return SKIP_WEIGHTS_VALIDATION
+        
+        if not self.model_weights_path:
+            self._download_model_weights()
+        self.model_weights_path = Path(self.model_weights_path).resolve()
+        if not self.model_weights_path.exists():
+            raise ValueError(
+                f"Model weights file not found: {self.model_weights_path}. "
+                "Please provide a valid path to a .pth checkpoint file in the "
+                "FMPose3DInference constructor. Or leave it empty to download "
+                "the weights from huggingface."
+            )
+        return self.model_weights_path
+
+    def _download_model_weights(self) -> None:
+        """Download model weights from huggingface."""
+        # TODO @deruyter92: Implement download from huggingface
+        raise NotImplementedError(
+            "Downloading model weights from huggingface is not implemented yet."
+            "Please provide a valid path to a .pth checkpoint file in the "
+            "FMPose3DInference constructor."
+        )
 
     def _ingest_input(self, source: Source) -> _IngestedInput:
         """Normalise *source* into a ``(N, H, W, C)`` frames array.
