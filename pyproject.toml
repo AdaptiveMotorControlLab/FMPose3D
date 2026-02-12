@@ -24,10 +24,10 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch==2.4.1",
-    "torchvision==0.19.1",
+    "torch>=2.4.1",
+    "torchvision>=0.19.1",
     "timm>=1.0.0",
-    "einops==0.4.0",
+    "einops>=0.4.0",
     "numpy>=1.18.5,<2.0",
     "tqdm>=4.60.0",
     "scipy>=1.7.0",
