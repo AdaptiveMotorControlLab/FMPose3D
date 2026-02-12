@@ -215,7 +215,9 @@ class SuperAnimalEstimator:
 
     @staticmethod
     def _map_keypoints(xy: np.ndarray) -> np.ndarray:
-        """Map quadruped80K keypoints to Animal3D 26-joint layout.
+        """Map keypoints from the quadruped80K dataset format (see: DeepLabCut model zoo:
+        https://huggingface.co/mwmathis/DeepLabCutModelZoo-SuperAnimal-Quadruped)
+        to the FMPose3D 3d animal 26-joint layout.
 
         Parameters
         ----------
@@ -265,6 +267,22 @@ def compute_limb_regularization_matrix(
     The limb vectors are taken as *proximal - distal* (pointing upward)
     and averaged.  A Rodrigues rotation is computed to map the result
     onto ``(0, 0, 1)``.
+
+    This is primarily intended for visualization and canonicalization of
+    upright poses.
+
+    .. note:: **Limitations**
+
+       * The function assumes a stable "up" limb direction and may produce
+         poor results for poses where this assumption does not hold (e.g.
+         lying down, jumping, or other non-upright orientations).
+       * The rotation is computed independently per frame with no temporal
+         smoothing or prior, so it can be unstable across frames and may
+         cause flickering in video sequences.
+
+       If these assumptions do not match your data, consider using the raw
+       predicted pose and implementing custom regularization logic suited
+       to your use-case.
 
     Parameters
     ----------
@@ -375,6 +393,7 @@ class AnimalPostProcessor:
         raw_output: torch.Tensor,
         *,
         camera_rotation: np.ndarray | None,
+        limb_regularization: bool = True,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Return ``(pose_3d, pose_world)`` each of shape ``(J, 3)``.
 
@@ -386,7 +405,10 @@ class AnimalPostProcessor:
             Ignored (accepted for interface compatibility).
         """
         pose_3d = raw_output[0, 0].cpu().detach().numpy()
-        R_reg = compute_limb_regularization_matrix(pose_3d)
+        R_reg = (
+            compute_limb_regularization_matrix(pose_3d) if limb_regularization
+            else np.eye(3)
+        )
         pose_world = apply_limb_regularization(pose_3d, R_reg)
         return pose_3d, pose_world
 
