@@ -70,6 +70,7 @@ line_length = 100
 [tool.pytest.ini_options]
 markers = [
     "functional: marks tests that require pretrained weights (deselect with '-m \"not functional\"')",
+    "network: marks tests that may need internet access on first run (deselect with '-m \"not network\"')",
 ]
 
 [tool.codespell]
