@@ -104,7 +104,7 @@ class _ZeroVelocityModel(torch.nn.Module):
 
 
 def _make_ready_api(
-    model_type: str = "fmpose3d",
+    model_type: str = "fmpose3d_humans",
     test_augmentation: bool = False,
 ) -> FMPose3DInference:
     """Return an ``FMPose3DInference`` with a mock model pre-installed.
@@ -148,7 +148,7 @@ def animal_api() -> FMPose3DInference:
 @pytest.fixture
 def ready_human_api() -> FMPose3DInference:
     """Human API with mock model (TTA disabled)."""
-    return _make_ready_api("fmpose3d", test_augmentation=False)
+    return _make_ready_api("fmpose3d_humans", test_augmentation=False)
 
 
 @pytest.fixture
@@ -393,7 +393,7 @@ class TestDefaultComponents:
 
 class TestFMPose3DInferenceInit:
     def test_default_human(self, human_api):
-        assert human_api.model_cfg.model_type == "fmpose3d"
+        assert human_api.model_cfg.model_type == "fmpose3d_humans"
         assert human_api._joints_left == [4, 5, 6, 11, 12, 13]
         assert human_api._joints_right == [1, 2, 3, 14, 15, 16]
         assert human_api._root_joint == 0
@@ -645,7 +645,7 @@ class TestPose3DValidation:
 
     def test_tta_path_produces_output(self):
         """Test-time augmentation (flip) path produces correct shapes."""
-        api = _make_ready_api("fmpose3d", test_augmentation=True)
+        api = _make_ready_api("fmpose3d_humans", test_augmentation=True)
         kpts = np.random.randn(1, 17, 2).astype("float32")
         result = api.pose_3d(kpts, image_size=(480, 640), seed=42)
         assert result.poses_3d.shape == (1, 17, 3)
@@ -660,7 +660,7 @@ class TestPose3DValidation:
 
     def test_predict_end_to_end_with_mock_estimator(self):
         """predict() chains prepare_2d → pose_3d correctly."""
-        api = _make_ready_api("fmpose3d", test_augmentation=False)
+        api = _make_ready_api("fmpose3d_humans", test_augmentation=False)
 
         mock_kpts = np.random.randn(1, 1, 17, 2).astype("float32")
         mock_scores = np.ones((1, 1, 17), dtype="float32")
