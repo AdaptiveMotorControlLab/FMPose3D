@@ -24,6 +24,7 @@ from fmpose3d.common.config import (
     FMPose3DConfig,
     HRNetConfig,
     InferenceConfig,
+    SupportedModel,
     SuperAnimalConfig,
 )
 from fmpose3d.models import get_model
@@ -430,7 +431,7 @@ def _default_components(
     inspected to choose pipeline components.  Adding a third pipeline
     means adding one branch here (or turning this into a registry).
     """
-    if model_cfg.model_type == "fmpose3d_animals":
+    if model_cfg.model_type == SupportedModel.FMPOSE3D_ANIMALS:
         return SuperAnimalEstimator(), AnimalPostProcessor()
     return HRNetEstimator(), HumanPostProcessor()
 
@@ -624,7 +625,7 @@ class FMPose3DInference:
         if inference_cfg is None:
             inference_cfg = InferenceConfig(test_augmentation=False)
         return cls(
-            model_cfg=FMPose3DConfig(model_type="fmpose3d_animals"),
+            model_cfg=FMPose3DConfig(model_type=SupportedModel.FMPOSE3D_ANIMALS),
             inference_cfg=inference_cfg,
             model_weights_path=model_weights_path,
             device=device,
