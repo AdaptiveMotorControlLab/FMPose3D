@@ -547,7 +547,7 @@ class TestIngestInput:
 
 class TestLoadWeightsErrors:
     def test_empty_path_raises(self):
-        with pytest.raises((ValueError, NotImplementedError)):
+        with pytest.raises(ValueError, match="Model weights file not found"):
             api = FMPose3DInference(model_weights_path="", device="cpu")
             api._model_3d = _ZeroVelocityModel()
             api._load_weights()
