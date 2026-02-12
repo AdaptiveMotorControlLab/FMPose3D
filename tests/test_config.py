@@ -36,7 +36,7 @@ from fmpose3d.common.config import (
 class TestFMPose3DConfig:
     def test_defaults(self):
         cfg = FMPose3DConfig()
-        assert cfg.layers == 3
+        assert cfg.layers == 5
         assert cfg.channel == 512
         assert cfg.d_hid == 1024
         assert cfg.n_joints == 17
