@@ -483,7 +483,7 @@ class _IngestedInput:
 class FMPose3DInference:
     """High-level, two-step inference API for FMPose3D.
 
-    Supports both **human** (``model_type="fmpose3d"``, 17 H36M joints)
+    Supports both **human** (``model_type="fmpose3d_humans"``, 17 H36M joints)
     and **animal** (``model_type="fmpose3d_animals"``, 26 Animal3D joints)
     pipelines.  The skeleton layout, 2D estimator, and post-processing
     are chosen automatically from the model configuration.
@@ -722,7 +722,7 @@ class FMPose3DInference:
     ) -> Pose3DResult:
         """Lift 2D keypoints to 3D using the flow-matching model.
 
-        **Human pipeline** (``model_type="fmpose3d"``):
+        **Human pipeline** (``model_type="fmpose3d_humans"``):
         Mirrors ``demo/vis_in_the_wild.py`` -- normalise screen
         coordinates, flip-augmented TTA, Euler ODE sampling, zero the
         root joint, ``camera_to_world``.
