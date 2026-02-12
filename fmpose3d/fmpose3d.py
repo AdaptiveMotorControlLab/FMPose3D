@@ -480,6 +480,9 @@ class _IngestedInput:
 # ---------------------------------------------------------------------------
 
 
+# FIXME @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
+SKIP_WEIGHTS_VALIDATION = object() # sentinel value to indicate that the weights should not be validated
+
 class FMPose3DInference:
     """High-level, two-step inference API for FMPose3D.
 
@@ -534,7 +537,7 @@ class FMPose3DInference:
         self,
         model_cfg: FMPose3DConfig | None = None,
         inference_cfg: InferenceConfig | None = None,
-        model_weights_path: str = "",
+        model_weights_path: str | Path | None = SKIP_WEIGHTS_VALIDATION,
         device: str | torch.device | None = None,
         *,
         estimator_2d: HRNetEstimator | SuperAnimalEstimator | None = None,
@@ -543,6 +546,9 @@ class FMPose3DInference:
         self.model_cfg = model_cfg or FMPose3DConfig()
         self.inference_cfg = inference_cfg or InferenceConfig()
         self.model_weights_path = model_weights_path
+
+        # Validate model weights path (download if needed)
+        self._resolve_model_weights_path()
 
         # Skeleton configuration from the model config.
         self._joints_left: list[int] = list(self.model_cfg.joints_left)
@@ -572,7 +578,7 @@ class FMPose3DInference:
     @classmethod
     def for_animals(
         cls,
-        model_weights_path: str = "",
+        model_weights_path: str = SKIP_WEIGHTS_VALIDATION,
         *,
         device: str | torch.device | None = None,
         inference_cfg: InferenceConfig | None = None,
@@ -915,34 +921,45 @@ class FMPose3DInference:
         state-dict keys and pull matching entries from the checkpoint so that
         extra keys in the checkpoint are silently ignored.
         """
-        if not self.model_weights_path:
-            raise ValueError(
-                "No model weights path provided. Pass 'model_weights_path' "
-                "to the FMPose3DInference constructor."
-            )
-        weights = Path(self.model_weights_path)
-        if not weights.exists():
-            raise ValueError(
-                f"Model weights file not found: {weights}. "
-                "Please provide a valid path to a .pth checkpoint file in the "
-                "FMPose3DInference constructor."
-            )
         if self._model_3d is None:
             raise ValueError("Model not initialised. Call setup_runtime() first.")
-        pre_dict = torch.load(
-            self.model_weights_path,
+        weights = self._resolve_model_weights_path()
+        state_dict = torch.load(
+            weights,
             weights_only=True,
             map_location=self.device,
         )
-        model_dict = self._model_3d.state_dict()
-        for name in model_dict:
-            if name in pre_dict:
-                model_dict[name] = pre_dict[name]
-        self._model_3d.load_state_dict(model_dict)
+        self._model_3d.load_state_dict(state_dict)
 
     # ------------------------------------------------------------------
     # Private helpers – input resolution
     # ------------------------------------------------------------------
+
+    def _resolve_model_weights_path(self) -> None:
+        # TODO @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
+        if self.model_weights_path is SKIP_WEIGHTS_VALIDATION:
+            return SKIP_WEIGHTS_VALIDATION
+        
+        if not self.model_weights_path:
+            self._download_model_weights()
+        self.model_weights_path = Path(self.model_weights_path).resolve()
+        if not self.model_weights_path.exists():
+            raise ValueError(
+                f"Model weights file not found: {self.model_weights_path}. "
+                "Please provide a valid path to a .pth checkpoint file in the "
+                "FMPose3DInference constructor. Or leave it empty to download "
+                "the weights from huggingface."
+            )
+        return self.model_weights_path
+
+    def _download_model_weights(self) -> None:
+        """Download model weights from huggingface."""
+        # TODO @deruyter92: Implement download from huggingface
+        raise NotImplementedError(
+            "Downloading model weights from huggingface is not implemented yet."
+            "Please provide a valid path to a .pth checkpoint file in the "
+            "FMPose3DInference constructor."
+        )
 
     def _ingest_input(self, source: Source) -> _IngestedInput:
         """Normalise *source* into a ``(N, H, W, C)`` frames array.

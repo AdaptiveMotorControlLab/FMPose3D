@@ -547,18 +547,18 @@ class TestIngestInput:
 
 class TestLoadWeightsErrors:
     def test_empty_path_raises(self):
-        api = FMPose3DInference(model_weights_path="", device="cpu")
-        api._model_3d = _ZeroVelocityModel()
-        with pytest.raises(ValueError, match="No model weights path"):
+        with pytest.raises((ValueError, NotImplementedError)):
+            api = FMPose3DInference(model_weights_path="", device="cpu")
+            api._model_3d = _ZeroVelocityModel()
             api._load_weights()
 
     def test_nonexistent_file_raises(self):
-        api = FMPose3DInference(
-            model_weights_path="/nonexistent/weights.pth",
-            device="cpu",
-        )
-        api._model_3d = _ZeroVelocityModel()
         with pytest.raises(ValueError, match="Model weights file not found"):
+            api = FMPose3DInference(
+            model_weights_path="/nonexistent/weights.pth",
+                device="cpu",
+            )
+            api._model_3d = _ZeroVelocityModel()
             api._load_weights()
 
     def test_model_not_initialized_raises(self, tmp_path):
