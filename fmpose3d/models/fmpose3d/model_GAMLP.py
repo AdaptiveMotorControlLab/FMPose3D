@@ -15,7 +15,7 @@ from fmpose3d.models.fmpose3d.graph_frames import Graph
 from fmpose3d.models.base_model import BaseModel, register_model
 from functools import partial
 from einops import rearrange
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
 class TimeEmbedding(nn.Module):
     def __init__(self, dim: int, hidden_dim: int = 64):
