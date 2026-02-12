@@ -15,6 +15,7 @@ from .arguments import opts
 from .config import (
     PipelineConfig,
     ModelConfig,
+    SupportedModel,
     FMPose3DConfig,
     HRNetConfig,
     Pose2DConfig,
@@ -48,6 +49,7 @@ __all__ = [
     "HRNetConfig",
     "Pose2DConfig",
     "ModelConfig",
+    "SupportedModel",
     "DatasetConfig",
     "TrainingConfig",
     "InferenceConfig",

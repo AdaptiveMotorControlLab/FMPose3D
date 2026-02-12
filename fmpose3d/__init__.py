@@ -24,6 +24,7 @@ from .common.config import (
     HRNetConfig,
     InferenceConfig,
     ModelConfig,
+    SupportedModel,
     PipelineConfig,
 )
 
@@ -57,6 +58,7 @@ __all__ = [
     "HRNetConfig",
     "InferenceConfig",
     "ModelConfig",
+    "SupportedModel",
     "PipelineConfig",
     # Aggregation methods
     "average_aggregation",
