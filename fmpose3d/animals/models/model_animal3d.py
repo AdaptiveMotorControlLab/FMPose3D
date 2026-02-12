@@ -13,7 +13,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 from einops import rearrange
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
 from fmpose3d.animals.models.graph_frames import Graph
 from fmpose3d.models.base_model import BaseModel, register_model
