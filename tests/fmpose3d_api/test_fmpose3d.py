@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 import torch
 
-from fmpose3d.fmpose3d import (
+from fmpose3d.inference_api.fmpose3d import (
     AnimalPostProcessor,
     FMPose3DInference,
     HRNetEstimator,

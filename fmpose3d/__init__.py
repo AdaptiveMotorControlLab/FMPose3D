@@ -29,7 +29,7 @@ from .common.config import (
 )
 
 # High-level inference API
-from .fmpose3d import (
+from .inference_api.fmpose3d import (
     FMPose3DInference,
     HRNetEstimator,
     Pose2DResult,

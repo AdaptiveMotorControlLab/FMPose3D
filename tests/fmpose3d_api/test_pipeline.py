@@ -36,7 +36,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fmpose3d.fmpose3d import FMPose3DInference
+from fmpose3d.inference_api.fmpose3d import FMPose3DInference
 
 from .conftest import (
     requires_human_weights,
