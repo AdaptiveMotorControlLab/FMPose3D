@@ -30,7 +30,7 @@ import pytest
 # HuggingFace repo & filenames (must match fmpose3d.fmpose3d._HF_REPO_ID)
 # ---------------------------------------------------------------------------
 
-HF_REPO_ID: str = "deruyter92/fmpose_temp"
+HF_REPO_ID: str = "DeepLabCut/FMPose3D"
 
 HUMAN_WEIGHTS_FILENAME: str = "fmpose3d_humans.pth"
 ANIMAL_WEIGHTS_FILENAME: str = "fmpose3d_animals.pth"
