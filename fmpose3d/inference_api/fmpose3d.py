@@ -33,6 +33,9 @@ from fmpose3d.models import get_model
 ProgressCallback = Callable[[int, int], None]
 
 
+#: HuggingFace repository hosting the official FMPose3D checkpoints.
+_HF_REPO_ID: str = "deruyter92/fmpose_temp"
+
 # Default camera-to-world rotation quaternion (from the demo script).
 _DEFAULT_CAM_ROTATION = np.array(
     [0.1407056450843811, -0.1500701755285263, -0.755240797996521, 0.6223280429840088],
@@ -560,7 +563,7 @@ class FMPose3DInference:
         self,
         model_cfg: FMPose3DConfig | None = None,
         inference_cfg: InferenceConfig | None = None,
-        model_weights_path: str | Path | None = SKIP_WEIGHTS_VALIDATION,
+        model_weights_path: str | Path | None = None,
         device: str | torch.device | None = None,
         *,
         estimator_2d: HRNetEstimator | SuperAnimalEstimator | None = None,
@@ -601,7 +604,7 @@ class FMPose3DInference:
     @classmethod
     def for_animals(
         cls,
-        model_weights_path: str = SKIP_WEIGHTS_VALIDATION,
+        model_weights_path: str | None = None,
         *,
         device: str | torch.device | None = None,
         inference_cfg: InferenceConfig | None = None,
@@ -958,15 +961,11 @@ class FMPose3DInference:
     # Private helpers – input resolution
     # ------------------------------------------------------------------
 
-    def _resolve_model_weights_path(self) -> None:
-        # TODO @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
-        if self.model_weights_path is SKIP_WEIGHTS_VALIDATION:
-            return SKIP_WEIGHTS_VALIDATION
-        
-        if not self.model_weights_path:
+    def _resolve_model_weights_path(self) -> None:      
+        if self.model_weights_path is None:
             self._download_model_weights()
         self.model_weights_path = Path(self.model_weights_path).resolve()
-        if not self.model_weights_path.exists():
+        if not self.model_weights_path.is_file():
             raise ValueError(
                 f"Model weights file not found: {self.model_weights_path}. "
                 "Please provide a valid path to a .pth checkpoint file in the "
@@ -976,12 +975,28 @@ class FMPose3DInference:
         return self.model_weights_path
 
     def _download_model_weights(self) -> None:
-        """Download model weights from huggingface."""
-        # TODO @deruyter92: Implement download from huggingface
-        raise NotImplementedError(
-            "Downloading model weights from huggingface is not implemented yet."
-            "Please provide a valid path to a .pth checkpoint file in the "
-            "FMPose3DInference constructor."
+        """Download model weights from HuggingFace Hub.
+
+        The weight file is determined by the current ``model_cfg.model_type``
+        (e.g. ``"fmpose3d_humans"`` -> ``fmpose3d_humans.pth``).  Files are
+        cached locally by :func:`huggingface_hub.hf_hub_download` so
+        subsequent calls are instant.
+
+        Sets ``self.model_weights_path`` to the local cached file path.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError:
+            raise ImportError(
+                "huggingface_hub is required to download model weights. "
+                "Install it with:  pip install huggingface_hub. Or download "
+                "the weights manually and set model_weights_path to the weights file."
+            ) from None
+
+        filename = f"{self.model_cfg.model_type.value}.pth"
+        self.model_weights_path = hf_hub_download(
+            repo_id=_HF_REPO_ID,
+            filename=filename,
         )
 
     def _ingest_input(self, source: Source) -> _IngestedInput:

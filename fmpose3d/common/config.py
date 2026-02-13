@@ -8,6 +8,7 @@ Licensed under Apache 2.0
 """
 
 import math
+import json
 from dataclasses import dataclass, field, fields, asdict
 from enum import Enum
 from typing import Dict, List
@@ -35,6 +36,16 @@ class SupportedModel(str, Enum):
 class ModelConfig:
     """Model architecture configuration."""
     model_type: str = "fmpose3d_humans"
+
+    def to_json(self, filename: str | None = None, **kwargs) -> str:
+        json_str = json.dumps(asdict(self), **kwargs)
+        with open(filename, "w") as f:
+            f.write(json_str)
+    
+    @classmethod
+    def from_json(cls, filename: str, **kwargs) -> "ModelConfig":
+        with open(filename, "r") as f:
+            return cls(**json.loads(f.read(), **kwargs))
 
 
 # Per-model-type defaults for fields marked with INFER_FROM_MODEL_TYPE.
