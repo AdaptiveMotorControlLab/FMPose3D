@@ -92,6 +92,10 @@ To run inference on Human3.6M:
 sh ./scripts/FMPose3D_test.sh
 ```
 
+### Inference API
+
+FMPose3D also ships a high-level Python API for end-to-end 3D pose estimation from images. See the [Inference API documentation](fmpose3d/inference_api/README.md) for the full reference.
+
 ## Experiments on non-human animals
 
 For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
