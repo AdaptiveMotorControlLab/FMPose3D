@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fmpose3d.fmpose3d import FMPose3DInference
+from fmpose3d.inference_api.fmpose3d import FMPose3DInference
 
 
 class TestDownloadModelWeights:
