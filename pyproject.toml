@@ -38,6 +38,7 @@ dependencies = [
     "filterpy>=1.4.5",
     "pandas>=1.0.1",
     "deeplabcut==3.0.0rc13",
+    "huggingface_hub>=0.20.0",
 ]
 
 [project.optional-dependencies]
@@ -69,6 +70,7 @@ line_length = 100
 [tool.pytest.ini_options]
 markers = [
     "functional: marks tests that require pretrained weights (deselect with '-m \"not functional\"')",
+    "network: marks tests that may need internet access on first run (deselect with '-m \"not network\"')",
 ]
 
 [tool.codespell]
