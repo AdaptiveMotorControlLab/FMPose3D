@@ -30,7 +30,7 @@ class TestDownloadModelWeights:
         """Human model type resolves to the correct repo/filename."""
         api = FMPose3DInference(device="cpu")
 
-        with patch("fmpose3d.fmpose3d.hf_hub_download", create=True) as mock_dl:
+        with patch("fmpose3d.inference_api.fmpose3d.hf_hub_download", create=True) as mock_dl:
             mock_dl.return_value = "/fake/cache/fmpose3d_humans.pth"
             # Patch the import inside the method
             with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
@@ -46,7 +46,7 @@ class TestDownloadModelWeights:
         """Animal model type resolves to the correct repo/filename."""
         api = FMPose3DInference.for_animals(device="cpu")
 
-        with patch("fmpose3d.fmpose3d.hf_hub_download", create=True) as mock_dl:
+        with patch("fmpose3d.inference_api.fmpose3d.hf_hub_download", create=True) as mock_dl:
             mock_dl.return_value = "/fake/cache/fmpose3d_animals.pth"
             with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
                 api._download_model_weights()
