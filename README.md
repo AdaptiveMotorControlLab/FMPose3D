@@ -20,7 +20,7 @@ FMPose3D creates a 3D pose from a single 2D image. It leverages fast Flow Matchi
 
 
 ## News!
-- Feb 21st, 2026: FMPose3D is accepted by CVPR 2026! 🔥
+- Feb 21st, 2026: The FMPose3D paper was accepted to CVPR 2026! 🔥
 - [X] Feb 2026: the FMPose3D code and our arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
 - [ ] Planned: This method will be integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
 
