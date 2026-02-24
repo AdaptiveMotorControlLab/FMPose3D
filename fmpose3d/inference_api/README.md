@@ -100,6 +100,10 @@ Convenience constructor for the **animal** pipeline. Sets `model_type="fmpose3d_
 #### `predict(source, *, camera_rotation, seed, progress)` → `Pose3DResult`
 
 End-to-end prediction: 2D estimation followed by 3D lifting in a single call.
+Raises `ValueError` when 2D estimation is unusable for lifting
+(`Pose2DResult.status` is `empty` or `invalid`).
+For partial 2D detections, invalid frames are masked to `NaN` in
+`Pose3DResult.poses_3d` and `Pose3DResult.poses_3d_world`.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -121,7 +125,9 @@ Runs only the 2D pose estimation step.
 | `source` | `Source` | Same flexible input as `predict()`. |
 | `progress` | `ProgressCallback \| None` | Optional progress callback. |
 
-**Returns:** `Pose2DResult` containing `keypoints`, `scores`, and `image_size`.
+**Returns:** `Pose2DResult` containing `keypoints`, `scores`, `image_size`,
+and `valid_frames_mask`. The object also exposes derived properties
+`status` and `status_message`.
 
 ---
 
@@ -168,6 +174,22 @@ Source = Union[str, Path, np.ndarray, Sequence[Union[str, Path, np.ndarray]]]
 | `keypoints` | `ndarray` | 2D keypoints, shape `(num_persons, num_frames, J, 2)`. |
 | `scores` | `ndarray` | Per-joint confidence, shape `(num_persons, num_frames, J)`. |
 | `image_size` | `tuple[int, int]` | `(height, width)` of source frames. |
+| `valid_frames_mask` | `ndarray \| None` | Boolean mask, shape `(num_frames,)`, indicating frames with valid detections. |
+
+Computed properties:
+
+- `status` → `ResultStatus`
+- `status_message` → `str`
+
+#### `ResultStatus`
+
+String enum values:
+
+- `success` — valid detections in all frames
+- `partial` — valid detections in a subset of frames
+- `empty` — no valid detections in any frame
+- `invalid` — output predictions are unusable/malformed
+- `unknown` — validity metadata missing or malformed
 
 #### `Pose3DResult`
 
@@ -175,6 +197,12 @@ Source = Union[str, Path, np.ndarray, Sequence[Union[str, Path, np.ndarray]]]
 |---|---|---|
 | `poses_3d` | `ndarray` | Root-relative 3D poses, shape `(num_frames, J, 3)`. |
 | `poses_3d_world` | `ndarray` | Post-processed 3D poses, shape `(num_frames, J, 3)`. For humans: world-coordinate poses. For animals: limb-regularized poses. |
+| `valid_frames_mask` | `ndarray \| None` | Boolean mask, shape `(num_frames,)`, indicating frames with valid 3D output. |
+
+Computed properties:
+
+- `status` → `ResultStatus`
+- `status_message` → `str`
 
 
 
@@ -187,14 +215,14 @@ Source = Union[str, Path, np.ndarray, Sequence[Union[str, Path, np.ndarray]]]
 Default 2D estimator for the human pipeline. Wraps HRNet + YOLO with a COCO → H36M keypoint conversion.
 
 - `setup_runtime()` — Loads YOLO + HRNet models.
-- `predict(frames: ndarray)` → `(keypoints, scores)` — Returns H36M-format 2D keypoints from BGR frames `(N, H, W, C)`.
+- `predict(frames: ndarray)` → `(keypoints, scores, valid_frames_mask)` — Returns H36M-format 2D keypoints from BGR frames `(N, H, W, C)` plus a frame-level validity mask.
 
 #### `SuperAnimalEstimator(cfg: SuperAnimalConfig | None)`
 
 2D estimator for the animal pipeline. Uses DeepLabCut SuperAnimal and maps quadruped80K keypoints to the 26-joint Animal3D layout.
 
 - `setup_runtime()` — No-op (DLC loads lazily).
-- `predict(frames: ndarray)` → `(keypoints, scores)` — Returns Animal3D-format 2D keypoints from BGR frames.
+- `predict(frames: ndarray)` → `(keypoints, scores, valid_frames_mask)` — Returns Animal3D-format 2D keypoints plus a frame-level validity mask.
 
 ---
 
