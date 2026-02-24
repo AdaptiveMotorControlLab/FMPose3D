@@ -595,8 +595,8 @@ def _default_components(
 # ---------------------------------------------------------------------------
 
 
-class Pose2DStatus(str, Enum):
-    """High-level status for 2D pose estimation."""
+class ResultStatus(str, Enum):
+    """High-level status for pose estimation outputs."""
 
     SUCCESS = "success"
     PARTIAL = "partial"
@@ -623,7 +623,7 @@ class Pose2DResult:
     """Boolean mask of frames with at least one valid detection, shape ``(N,)``."""
 
     @property
-    def status(self) -> Pose2DStatus:
+    def status(self) -> ResultStatus:
         """Prediction status derived from ``valid_frames_mask``."""
         return self.get_status_info()[0]
 
@@ -632,30 +632,29 @@ class Pose2DResult:
         """Human-readable explanation for :attr:`status`."""
         return self.get_status_info()[1]
 
-    def get_status_info(self) -> tuple[Pose2DStatus, str]:
+    def get_status_info(self) -> tuple[ResultStatus, str]:
         """Prediction status derived from ``valid_frames_mask``."""
-        if self.valid_frames_mask is None:
-            return Pose2DStatus.UNKNOWN, "No frame-validity mask provided by the estimator."
-        elif not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
-            return Pose2DStatus.UNKNOWN, "invalid valid_frames_mask: must be a 1D numpy array."
-
         # Derive expected frame count from canonical shapes.
         if self.keypoints.ndim == 4:
             num_frames = int(self.keypoints.shape[1])
         elif self.scores.ndim == 3:
             num_frames = int(self.scores.shape[1])
         else:
-            return Pose2DStatus.INVALID, "Incorrect keypoints/scores dimensions."
+            return ResultStatus.INVALID, "Incorrect 2D pose keypoints/scores dimensions."
 
+        if self.valid_frames_mask is None:
+            return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 2D pose."
+        if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
+            return ResultStatus.UNKNOWN, "invalid 2D pose valid_frames_mask: must be a 1D numpy array."
         if self.valid_frames_mask.shape[0] != num_frames:
-            return Pose2DStatus.INVALID, "valid_frames_mask mismatches the number of frames."
+            return ResultStatus.INVALID, "2D pose valid_frames_mask mismatches the number of frames."
 
         valid_count = int(np.sum(self.valid_frames_mask))
         if valid_count == 0:
-            return Pose2DStatus.EMPTY, "No valid predictions in any frame."
+            return ResultStatus.EMPTY, "No valid 2D pose predictions in any frame."
         if valid_count < num_frames:
-            return Pose2DStatus.PARTIAL, "Missing predictions in a subset of frames."
-        return Pose2DStatus.SUCCESS, "Valid predictions for all frames."
+            return ResultStatus.PARTIAL, "Missing 2D pose predictions in a subset of frames."
+        return ResultStatus.SUCCESS, "Valid 2D pose predictions for all frames."
 
 
 @dataclass
@@ -675,6 +674,40 @@ class Pose3DResult:
     ``camera_to_world``).  For animal poses this contains the
     limb-regularised output.
     """
+    valid_frames_mask: np.ndarray | None = None
+    """Boolean mask of frames with valid 3D poses, shape ``(num_frames,)``."""
+
+    @property
+    def status(self) -> ResultStatus:
+        """Prediction status derived from ``valid_frames_mask``."""
+        return self.get_status_info()[0]
+
+    @property
+    def status_message(self) -> str:
+        """Human-readable explanation for :attr:`status`."""
+        return self.get_status_info()[1]
+
+    def get_status_info(self) -> tuple[ResultStatus, str]:
+        """Prediction status derived from ``valid_frames_mask``."""
+        if self.poses_3d.ndim != 3 or self.poses_3d_world.ndim != 3:
+            return ResultStatus.INVALID, "Incorrect 3D result dimensions."
+        num_frames = int(self.poses_3d.shape[0])
+        if self.poses_3d_world.shape[0] != num_frames:
+            return ResultStatus.INVALID, "poses_3d and poses_3d_world frame counts differ."
+
+        if self.valid_frames_mask is None:
+            return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 3D pose."
+        if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
+            return ResultStatus.UNKNOWN, "invalid 3D pose valid_frames_mask: must be a 1D numpy array."
+        if self.valid_frames_mask.shape[0] != num_frames:
+            return ResultStatus.INVALID, "3D pose valid_frames_mask mismatches the number of frames."
+
+        valid_count = int(np.sum(self.valid_frames_mask))
+        if valid_count == 0:
+            return ResultStatus.EMPTY, "No valid 3D pose predictions in any frame."
+        if valid_count < num_frames:
+            return ResultStatus.PARTIAL, "Missing 3D pose predictions in a subset of frames."
+        return ResultStatus.SUCCESS, "Valid 3D pose predictions for all frames."
 
 
 #: Accepted source types for :meth:`FMPose3DInference.predict`.
@@ -889,15 +922,23 @@ class FMPose3DInference:
         """
         result_2d = self.prepare_2d(source)
         status, status_msg = result_2d.get_status_info()
-        if status in {Pose2DStatus.EMPTY, Pose2DStatus.INVALID}:
+        if status in {ResultStatus.EMPTY, ResultStatus.INVALID}:
             raise ValueError(f"2D pose estimation is not usable for 3D lifting: {status.value}. {status_msg}")
-        return self.pose_3d(
+        result_3d = self.pose_3d(
             result_2d.keypoints,
             result_2d.image_size,
             camera_rotation=camera_rotation,
             seed=seed,
             progress=progress,
         )
+        mask = result_2d.valid_frames_mask
+        if mask is not None:
+            invalid = ~mask
+            if np.any(invalid):
+                result_3d.poses_3d[invalid] = np.nan
+                result_3d.poses_3d_world[invalid] = np.nan
+            result_3d.valid_frames_mask = mask
+        return result_3d
 
     @torch.no_grad()
     def prepare_2d(
