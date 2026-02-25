@@ -25,6 +25,7 @@ from fmpose3d.inference_api.fmpose3d import (
     HRNetEstimator,
     HumanPostProcessor,
     Pose2DResult,
+    ResultStatus,
     Pose3DResult,
     SuperAnimalEstimator,
     _default_components,
@@ -615,8 +616,9 @@ class TestPose3DValidation:
 
         mock_kpts = np.random.randn(1, 1, 17, 2).astype("float32")
         mock_scores = np.ones((1, 1, 17), dtype="float32")
+        mock_mask = np.array([True], dtype=bool)
         api._estimator_2d = MagicMock()
-        api._estimator_2d.predict.return_value = (mock_kpts, mock_scores)
+        api._estimator_2d.predict.return_value = (mock_kpts, mock_scores, mock_mask)
         api._estimator_2d.setup_runtime = MagicMock()
 
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
@@ -625,6 +627,54 @@ class TestPose3DValidation:
         assert isinstance(result, Pose3DResult)
         assert result.poses_3d.shape == (1, 17, 3)
         api._estimator_2d.predict.assert_called_once()
+
+    def test_predict_applies_partial_2d_mask_to_3d(self):
+        """predict() masks invalid 2D frames to NaN in 3D outputs."""
+        api = _make_ready_api("fmpose3d_humans", test_augmentation=False)
+        mock_kpts = np.random.randn(1, 3, 17, 2).astype("float32")
+        mock_scores = np.ones((1, 3, 17), dtype="float32")
+        mask = np.array([True, False, True], dtype=bool)
+        api._estimator_2d = MagicMock()
+        api._estimator_2d.predict.return_value = (mock_kpts, mock_scores, mask)
+        api._estimator_2d.setup_runtime = MagicMock()
+
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        result = api.predict([frame, frame, frame], seed=42)
+
+        np.testing.assert_array_equal(result.valid_frames_mask, mask)
+        assert result.status == ResultStatus.PARTIAL
+        assert np.all(np.isnan(result.poses_3d[1]))
+        assert np.all(np.isnan(result.poses_3d_world[1]))
+
+    @pytest.mark.parametrize(
+        "mask,expected_status",
+        [
+            (
+                np.array([False, False], dtype=bool),
+                ResultStatus.EMPTY,
+            ),
+            (
+                np.array([True], dtype=bool),
+                ResultStatus.INVALID,
+            ),
+        ],
+    )
+    def test_predict_raises_on_unusable_2d_status(self, mask, expected_status):
+        """predict() raises for EMPTY/INVALID 2D status and skips 3D lifting."""
+        api = _make_ready_api("fmpose3d_humans", test_augmentation=False)
+        mock_kpts = np.random.randn(1, 2, 17, 2).astype("float32")
+        mock_scores = np.ones((1, 2, 17), dtype="float32")
+        api._estimator_2d = MagicMock()
+        api._estimator_2d.predict.return_value = (mock_kpts, mock_scores, mask)
+        api._estimator_2d.setup_runtime = MagicMock()
+        api.pose_3d = MagicMock()
+
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        with pytest.raises(ValueError) as exc_info:
+            api.predict([frame, frame], seed=42)
+
+        assert f": {expected_status.value}." in str(exc_info.value)
+        api.pose_3d.assert_not_called()
 
 
 # =========================================================================
@@ -648,12 +698,41 @@ class TestDataclasses:
         )
         assert result.image_size == (0, 0)
 
+    def test_pose2d_status_success(self):
+        result = Pose2DResult(
+            keypoints=np.zeros((1, 2, 17, 2)),
+            scores=np.zeros((1, 2, 17)),
+            valid_frames_mask=np.array([True, True], dtype=bool),
+        )
+        assert result.status == ResultStatus.SUCCESS
+        assert "all frames" in result.status_message
+
+    def test_pose2d_status_partial(self):
+        result = Pose2DResult(
+            keypoints=np.zeros((1, 2, 17, 2)),
+            scores=np.zeros((1, 2, 17)),
+            valid_frames_mask=np.array([True, False], dtype=bool),
+        )
+        assert result.status == ResultStatus.PARTIAL
+        assert "subset" in result.status_message
+
+    def test_pose2d_status_invalid_mask_length(self):
+        result = Pose2DResult(
+            keypoints=np.zeros((1, 2, 17, 2)),
+            scores=np.zeros((1, 2, 17)),
+            valid_frames_mask=np.array([True], dtype=bool),
+        )
+        assert result.status == ResultStatus.INVALID
+        assert "mismatches" in result.status_message
+
     def test_pose3d_result(self):
         p3d = np.random.randn(10, 17, 3)
         pw = np.random.randn(10, 17, 3)
-        result = Pose3DResult(poses_3d=p3d, poses_3d_world=pw)
+        mask = np.ones((10,), dtype=bool)
+        result = Pose3DResult(poses_3d=p3d, poses_3d_world=pw, valid_frames_mask=mask)
         assert result.poses_3d is p3d
         assert result.poses_3d_world is pw
+        assert result.status == ResultStatus.SUCCESS
 
 
 # =========================================================================
@@ -672,12 +751,13 @@ class TestSuperAnimalPrediction:
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
             mock_fn.return_value = {"frame.png": {"bodyparts": None}}
-            kpts, scores = estimator.predict(frames)
+            kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 2, 26, 2)
         np.testing.assert_allclose(kpts, 0.0)
         assert scores.shape == (1, 2, 26)
-        np.testing.assert_allclose(scores, 1.0)
+        np.testing.assert_allclose(scores, 0.0)
+        np.testing.assert_array_equal(mask, np.array([False, False]))
 
     def test_predict_maps_valid_bodyparts(self):
         """Valid DLC bodyparts are mapped to Animal3D layout."""
@@ -692,9 +772,10 @@ class TestSuperAnimalPrediction:
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
             mock_fn.return_value = {"frame.png": {"bodyparts": fake_bp}}
-            kpts, scores = estimator.predict(frames)
+            kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 1, 26, 2)
         assert scores.shape == (1, 1, 26)
+        np.testing.assert_array_equal(mask, np.array([True]))
         # target[24] ← source[0] → (0*3, 0*3+1) = (0.0, 1.0)
         np.testing.assert_allclose(kpts[0, 0, 24], fake_bp[0, 0, :2])

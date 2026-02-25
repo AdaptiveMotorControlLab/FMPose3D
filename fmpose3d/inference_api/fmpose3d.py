@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Callable, Sequence, Tuple, Union
 
@@ -82,7 +83,7 @@ class HRNetEstimator:
 
     def predict(
         self, frames: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Estimate 2D keypoints from image frames and return in H36M format.
 
         Parameters
@@ -96,6 +97,9 @@ class HRNetEstimator:
             H36M-format 2D keypoints, shape ``(num_persons, N, 17, 2)``.
         scores : ndarray
             Per-joint confidence scores, shape ``(num_persons, N, 17)``.
+        valid_frames_mask : ndarray
+            Boolean mask indicating which frames contain at least one
+            valid detection, shape ``(N,)``.
         """
         from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
 
@@ -104,11 +108,69 @@ class HRNetEstimator:
         keypoints, scores = self._model.predict(frames)
 
         keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
+        keypoints, scores = self._validate_predictions(
+            keypoints, scores, num_frames=frames.shape[0],
+        )
+        valid_frames_mask = self._compute_valid_frames_mask(keypoints, scores)
+
         # NOTE: revise_kpts is computed for consistency but is NOT applied
         # to the returned keypoints, matching the demo script behaviour.
         _revised = revise_kpts(keypoints, scores, valid_frames)  # noqa: F841
+        return keypoints, scores, valid_frames_mask
 
+    def _validate_predictions(
+        self,
+        keypoints: np.ndarray,
+        scores: np.ndarray,
+        *,
+        num_frames: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Validate and normalise HRNet/H36M predictions."""
+        num_joints = 17
+
+        keypoints = np.asarray(keypoints, dtype=np.float32)
+        scores = np.asarray(scores, dtype=np.float32)
+
+        if keypoints.shape[0] == 0:
+            # h36m_coco_format can drop all persons when all frames are empty.
+            return (
+                np.zeros((1, num_frames, num_joints, 2), dtype=np.float32),
+                np.zeros((1, num_frames, num_joints), dtype=np.float32),
+            )
+
+        if keypoints.ndim != 4 or keypoints.shape[-2:] != (num_joints, 2):
+            raise ValueError(
+                f"Invalid HRNet keypoints shape {keypoints.shape}; "
+                f"expected (num_persons, num_frames, {num_joints}, 2)."
+            )
+        if scores.ndim != 3 or scores.shape[-1] != num_joints:
+            raise ValueError(
+                f"Invalid HRNet scores shape {scores.shape}; "
+                f"expected (num_persons, num_frames, {num_joints})."
+            )
+        if keypoints.shape[:2] != scores.shape[:2]:
+            raise ValueError(
+                "HRNet keypoints/scores leading dimensions do not match: "
+                f"{keypoints.shape[:2]} vs {scores.shape[:2]}."
+            )
+        if keypoints.shape[1] != num_frames:
+            raise ValueError(
+                f"HRNet frame count mismatch: got {keypoints.shape[1]}, "
+                f"expected {num_frames}."
+            )
         return keypoints, scores
+
+    @staticmethod
+    def _compute_valid_frames_mask(
+        keypoints: np.ndarray, scores: np.ndarray
+    ) -> np.ndarray:
+        """Return frame-level validity mask from estimator outputs."""
+        safe_scores = np.nan_to_num(scores, nan=0.0)
+        has_score = np.any(safe_scores > 0, axis=-1)  # (num_persons, num_frames)
+
+        safe_kpts = np.nan_to_num(np.abs(keypoints), nan=0.0)
+        has_kpt = np.any(safe_kpts > 0, axis=(-1, -2))  # (num_persons, num_frames)
+        return np.any(has_score | has_kpt, axis=0)
 
 
 # Quadruped80K → Animal3D (26 keypoints) mapping table.
@@ -148,7 +210,7 @@ class SuperAnimalEstimator:
 
     def predict(
         self, frames: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Estimate 2D keypoints from image frames in Animal3D format.
 
         The method writes *frames* to a temporary directory, runs
@@ -166,8 +228,11 @@ class SuperAnimalEstimator:
             Animal3D-format 2D keypoints, shape ``(1, N, 26, 2)``.
             The first axis is always 1 (single individual).
         scores : ndarray
-            Placeholder confidence scores (all ones),
+            Mapped per-joint confidence scores,
             shape ``(1, N, 26)``.
+        valid_frames_mask : ndarray
+            Boolean mask indicating which frames contain at least one
+            valid detection, shape ``(N,)``.
         """
         import cv2
         import tempfile
@@ -178,6 +243,7 @@ class SuperAnimalEstimator:
         cfg = self.cfg
         num_frames = frames.shape[0]
         all_mapped: list[np.ndarray] = []
+        all_scores: list[np.ndarray] = []
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Write each frame as an image so DLC can read it.
@@ -187,8 +253,7 @@ class SuperAnimalEstimator:
                 cv2.imwrite(p, frames[idx])
                 paths.append(p)
 
-            # Run DeepLabCut on each frame individually (the API
-            # expects a single image path).
+            # Run DeepLabCut on each frame individually.
             for img_path in paths:
                 predictions = superanimal_analyze_images(
                     superanimal_name=cfg.superanimal_name,
@@ -199,21 +264,33 @@ class SuperAnimalEstimator:
                     out_folder=tmpdir,
                 )
                 # predictions: {image_path: {"bodyparts": (N_ind, K, 3), ...}}
-                for _path, payload in predictions.items():
-                    bodyparts = payload.get("bodyparts")
-                    if bodyparts is None:
-                        # No detection -- fill with zeros.
-                        all_mapped.append(np.zeros((1, 26, 2), dtype="float32"))
-                        continue
-                    xy = bodyparts[..., :2]  # (N_ind, K, 2)
-                    mapped = self._map_keypoints(xy)
-                    # Take only the first individual.
-                    all_mapped.append(mapped[:1])
+                payload = predictions.get(img_path) if isinstance(predictions, dict) else None
+                if payload is None and isinstance(predictions, dict) and len(predictions) == 1:
+                    payload = next(iter(predictions.values()))
+
+                bodyparts = None if payload is None else payload.get("bodyparts")
+                bodyparts = None if bodyparts is None else np.asarray(bodyparts)
+                if bodyparts is None or bodyparts.shape[0] == 0:
+                    # No detection -- fill with zeros and zero confidence.
+                    all_mapped.append(np.zeros((1, 26, 2), dtype=np.float32))
+                    all_scores.append(np.zeros((1, 26), dtype=np.float32))
+                    continue
+
+                xy = bodyparts[..., :2]   # (N_ind, K, 2)
+                conf = bodyparts[..., 2]  # (N_ind, K)
+                mapped = self._map_keypoints(xy)
+                mapped_scores = self._map_scores(conf)
+
+                # Take only the first individual.
+                all_mapped.append(mapped[:1])
+                all_scores.append(mapped_scores[:1])
 
         # Stack along frame axis → (1, N, 26, 2)
         kpts = np.stack(all_mapped, axis=1)  # (1, N, 26, 2)
-        scores = np.ones(kpts.shape[:3], dtype="float32")  # (1, N, 26)
-        return kpts, scores
+        scores = np.stack(all_scores, axis=1)  # (1, N, 26)
+        kpts, scores = self._validate_predictions(kpts, scores, num_frames=num_frames)
+        valid_frames_mask = self._compute_valid_frames_mask(kpts, scores)
+        return kpts, scores, valid_frames_mask
 
     # ------------------------------------------------------------------ #
 
@@ -246,6 +323,80 @@ class SuperAnimalEstimator:
                     mapped[:, tgt_idx, :] = (xy[:, s1, :] + xy[:, s2, :]) / 2.0
 
         return mapped
+
+    @staticmethod
+    def _map_scores(conf: np.ndarray) -> np.ndarray:
+        """Map confidence scores from quadruped80K to Animal3D layout."""
+        num_ind, num_src = conf.shape
+        num_tgt = len(_QUADRUPED80K_TO_ANIMAL3D)
+        mapped = np.full((num_ind, num_tgt), np.nan, dtype=np.float32)
+
+        for tgt_idx, src_idx in enumerate(_QUADRUPED80K_TO_ANIMAL3D):
+            if src_idx != -1 and src_idx < num_src:
+                mapped[:, tgt_idx] = conf[:, src_idx]
+            elif src_idx == -1 and tgt_idx in _INTERPOLATION_RULES:
+                s1, s2 = _INTERPOLATION_RULES[tgt_idx]
+                if s1 < num_src and s2 < num_src:
+                    mapped[:, tgt_idx] = (conf[:, s1] + conf[:, s2]) / 2.0
+
+        return mapped
+
+    def _validate_predictions(
+        self,
+        keypoints: np.ndarray,
+        scores: np.ndarray,
+        *,
+        num_frames: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Validate and normalise SuperAnimal predictions."""
+        num_joints = 26
+        keypoints = np.asarray(keypoints, dtype=np.float32)
+        scores = np.asarray(scores, dtype=np.float32)
+
+        if keypoints.shape[0] == 0:
+            return (
+                np.zeros((1, num_frames, num_joints, 2), dtype=np.float32),
+                np.zeros((1, num_frames, num_joints), dtype=np.float32),
+            )
+
+        if keypoints.ndim != 4 or keypoints.shape[-2:] != (num_joints, 2):
+            raise ValueError(
+                f"Invalid SuperAnimal keypoints shape {keypoints.shape}; "
+                f"expected (num_individuals, num_frames, {num_joints}, 2)."
+            )
+        if scores.ndim != 3 or scores.shape[-1] != num_joints:
+            raise ValueError(
+                f"Invalid SuperAnimal scores shape {scores.shape}; "
+                f"expected (num_individuals, num_frames, {num_joints})."
+            )
+        if keypoints.shape[:2] != scores.shape[:2]:
+            raise ValueError(
+                "SuperAnimal keypoints/scores leading dimensions do not match: "
+                f"{keypoints.shape[:2]} vs {scores.shape[:2]}."
+            )
+        if keypoints.shape[1] != num_frames:
+            raise ValueError(
+                f"SuperAnimal frame count mismatch: got {keypoints.shape[1]}, "
+                f"expected {num_frames}."
+            )
+
+        # Normalise unknown values to zeros so downstream code can treat these
+        # joints as invalid via score==0 while retaining shape stability.
+        keypoints = np.nan_to_num(keypoints, nan=0.0)
+        scores = np.nan_to_num(scores, nan=0.0)
+        return keypoints, scores
+
+    @staticmethod
+    def _compute_valid_frames_mask(
+        keypoints: np.ndarray, scores: np.ndarray
+    ) -> np.ndarray:
+        """Return frame-level validity mask from estimator outputs."""
+        safe_scores = np.nan_to_num(scores, nan=0.0)
+        has_score = np.any(safe_scores > 0, axis=-1)  # (num_persons, num_frames)
+
+        safe_kpts = np.nan_to_num(np.abs(keypoints), nan=0.0)
+        has_kpt = np.any(safe_kpts > 0, axis=(-1, -2))  # (num_persons, num_frames)
+        return np.any(has_score | has_kpt, axis=0)
 
 
 # ---------------------------------------------------------------------------
@@ -444,6 +595,16 @@ def _default_components(
 # ---------------------------------------------------------------------------
 
 
+class ResultStatus(str, Enum):
+    """High-level status for pose estimation outputs."""
+
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    EMPTY = "empty"
+    INVALID = "invalid"
+    UNKNOWN = "unknown"
+
+
 @dataclass
 class Pose2DResult:
     """Container returned by :meth:`FMPose3DInference.prepare_2d`.
@@ -458,6 +619,43 @@ class Pose2DResult:
     """Per-joint confidence scores, shape ``(num_persons, num_frames, J)``."""
     image_size: tuple[int, int] = (0, 0)
     """``(height, width)`` of the source frames."""
+    valid_frames_mask: np.ndarray | None = None
+    """Boolean mask of frames with at least one valid detection, shape ``(N,)``."""
+
+    @property
+    def status(self) -> ResultStatus:
+        """Prediction status derived from ``valid_frames_mask``."""
+        return self.get_status_info()[0]
+
+    @property
+    def status_message(self) -> str:
+        """Human-readable explanation for :attr:`status`."""
+        return self.get_status_info()[1]
+
+    def get_status_info(self) -> tuple[ResultStatus, str]:
+        """Prediction status derived from ``valid_frames_mask``."""
+        # Validate canonical shapes and frame-count consistency.
+        if self.keypoints.ndim != 4 or self.scores.ndim != 3:
+            return ResultStatus.INVALID, "Incorrect 2D pose keypoints/scores dimensions."
+        if self.keypoints.shape[1] != self.scores.shape[1]:
+            return ResultStatus.INVALID, "2D pose keypoints/scores frame counts do not match."
+        num_frames = int(self.keypoints.shape[1])
+
+        if self.valid_frames_mask is None:
+            return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 2D pose."
+        if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
+            return ResultStatus.UNKNOWN, "invalid 2D pose valid_frames_mask: must be a 1D numpy array."
+        if not np.issubdtype(self.valid_frames_mask.dtype, np.bool_):
+            return ResultStatus.UNKNOWN, "invalid 2D pose valid_frames_mask: must be a boolean numpy array."
+        if self.valid_frames_mask.shape[0] != num_frames:
+            return ResultStatus.INVALID, "2D pose valid_frames_mask mismatches the number of frames."
+
+        valid_count = int(np.sum(self.valid_frames_mask))
+        if valid_count == 0:
+            return ResultStatus.EMPTY, "No valid 2D pose predictions in any frame."
+        if valid_count < num_frames:
+            return ResultStatus.PARTIAL, "Missing 2D pose predictions in a subset of frames."
+        return ResultStatus.SUCCESS, "Valid 2D pose predictions for all frames."
 
 
 @dataclass
@@ -477,6 +675,47 @@ class Pose3DResult:
     ``camera_to_world``).  For animal poses this contains the
     limb-regularised output.
     """
+    valid_frames_mask: np.ndarray | None = None
+    """Boolean mask of frames with valid 3D poses, shape ``(num_frames,)``."""
+    status_hint: str | None = None
+    """Optional extra context for status reporting."""
+
+    @property
+    def status(self) -> ResultStatus:
+        """Prediction status derived from ``valid_frames_mask``."""
+        return self.get_status_info()[0]
+
+    @property
+    def status_message(self) -> str:
+        """Human-readable explanation for :attr:`status`."""
+        return self.get_status_info()[1]
+
+    def get_status_info(self) -> tuple[ResultStatus, str]:
+        """Prediction status derived from ``valid_frames_mask``."""
+        if self.poses_3d.ndim != 3 or self.poses_3d_world.ndim != 3:
+            return ResultStatus.INVALID, "Incorrect 3D result dimensions."
+        num_frames = int(self.poses_3d.shape[0])
+        if self.poses_3d_world.shape[0] != num_frames:
+            return ResultStatus.INVALID, "poses_3d and poses_3d_world frame counts differ."
+
+        def _with_hint(message: str) -> str:
+            return f"{message} {self.status_hint}" if self.status_hint else message
+
+        if self.valid_frames_mask is None:
+            return ResultStatus.UNKNOWN, _with_hint("No frame-validity mask provided by the 3D pose.")
+        if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
+            return ResultStatus.UNKNOWN, _with_hint("invalid 3D pose valid_frames_mask: must be a 1D numpy array.")
+        if not np.issubdtype(self.valid_frames_mask.dtype, np.bool_):
+            return ResultStatus.UNKNOWN, _with_hint("invalid 3D pose valid_frames_mask: must be a boolean numpy array.")
+        if self.valid_frames_mask.shape[0] != num_frames:
+            return ResultStatus.INVALID, _with_hint("3D pose valid_frames_mask mismatches the number of frames.")
+
+        valid_count = int(np.sum(self.valid_frames_mask))
+        if valid_count == 0:
+            return ResultStatus.EMPTY, _with_hint("No valid 3D pose predictions in any frame.")
+        if valid_count < num_frames:
+            return ResultStatus.PARTIAL, _with_hint("Missing 3D pose predictions in a subset of frames.")
+        return ResultStatus.SUCCESS, _with_hint("Valid 3D pose predictions for all frames.")
 
 
 #: Accepted source types for :meth:`FMPose3DInference.predict`.
@@ -689,14 +928,32 @@ class FMPose3DInference:
         Pose3DResult
             Root-relative and world-coordinate 3D poses.
         """
+        # 2D pose estimation
         result_2d = self.prepare_2d(source)
-        return self.pose_3d(
+        status, status_msg = result_2d.get_status_info()
+        if status in {ResultStatus.EMPTY, ResultStatus.INVALID}:
+            raise ValueError(f"2D pose estimation is not usable for 3D lifting: {status.value}. {status_msg}")
+
+        # 3D pose lifting
+        result_3d = self.pose_3d(
             result_2d.keypoints,
             result_2d.image_size,
             camera_rotation=camera_rotation,
             seed=seed,
             progress=progress,
         )
+
+        # Propagate 2D result status and validity mask to 3D pose result
+        result_3d.status_hint = f"2D pose status is {status.value}: {status_msg}"
+        result_3d.valid_frames_mask = result_2d.valid_frames_mask
+
+        # Apply result masking for partial results (set NaN for invalid frames)
+        if status == ResultStatus.PARTIAL:
+            invalid = ~result_3d.valid_frames_mask
+            if np.any(invalid):
+                result_3d.poses_3d[invalid] = np.nan
+                result_3d.poses_3d_world[invalid] = np.nan
+        return result_3d
 
     @torch.no_grad()
     def prepare_2d(
@@ -733,13 +990,16 @@ class FMPose3DInference:
         self.setup_runtime()
         if progress:
             progress(0, 1)
-        keypoints, scores = self._estimator_2d.predict(ingested.frames)
+        keypoints, scores, valid_frames_mask = self._estimator_2d.predict(
+            ingested.frames
+        )
         if progress:
             progress(1, 1)
         return Pose2DResult(
             keypoints=keypoints,
             scores=scores,
             image_size=ingested.image_size,
+            valid_frames_mask=valid_frames_mask,
         )
 
     @torch.no_grad()
