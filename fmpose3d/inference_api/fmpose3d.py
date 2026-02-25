@@ -645,6 +645,8 @@ class Pose2DResult:
             return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 2D pose."
         if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
             return ResultStatus.UNKNOWN, "invalid 2D pose valid_frames_mask: must be a 1D numpy array."
+        if not np.issubdtype(self.valid_frames_mask.dtype, np.bool_):
+            return ResultStatus.UNKNOWN, "invalid 2D pose valid_frames_mask: must be a boolean numpy array."
         if self.valid_frames_mask.shape[0] != num_frames:
             return ResultStatus.INVALID, "2D pose valid_frames_mask mismatches the number of frames."
 
@@ -698,6 +700,8 @@ class Pose3DResult:
             return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 3D pose."
         if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
             return ResultStatus.UNKNOWN, "invalid 3D pose valid_frames_mask: must be a 1D numpy array."
+        if not np.issubdtype(self.valid_frames_mask.dtype, np.bool_):
+            return ResultStatus.UNKNOWN, "invalid 3D pose valid_frames_mask: must be a boolean numpy array."
         if self.valid_frames_mask.shape[0] != num_frames:
             return ResultStatus.INVALID, "3D pose valid_frames_mask mismatches the number of frames."
 
