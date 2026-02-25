@@ -101,7 +101,7 @@ Convenience constructor for the **animal** pipeline. Sets `model_type="fmpose3d_
 
 End-to-end prediction: 2D estimation followed by 3D lifting in a single call.
 Raises `ValueError` when 2D estimation is unusable for lifting
-(`Pose2DResult.status` is `empty` or `invalid`).
+(`Pose2DResult.status` is `ResultStatus.EMPTY` or `ResultStatus.INVALID`).
 For partial 2D detections, invalid frames are masked to `NaN` in
 `Pose3DResult.poses_3d` and `Pose3DResult.poses_3d_world`.
 
