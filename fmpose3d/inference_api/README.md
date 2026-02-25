@@ -97,7 +97,7 @@ Convenience constructor for the **animal** pipeline. Sets `model_type="fmpose3d_
 
 ### Public Methods
 
-#### `predict(source, *, camera_rotation, seed, progress)` → `Pose3DResult`
+#### `predict(source, *, camera_rotation, seed, progress, return_2d)` → `Pose3DResult`
 
 End-to-end prediction: 2D estimation followed by 3D lifting in a single call.
 
@@ -107,6 +107,7 @@ End-to-end prediction: 2D estimation followed by 3D lifting in a single call.
 | `camera_rotation` | `ndarray \| None` | Length-4 quaternion for camera-to-world rotation. Defaults to the official demo rotation. `None` skips the transform. Ignored for animals. |
 | `seed` | `int \| None` | Seed for reproducible sampling. |
 | `progress` | `ProgressCallback \| None` | Callback `(current_step, total_steps) -> None`. |
+| `return_2d` | `bool` | When `True`, include the intermediate 2D result under `Pose3DResult.pose_2d`. Default: `False`. |
 
 **Returns:** `Pose3DResult`
 
@@ -175,6 +176,7 @@ Source = Union[str, Path, np.ndarray, Sequence[Union[str, Path, np.ndarray]]]
 |---|---|---|
 | `poses_3d` | `ndarray` | Root-relative 3D poses, shape `(num_frames, J, 3)`. |
 | `poses_3d_world` | `ndarray` | Post-processed 3D poses, shape `(num_frames, J, 3)`. For humans: world-coordinate poses. For animals: limb-regularized poses. |
+| `pose_2d` | `Pose2DResult \| None` | Optional 2D prediction payload, present when `predict(..., return_2d=True)` is used. |
 
 
 
