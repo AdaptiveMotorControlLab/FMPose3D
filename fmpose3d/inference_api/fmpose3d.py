@@ -677,6 +677,8 @@ class Pose3DResult:
     """
     valid_frames_mask: np.ndarray | None = None
     """Boolean mask of frames with valid 3D poses, shape ``(num_frames,)``."""
+    status_hint: str | None = None
+    """Optional extra context for status reporting."""
 
     @property
     def status(self) -> ResultStatus:
@@ -696,21 +698,24 @@ class Pose3DResult:
         if self.poses_3d_world.shape[0] != num_frames:
             return ResultStatus.INVALID, "poses_3d and poses_3d_world frame counts differ."
 
+        def _with_hint(message: str) -> str:
+            return f"{message} {self.status_hint}" if self.status_hint else message
+
         if self.valid_frames_mask is None:
-            return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 3D pose."
+            return ResultStatus.UNKNOWN, _with_hint("No frame-validity mask provided by the 3D pose.")
         if not isinstance(self.valid_frames_mask, np.ndarray) or self.valid_frames_mask.ndim != 1:
-            return ResultStatus.UNKNOWN, "invalid 3D pose valid_frames_mask: must be a 1D numpy array."
+            return ResultStatus.UNKNOWN, _with_hint("invalid 3D pose valid_frames_mask: must be a 1D numpy array.")
         if not np.issubdtype(self.valid_frames_mask.dtype, np.bool_):
-            return ResultStatus.UNKNOWN, "invalid 3D pose valid_frames_mask: must be a boolean numpy array."
+            return ResultStatus.UNKNOWN, _with_hint("invalid 3D pose valid_frames_mask: must be a boolean numpy array.")
         if self.valid_frames_mask.shape[0] != num_frames:
-            return ResultStatus.INVALID, "3D pose valid_frames_mask mismatches the number of frames."
+            return ResultStatus.INVALID, _with_hint("3D pose valid_frames_mask mismatches the number of frames.")
 
         valid_count = int(np.sum(self.valid_frames_mask))
         if valid_count == 0:
-            return ResultStatus.EMPTY, "No valid 3D pose predictions in any frame."
+            return ResultStatus.EMPTY, _with_hint("No valid 3D pose predictions in any frame.")
         if valid_count < num_frames:
-            return ResultStatus.PARTIAL, "Missing 3D pose predictions in a subset of frames."
-        return ResultStatus.SUCCESS, "Valid 3D pose predictions for all frames."
+            return ResultStatus.PARTIAL, _with_hint("Missing 3D pose predictions in a subset of frames.")
+        return ResultStatus.SUCCESS, _with_hint("Valid 3D pose predictions for all frames.")
 
 
 #: Accepted source types for :meth:`FMPose3DInference.predict`.
@@ -923,10 +928,13 @@ class FMPose3DInference:
         Pose3DResult
             Root-relative and world-coordinate 3D poses.
         """
+        # 2D pose estimation
         result_2d = self.prepare_2d(source)
         status, status_msg = result_2d.get_status_info()
         if status in {ResultStatus.EMPTY, ResultStatus.INVALID}:
             raise ValueError(f"2D pose estimation is not usable for 3D lifting: {status.value}. {status_msg}")
+
+        # 3D pose lifting
         result_3d = self.pose_3d(
             result_2d.keypoints,
             result_2d.image_size,
@@ -934,13 +942,17 @@ class FMPose3DInference:
             seed=seed,
             progress=progress,
         )
-        mask = result_2d.valid_frames_mask
-        if mask is not None:
-            invalid = ~mask
+
+        # Propagate 2D result status and validity mask to 3D pose result
+        result_3d.status_hint = f"2D pose status is {status.value}: {status_msg}"
+        result_3d.valid_frames_mask = result_2d.valid_frames_mask
+
+        # Apply result masking for partial results (set NaN for invalid frames)
+        if status == ResultStatus.PARTIAL:
+            invalid = ~result_3d.valid_frames_mask
             if np.any(invalid):
                 result_3d.poses_3d[invalid] = np.nan
                 result_3d.poses_3d_world[invalid] = np.nan
-            result_3d.valid_frames_mask = mask
         return result_3d
 
     @torch.no_grad()
