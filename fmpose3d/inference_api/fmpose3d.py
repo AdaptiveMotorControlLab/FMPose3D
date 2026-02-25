@@ -634,13 +634,12 @@ class Pose2DResult:
 
     def get_status_info(self) -> tuple[ResultStatus, str]:
         """Prediction status derived from ``valid_frames_mask``."""
-        # Derive expected frame count from canonical shapes.
-        if self.keypoints.ndim == 4:
-            num_frames = int(self.keypoints.shape[1])
-        elif self.scores.ndim == 3:
-            num_frames = int(self.scores.shape[1])
-        else:
+        # Validate canonical shapes and frame-count consistency.
+        if self.keypoints.ndim != 4 or self.scores.ndim != 3:
             return ResultStatus.INVALID, "Incorrect 2D pose keypoints/scores dimensions."
+        if self.keypoints.shape[1] != self.scores.shape[1]:
+            return ResultStatus.INVALID, "2D pose keypoints/scores frame counts do not match."
+        num_frames = int(self.keypoints.shape[1])
 
         if self.valid_frames_mask is None:
             return ResultStatus.UNKNOWN, "No frame-validity mask provided by the 2D pose."
