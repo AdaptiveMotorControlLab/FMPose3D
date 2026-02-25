@@ -646,6 +646,36 @@ class TestPose3DValidation:
         assert np.all(np.isnan(result.poses_3d[1]))
         assert np.all(np.isnan(result.poses_3d_world[1]))
 
+    @pytest.mark.parametrize(
+        "mask,expected_status",
+        [
+            (
+                np.array([False, False], dtype=bool),
+                ResultStatus.EMPTY,
+            ),
+            (
+                np.array([True], dtype=bool),
+                ResultStatus.INVALID,
+            ),
+        ],
+    )
+    def test_predict_raises_on_unusable_2d_status(self, mask, expected_status):
+        """predict() raises for EMPTY/INVALID 2D status and skips 3D lifting."""
+        api = _make_ready_api("fmpose3d_humans", test_augmentation=False)
+        mock_kpts = np.random.randn(1, 2, 17, 2).astype("float32")
+        mock_scores = np.ones((1, 2, 17), dtype="float32")
+        api._estimator_2d = MagicMock()
+        api._estimator_2d.predict.return_value = (mock_kpts, mock_scores, mask)
+        api._estimator_2d.setup_runtime = MagicMock()
+        api.pose_3d = MagicMock()
+
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        with pytest.raises(ValueError) as exc_info:
+            api.predict([frame, frame], seed=42)
+
+        assert f": {expected_status.value}." in str(exc_info.value)
+        api.pose_3d.assert_not_called()
+
 
 # =========================================================================
 # Unit tests — dataclasses
