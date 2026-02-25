@@ -477,6 +477,8 @@ class Pose3DResult:
     ``camera_to_world``).  For animal poses this contains the
     limb-regularised output.
     """
+    pose_2d: Pose2DResult | None = None
+    """Optional 2D prediction payload from :meth:`FMPose3DInference.predict`."""
 
 
 #: Accepted source types for :meth:`FMPose3DInference.predict`.
@@ -659,6 +661,7 @@ class FMPose3DInference:
         camera_rotation: np.ndarray | None = _DEFAULT_CAM_ROTATION,
         seed: int | None = None,
         progress: ProgressCallback | None = None,
+        return_2d: bool = False,
     ) -> Pose3DResult:
         """End-to-end prediction: 2D pose estimation → 3D lifting.
 
@@ -683,6 +686,9 @@ class FMPose3DInference:
         progress : ProgressCallback or None
             Optional ``(current_step, total_steps)`` callback.  Forwarded
             to the :meth:`pose_3d` step (per-frame reporting).
+        return_2d : bool
+            When ``True``, include the intermediate :class:`Pose2DResult`
+            in the returned :class:`Pose3DResult` as ``pose_2d``.
 
         Returns
         -------
@@ -690,13 +696,16 @@ class FMPose3DInference:
             Root-relative and world-coordinate 3D poses.
         """
         result_2d = self.prepare_2d(source)
-        return self.pose_3d(
+        result_3d = self.pose_3d(
             result_2d.keypoints,
             result_2d.image_size,
             camera_rotation=camera_rotation,
             seed=seed,
             progress=progress,
         )
+        if return_2d:
+            result_3d.pose_2d = result_2d
+        return result_3d
 
     @torch.no_grad()
     def prepare_2d(
