@@ -261,6 +261,7 @@ class SuperAnimalEstimator:
                 images=paths,
                 max_individuals=cfg.max_individuals,
                 out_folder=tmpdir,
+                progress_bar=False
             )
             # predictions: {image_path: {"bodyparts": (N_ind, K, 3), ...}}
             # Iterate in input order to keep frame alignment stable.
