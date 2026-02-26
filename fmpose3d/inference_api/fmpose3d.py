@@ -1111,10 +1111,10 @@ class FMPose3DInference:
         if isinstance(keypoints_2d, Pose2DResult):
             if image_size is not None and image_size != keypoints_2d.image_size:
                 raise ValueError(
-                    f"Got two different image sizes: image_size={image_size} does not match "
-                    f"Got Pose2DResult.image_size={keypoints_2d.image_size} and image_size={image_size}. "	
-                    "Please provide either a Pose2DResult (containing image_size), or keypoints_2d as a "
-                    "numpy ndarray together with image_size={image_size}."
+                    f"Image size mismatch: Pose2DResult.image_size={keypoints_2d.image_size}, "
+                    f"image_size={image_size}. Please provide either a Pose2DResult (containing "
+                    f"image_size), or keypoints_2d as a numpy ndarray together with "
+                    f"image_size={image_size}."
                 )
             return keypoints_2d
 
