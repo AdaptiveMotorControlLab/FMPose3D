@@ -1053,7 +1053,6 @@ class FMPose3DInference:
         status, status_msg = result_2d.get_status_info()
         if status in {ResultStatus.EMPTY, ResultStatus.INVALID}:
             raise ValueError(f"2D pose estimation is not usable for 3D lifting: {status.value}. {status_msg}")
-        
         # Just use the first person's keypoints for now.
         kpts = result_2d.keypoints[0]
         h, w = result_2d.image_size
