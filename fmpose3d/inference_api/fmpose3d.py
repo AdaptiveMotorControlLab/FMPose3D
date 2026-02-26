@@ -1066,7 +1066,6 @@ class FMPose3DInference:
         if seed is not None:
             torch.manual_seed(seed)
 
-
         num_frames = kpts.shape[0]
         all_poses_3d: list[np.ndarray] = []
         all_poses_world: list[np.ndarray] = []
