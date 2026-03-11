@@ -189,6 +189,20 @@ _INTERPOLATION_RULES: dict[int, tuple[int, int]] = {
 }
 
 
+def _require_superanimal_analyze_images() -> Callable[..., object]:
+    """Return DeepLabCut's SuperAnimal API or raise a clear ImportError."""
+    try:
+        from deeplabcut.pose_estimation_pytorch.apis import (  # pyright: ignore[reportMissingImports]
+            superanimal_analyze_images,
+        )
+    except ImportError:
+        raise ImportError(
+            "DeepLabCut is required for the animal 2D estimator. "
+            "Install it with: pip install \"fmpose3d[animals]\""
+        ) from None
+    return superanimal_analyze_images
+
+
 class SuperAnimalEstimator:
     """2D pose estimator for animals: DeepLabCut SuperAnimal.
 
@@ -236,9 +250,7 @@ class SuperAnimalEstimator:
         """
         import cv2
         import tempfile
-        from deeplabcut.pose_estimation_pytorch.apis import (
-            superanimal_analyze_images,
-        )
+        superanimal_analyze_images = _require_superanimal_analyze_images()
 
         cfg = self.cfg
         num_frames = frames.shape[0]
