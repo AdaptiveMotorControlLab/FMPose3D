@@ -36,6 +36,12 @@ conda activate fmpose_3d
 pip install fmpose3d
 ```
 
+For the animal pipeline, install the optional DeepLabCut dependency:
+
+```bash
+pip install "fmpose3d[animals]"
+```
+
 ## Demos
 
 ### Testing on in-the-wild images (humans)
