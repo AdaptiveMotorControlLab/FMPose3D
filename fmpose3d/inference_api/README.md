@@ -48,6 +48,12 @@ result = api.predict("dog.jpg")
 print(result.poses_3d.shape)  # (1, 26, 3)
 ```
 
+Before using the animal pipeline, install the optional DeepLabCut dependency:
+
+```bash
+pip install "fmpose3d[animals]"
+```
+
 
 ## API Documentation
 
@@ -220,6 +226,9 @@ Default 2D estimator for the human pipeline. Wraps HRNet + YOLO with a COCO → 
 #### `SuperAnimalEstimator(cfg: SuperAnimalConfig | None)`
 
 2D estimator for the animal pipeline. Uses DeepLabCut SuperAnimal and maps quadruped80K keypoints to the 26-joint Animal3D layout.
+
+If DeepLabCut is not installed, calling this estimator raises a clear `ImportError`
+with the recommended install command: `pip install "fmpose3d[animals]"`.
 
 - `setup_runtime()` — No-op (DLC loads lazily).
 - `predict(frames: ndarray)` → `(keypoints, scores, valid_frames_mask)` — Returns Animal3D-format 2D keypoints plus a frame-level validity mask.
