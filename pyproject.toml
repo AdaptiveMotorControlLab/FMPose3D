@@ -44,7 +44,7 @@ dependencies = [
 dev = ["pytest>=7.0.0", "black>=22.0.0", "flake8>=4.0.0", "isort>=5.10.0"]
 wandb = ["wandb>=0.12.0"]
 viz = ["matplotlib>=3.5.0", "opencv-python>=4.5.0"]
-animals = ["deeplabcut==3.0.0rc13"]
+animals = ["deeplabcut>=3.0.0rc13"]
 
 [tool.setuptools]
 include-package-data = true
