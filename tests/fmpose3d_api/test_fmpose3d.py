@@ -741,6 +741,18 @@ class TestDataclasses:
 
 
 class TestSuperAnimalPrediction:
+    def test_predict_raises_clear_error_without_deeplabcut(self):
+        """Missing DLC should raise a clear installation hint."""
+        estimator = SuperAnimalEstimator()
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+
+        with patch(
+            "fmpose3d.inference_api.fmpose3d.importlib.util.find_spec",
+            return_value=None,
+        ):
+            with pytest.raises(ImportError, match=r"fmpose3d\[animals\]"):
+                estimator.predict(frames)
+
     def test_predict_returns_zeros_when_no_bodyparts(self):
         """When DLC detects nothing, keypoints are zero-filled."""
         pytest.importorskip("deeplabcut")

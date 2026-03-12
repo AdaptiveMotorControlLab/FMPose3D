@@ -46,7 +46,15 @@ else:
     from fmpose3d.models import get_model
     CFM = get_model(args.model_type)
 
-from deeplabcut.pose_estimation_pytorch.apis import superanimal_analyze_images
+try:
+    from deeplabcut.pose_estimation_pytorch.apis import (  # pyright: ignore[reportMissingImports]
+        superanimal_analyze_images,
+    )
+except ImportError:
+    raise ImportError(
+        "DeepLabCut is required for the animal demo. "
+        "Install it with: pip install \"fmpose3d[animals]\""
+    ) from None
 
 superanimal_name = "superanimal_quadruped"
 model_name = "hrnet_w32"
