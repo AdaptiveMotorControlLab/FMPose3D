@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import socket
+from importlib.util import find_spec
 
 import pytest
 
@@ -72,12 +73,7 @@ HAS_INTERNET: bool = _has_internet()
 HUMAN_WEIGHTS_READY: bool = weights_ready(HUMAN_WEIGHTS_FILENAME)
 ANIMAL_WEIGHTS_READY: bool = weights_ready(ANIMAL_WEIGHTS_FILENAME)
 
-try:
-    import deeplabcut  # noqa: F401
-
-    DLC_AVAILABLE: bool = True
-except ImportError:
-    DLC_AVAILABLE = False
+DLC_AVAILABLE: bool = find_spec("deeplabcut") is not None
 
 # ---------------------------------------------------------------------------
 # Reusable skip markers
