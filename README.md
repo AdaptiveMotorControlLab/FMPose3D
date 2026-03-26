@@ -2,11 +2,14 @@
 
 ![Version](https://img.shields.io/badge/python_version-3.10-purple)
 [![PyPI version](https://badge.fury.io/py/fmpose3d.svg?icon=si%3Apython)](https://badge.fury.io/py/fmpose3d)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/fmpose3d?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fmpose3d)
 
-This is the official implementation of the approach described in the preprint:
+Code:[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+Models:[![License: NC](https://img.shields.io/badge/License-NC-red.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/deed.en)
 
-[**FMPose3D: monocular 3D pose estimation via flow matching**](https://arxiv.org/abs/2602.05755)            
+This is the official implementation of the approach described in:
+
+[**FMPose3D: monocular 3D pose estimation via flow matching**](https://arxiv.org/abs/2602.05755) **CVPR 2026**           
 Ti Wang, Xiaohang Yu, Mackenzie Weygandt Mathis
 
 <!-- <p align="center"><img src="./images/Frame 4.jpg" width="50%" alt="" /></p> -->
@@ -20,9 +23,9 @@ FMPose3D creates a 3D pose from a single 2D image. It leverages fast Flow Matchi
 
 
 ## News!
-- Feb 21st, 2026: The FMPose3D paper was accepted to CVPR 2026! 🔥
+- [X] Feb 2026: The FMPose3D paper was accepted to CVPR 2026! 🔥
 - [X] Feb 2026: the FMPose3D code and our arXiv paper is released - check out the demos here or on our [project page](https://xiu-cs.github.io/FMPose3D/)
-- [ ] Planned: This method will be integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
+- [X] March 2026: This method is integrated into [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut)
 
 ## Installation
 
@@ -113,9 +116,7 @@ For animal training/testing and demo scripts, see [animals/README.md](animals/RE
       title={FMPose3D: monocular 3D pose estimation via flow matching}, 
       author={Ti Wang and Xiaohang Yu and Mackenzie Weygandt Mathis},
       year={2026},
-      eprint={2602.05755},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
+      journal={CVPR},
       url={https://arxiv.org/abs/2602.05755}, 
 }
 ```
