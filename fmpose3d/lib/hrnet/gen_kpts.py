@@ -34,7 +34,6 @@ cfg_dir = osp.join(osp.dirname(osp.abspath(__file__)), 'experiments') + '/'
 
 # Auto-download checkpoints if missing and get checkpoint paths
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints, get_checkpoint_path
-ensure_checkpoints()
 
 # Loading human detector model
 from fmpose3d.lib.yolov3.human_detector import load_model as yolo_model
@@ -153,6 +152,9 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
 
 
 def gen_video_kpts(path, det_dim=416, num_peroson=1, gen_output=False, type='image'):
+    # Ensure checkpoints are downloaded only when HRNet is actually requested
+    ensure_checkpoints()
+    
     # Updating configuration
     args1 = parse_args()
     reset_config(args1)
