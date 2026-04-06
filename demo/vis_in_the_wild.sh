@@ -6,7 +6,11 @@ batch_size=1
 sh_file='vis_in_the_wild.sh'
 
 model_type='fmpose3d_humans'
-model_weights_path='../pre_trained_models/fmpose3d_h36m/FMpose3D_pretrained_weights.pth'
+
+# By default, weights are automatically downloaded from Hugging Face Hub.
+# To use local weights instead, uncomment the line below:
+# model_weights_path='../pre_trained_models/fmpose3d_h36m/FMpose3D_pretrained_weights.pth'
+model_weights_path=''
 
 target_path='./images/'  # folder containing multiple images
 # target_path='./images/xx.png'  # single image
