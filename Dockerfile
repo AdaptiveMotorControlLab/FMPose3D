@@ -24,9 +24,11 @@ ENV PATH="/opt/conda/bin:${PATH}"
 # Initialize conda for root just in case and fix symlinks
 RUN ln -fs /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
-# --- Install FMPose3D from PyPI (as documented in README) ---
+# --- Install FMPose3D from GitHub ---
 RUN python -m pip install --no-cache-dir --upgrade pip && \
-    python -m pip install --no-cache-dir "fmpose3d[animals,viz]" gdown
+    git clone --depth 1 https://github.com/AdaptiveMotorControlLab/FMPose3D.git /tmp/fmpose3d && \
+    python -m pip install --no-cache-dir "/tmp/fmpose3d[animals,viz]" gdown && \
+    rm -rf /tmp/fmpose3d
 
 # Allow non-root user to download DLC model weights at runtime
 RUN mkdir -p /opt/conda/lib/python3.11/site-packages/deeplabcut/modelzoo/checkpoints && \
