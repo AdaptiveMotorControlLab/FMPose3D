@@ -34,8 +34,7 @@ from fmpose3d.models import get_model
 ProgressCallback = Callable[[int, int], None]
 
 
-#: HuggingFace repository hosting the official FMPose3D checkpoints.
-_HF_REPO_ID: str = "deruyter92/fmpose_temp"
+from fmpose3d.utils.weights import HF_REPO_ID as _HF_REPO_ID
 
 # Default camera-to-world rotation quaternion (from the demo script).
 _DEFAULT_CAM_ROTATION = np.array(
