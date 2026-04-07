@@ -278,15 +278,8 @@ def get_pose3D(path, output_dir, type='image'):
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    model_path = args.model_weights_path
-
-    # If no local path is provided, download from Hugging Face Hub
-    if not model_path:
-        from huggingface_hub import hf_hub_download
-        _HF_REPO_ID = "deruyter92/fmpose_temp"
-        hf_filename = f"{args.model_type}.pth"
-        print(f"No local weights path specified. Downloading '{hf_filename}' from Hugging Face ({_HF_REPO_ID})...")
-        model_path = hf_hub_download(repo_id=_HF_REPO_ID, filename=hf_filename)
+    from fmpose3d.utils.weights import resolve_weights_path
+    model_path = resolve_weights_path(args.model_weights_path, args.model_type)
 
     print(f"Loading weights from: {model_path}")
     pre_dict = torch.load(model_path, map_location=device, weights_only=True)
