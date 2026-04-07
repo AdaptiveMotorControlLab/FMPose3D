@@ -216,7 +216,7 @@ def create_modules(blocks):
             except:
                 end = 0
 
-            # Positive anotation
+            # Positive annotation
             if start > 0:
                 start = start - index
 
