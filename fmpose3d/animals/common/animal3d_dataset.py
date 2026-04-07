@@ -38,9 +38,9 @@ class TrainDataset(Dataset):
         else:
             keypoint_2d = np.array(data.get("keypoint_2d", []), dtype=np.float32)
          # normalize 2D keypoints
-        hight = np.array(data["height"])
+        height = np.array(data["height"])
         width = np.array(data["width"])
-        keypoint_2d = normalize_screen_coordinates(keypoint_2d[..., :2], width, hight)
+        keypoint_2d = normalize_screen_coordinates(keypoint_2d[..., :2], width, height)
          
         # build 3D keypoints; append ones; fallback to zeros if missing
         if "keypoint_3d" in data and data["keypoint_3d"] is not None:
