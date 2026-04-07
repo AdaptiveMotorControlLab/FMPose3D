@@ -9,7 +9,7 @@ Licensed under Apache 2.0
 
 """Shared helpers for resolving / downloading FMPose3D model weights."""
 
-HF_REPO_ID: str = "deruyter92/fmpose_temp"
+HF_REPO_ID: str = "MLAdaptiveIntelligence/FMPose3D"
 
 
 def resolve_weights_path(model_weights_path: str, model_type: str) -> str:
