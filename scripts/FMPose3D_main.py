@@ -268,7 +268,11 @@ if __name__ == "__main__":
             args.checkpoint = "./checkpoint/" + folder_name
         elif args.train == False:
             # create a new folder for the test results
-            args.previous_dir = os.path.dirname(args.model_weights_path)
+            if args.model_weights_path:
+                args.previous_dir = os.path.dirname(args.model_weights_path)
+            else:
+                # HuggingFace-downloaded weights: no local dir, use ./checkpoint/
+                args.previous_dir = "./checkpoint"
             args.checkpoint = os.path.join(args.previous_dir, folder_name)
 
         if not os.path.exists(args.checkpoint):
@@ -338,7 +342,16 @@ if __name__ == "__main__":
     if args.reload:
         model_dict = model["CFM"].state_dict()
         model_path = args.model_weights_path
-        print(model_path)
+
+        # If no local path is provided, download from Hugging Face Hub
+        if not model_path:
+            from huggingface_hub import hf_hub_download
+            _HF_REPO_ID = "deruyter92/fmpose_temp"
+            hf_filename = f"{args.model_type}.pth"
+            print(f"No local weights path specified. Downloading '{hf_filename}' from Hugging Face ({_HF_REPO_ID})...")
+            model_path = hf_hub_download(repo_id=_HF_REPO_ID, filename=hf_filename)
+
+        print(f"Loading weights from: {model_path}")
         pre_dict = torch.load(model_path, map_location=device, weights_only=True)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
