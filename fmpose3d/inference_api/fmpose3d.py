@@ -758,8 +758,6 @@ class _IngestedInput:
 # ---------------------------------------------------------------------------
 
 
-# FIXME @deruyter92: THIS IS TEMPORARY UNTIL WE DOWNLOAD THE WEIGHTS FROM HUGGINGFACE
-SKIP_WEIGHTS_VALIDATION = object() # sentinel value to indicate that the weights should not be validated
 
 class FMPose3DInference:
     """High-level, two-step inference API for FMPose3D.
