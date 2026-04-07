@@ -48,18 +48,6 @@ stop:
 rm:
 	docker rm $(CONTAINER_NAME)
 
-
-#######################
-# BUILD CORE WITH SRC #
-#######################
-# [USER: ADJUST SRC PATH]
-SRC_PATH="/home/user/project"
-build_production:
-	cp -r $(SRC_PATH) src
-	docker build $(BUILD_ARGS) --build-arg src=src \
-		-t $(IMG_NAME):$(IMG_TAG) -f $(DOCKERFILE) .
-	rm -r src
-
 # Help message
 help:
 	@echo "Available targets:"
@@ -69,7 +57,6 @@ help:
 	@echo "  exec_bash         - Attach to running container (bash)."
 	@echo "  stop              - Stop the running container."
 	@echo "  rm                - Remove the stopped container."
-	@echo "  build_production  - Build a Docker image with source code."
 	@echo "  help              - Show this help message."
 	@echo ""
 	@echo "Usage:"
