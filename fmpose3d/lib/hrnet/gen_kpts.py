@@ -24,7 +24,7 @@ import torch.backends.cudnn as cudnn
 import cv2
 import copy
 
-from fmpose3d.lib.hrnet.lib.utils.utilitys import plot_keypoint, PreProcess, write, load_json
+from fmpose3d.lib.hrnet.lib.utils.utilitys import PreProcess
 from fmpose3d.lib.hrnet.lib.config import cfg, update_config
 from fmpose3d.lib.hrnet.lib.utils.transforms import *
 from fmpose3d.lib.hrnet.lib.utils.inference import get_final_preds
