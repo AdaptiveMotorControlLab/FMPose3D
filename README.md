@@ -51,8 +51,9 @@ pip install "fmpose3d[animals]"
 
 This visualization script is designed for single-frame based model, allowing you to easily run 3D human pose estimation on any single image.
 
-Before testing, make sure you have the pre-trained model ready.
-You may either use the model trained by your own or download ours from [here](https://drive.google.com/drive/folders/1235_UgUQXYZtjprBOv2ZJJHY2KOAS_6p?usp=sharing) and place it in the `./pre_trained_models` directory.
+Pre-trained weights are downloaded automatically from [Hugging Face](https://huggingface.co/MLAdaptiveIntelligence/FMPose3D) the first time you run inference, so no manual setup is needed.
+
+Alternatively, you can use your own trained weights or download ours from [Google Drive](https://drive.google.com/drive/folders/1aRZ6t_6IxSfM1nCTFOUXcYVaOk-5koGA?usp=sharing), place them in the `./pre_trained_models` directory, and set `model_weights_path` in the shell script (e.g. `demo/vis_in_the_wild.sh`).
 
 Next, put your test images into folder `demo/images`. Then run the visualization script:
 ```bash
@@ -93,7 +94,7 @@ sh ./scripts/FMPose3D_train.sh
 
 ### Inference
 
-First, download the folder with pre-trained model from [here](https://drive.google.com/drive/folders/1235_UgUQXYZtjprBOv2ZJJHY2KOAS_6p?usp=sharing) and place it in the './pre_trained_models' directory.
+Pre-trained weights are fetched automatically from Hugging Face on the first run. You can also use local weights by setting `model_weights_path` in the shell script (see [Demos](#testing-on-in-the-wild-images-humans) above for details).
 
 To run inference on Human3.6M:
 
