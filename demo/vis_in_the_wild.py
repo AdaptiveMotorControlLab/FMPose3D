@@ -19,6 +19,7 @@ import copy
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints
 ensure_checkpoints()
 
+from fmpose3d.utils.weights import resolve_weights_path
 from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
 from fmpose3d.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
 from fmpose3d.common.arguments import opts as parse_args
@@ -278,7 +279,6 @@ def get_pose3D(path, output_dir, type='image'):
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    from fmpose3d.utils.weights import resolve_weights_path
     model_path = resolve_weights_path(args.model_weights_path, args.model_type)
 
     print(f"Loading weights from: {model_path}")
