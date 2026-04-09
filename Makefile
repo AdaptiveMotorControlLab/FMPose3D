@@ -1,6 +1,5 @@
 # [USER: ADJUST PATH]
 PROJECT_NAME := fmpose3d
-project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 #######
 # RUN #
 #######
