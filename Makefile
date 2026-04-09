@@ -31,7 +31,7 @@ CONTAINER_NAME := fmpose3d_dev1
 HOST_SRC := $(shell pwd)
 DOCKER_SRC := /fmpose3d
 VOLUMES := \
-	--volume $(HOST_SRC):$(DOCKER_SRC) 
+    --volume "$(HOST_SRC):$(DOCKER_SRC)"
 
 
 run:
