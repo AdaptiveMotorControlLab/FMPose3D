@@ -9,8 +9,9 @@ project_name_lo := $(shell echo $(PROJECT_NAME) | tr '[:upper:]' '[:lower:]')
 IMG_NAME := fmpose3d
 IMG_TAG := v0.1
 DOCKERFILE := Dockerfile
-HOST_UID := $(shell id -u)
-HOST_GID := $(shell id -g)
+# Linux/macOS: use host UID/GID; Windows fallback to 1000
+HOST_UID ?= $(shell sh -c 'id -u 2>/dev/null || echo 1000')
+HOST_GID ?= $(shell sh -c 'id -g 2>/dev/null || echo 1000')
 BUILD_ARGS := \
 		--build-arg USERNAME=fmpose3d \
         --build-arg USER_GID=$(HOST_GID) \
