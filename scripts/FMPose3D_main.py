@@ -18,6 +18,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
+from fmpose3d.utils.weights import resolve_weights_path
 from fmpose3d.common import opts, Human36mDataset, Fusion
 from fmpose3d.common.utils import *
 
@@ -341,7 +342,6 @@ if __name__ == "__main__":
 
     if args.reload:
         model_dict = model["CFM"].state_dict()
-        from fmpose3d.utils.weights import resolve_weights_path
         model_path = resolve_weights_path(args.model_weights_path, args.model_type)
 
         print(f"Loading weights from: {model_path}")
