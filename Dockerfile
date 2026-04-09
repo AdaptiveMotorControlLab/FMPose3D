@@ -31,8 +31,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
     rm -rf /tmp/fmpose3d
 
 # Allow non-root user to download DLC model weights at runtime
-RUN mkdir -p /opt/conda/lib/python3.11/site-packages/deeplabcut/modelzoo/checkpoints && \
-    chown -R ${USERNAME}:${USERNAME} /opt/conda/lib/python3.11/site-packages/deeplabcut/modelzoo
+RUN DLC_MODELZOO_DIR="$(python -c "import site, pathlib; print(pathlib.Path(site.getsitepackages()[0]) / 'deeplabcut' / 'modelzoo')")" \
+ && mkdir -p "${DLC_MODELZOO_DIR}/checkpoints" \
+ && chown -R "${USERNAME}:${USERNAME}" "${DLC_MODELZOO_DIR}"
 
 # Set your user as owner of the home directory before switching
 RUN chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
