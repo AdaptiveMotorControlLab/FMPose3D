@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fmpose3d.inference_api.fmpose3d import FMPose3DInference
+from fmpose3d.utils.weights import HF_REPO_ID
 
 
 class TestDownloadModelWeights:
@@ -37,7 +38,7 @@ class TestDownloadModelWeights:
                 api._download_model_weights()
 
         mock_dl.assert_called_once_with(
-            repo_id="deruyter92/fmpose_temp",
+            repo_id=HF_REPO_ID,
             filename="fmpose3d_humans.pth",
         )
         assert api.model_weights_path == "/fake/cache/fmpose3d_humans.pth"
@@ -52,7 +53,7 @@ class TestDownloadModelWeights:
                 api._download_model_weights()
 
         mock_dl.assert_called_once_with(
-            repo_id="deruyter92/fmpose_temp",
+            repo_id=HF_REPO_ID,
             filename="fmpose3d_animals.pth",
         )
         assert api.model_weights_path == "/fake/cache/fmpose3d_animals.pth"

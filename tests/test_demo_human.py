@@ -38,7 +38,7 @@ def test_2d_pose_estimation(test_image_path, test_output_dir):
     from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
     
     # Run 2D pose estimation
-    keypoints, scores = hrnet_pose(test_image_path, det_dim=416, num_peroson=1, gen_output=True, type='image')
+    keypoints, scores = hrnet_pose(test_image_path, det_dim=416, num_person=1, gen_output=True, type='image')
     
     # Check output shapes
     assert keypoints is not None, "Keypoints should not be None"

@@ -747,8 +747,8 @@ class TestSuperAnimalPrediction:
         frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
 
         with patch(
-            "fmpose3d.inference_api.fmpose3d.importlib.util.find_spec",
-            return_value=None,
+            "fmpose3d.inference_api.fmpose3d._require_superanimal_analyze_images",
+            side_effect=ImportError('pip install "fmpose3d[animals]"'),
         ):
             with pytest.raises(ImportError, match=r"fmpose3d\[animals\]"):
                 estimator.predict(frames)

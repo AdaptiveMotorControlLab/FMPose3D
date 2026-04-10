@@ -24,7 +24,7 @@ import torch.backends.cudnn as cudnn
 import cv2
 import copy
 
-from fmpose3d.lib.hrnet.lib.utils.utilitys import plot_keypoint, PreProcess, write, load_json
+from fmpose3d.lib.hrnet.lib.utils.utilitys import PreProcess
 from fmpose3d.lib.hrnet.lib.config import cfg, update_config
 from fmpose3d.lib.hrnet.lib.utils.transforms import *
 from fmpose3d.lib.hrnet.lib.utils.inference import get_final_preds
@@ -34,7 +34,6 @@ cfg_dir = osp.join(osp.dirname(osp.abspath(__file__)), 'experiments') + '/'
 
 # Auto-download checkpoints if missing and get checkpoint paths
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints, get_checkpoint_path
-ensure_checkpoints()
 
 # Loading human detector model
 from fmpose3d.lib.yolov3.human_detector import load_model as yolo_model
@@ -100,7 +99,7 @@ def model_load(config):
     
     return model
 
-def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=416, num_peroson=1, gen_output=False):
+def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=416, num_person=1, gen_output=False):
     
     bboxs, scores = yolo_det(frame, human_model, reso=det_dim, confidence=args.thred_score)
     if bboxs is None or not bboxs.any():
@@ -118,7 +117,7 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
     if people_track.shape[0] == 1:
         people_track_ = people_track[-1, :-1].reshape(1, 4)
     elif people_track.shape[0] >= 2:
-        people_track_ = people_track[-num_peroson:, :-1].reshape(num_peroson, 4)
+        people_track_ = people_track[-num_person:, :-1].reshape(num_person, 4)
         people_track_ = people_track_[::-1]
     else:
         return [], []
@@ -130,7 +129,7 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
 
     with torch.no_grad():
         # bbox is coordinate location
-        inputs, origin_img, center, scale = PreProcess(frame, track_bboxs, cfg, num_peroson)
+        inputs, origin_img, center, scale = PreProcess(frame, track_bboxs, cfg, num_person)
 
         inputs = inputs[:, [2, 1, 0]]
 
@@ -141,8 +140,8 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
         # compute coordinate
         preds, maxvals = get_final_preds(cfg, output.clone().cpu().numpy(), np.asarray(center), np.asarray(scale))
 
-    kpts = np.zeros((num_peroson, 17, 2), dtype=np.float32)
-    scores = np.zeros((num_peroson, 17), dtype=np.float32)
+    kpts = np.zeros((num_person, 17, 2), dtype=np.float32)
+    scores = np.zeros((num_person, 17), dtype=np.float32)
     for i, kpt in enumerate(preds):
         kpts[i] = kpt
 
@@ -152,7 +151,10 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
     return kpts, scores
 
 
-def gen_video_kpts(path, det_dim=416, num_peroson=1, gen_output=False, type='image'):
+def gen_video_kpts(path, det_dim=416, num_person=1, gen_output=False, type='image'):
+    # Ensure checkpoints are downloaded only when HRNet is actually requested
+    ensure_checkpoints()
+    
     # Updating configuration
     args1 = parse_args()
     reset_config(args1)
@@ -166,7 +168,7 @@ def gen_video_kpts(path, det_dim=416, num_peroson=1, gen_output=False, type='ima
     scores_result = []
     if type == "image":
         frame = cv2.imread(path)
-        kpts, scores = gen_from_image(args1, frame, people_sort, human_model, pose_model, det_dim=det_dim, num_peroson=num_peroson, gen_output=gen_output)
+        kpts, scores = gen_from_image(args1, frame, people_sort, human_model, pose_model, det_dim=det_dim, num_person=num_person, gen_output=gen_output)
         kpts_result.append(kpts)
         scores_result.append(scores)
 
@@ -178,7 +180,7 @@ def gen_video_kpts(path, det_dim=416, num_peroson=1, gen_output=False, type='ima
             if not ret:
                 continue
 
-            kpts, scores = gen_from_image(args1, frame, people_sort, human_model, pose_model, det_dim=det_dim, num_peroson=num_peroson, gen_output=gen_output)
+            kpts, scores = gen_from_image(args1, frame, people_sort, human_model, pose_model, det_dim=det_dim, num_person=num_person, gen_output=gen_output)
             kpts_result.append(kpts)
             scores_result.append(scores)
 

@@ -19,6 +19,7 @@ import copy
 from fmpose3d.lib.checkpoint.download_checkpoints import ensure_checkpoints
 ensure_checkpoints()
 
+from fmpose3d.utils.weights import resolve_weights_path
 from fmpose3d.lib.preprocess import h36m_coco_format, revise_kpts
 from fmpose3d.lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
 from fmpose3d.common.arguments import opts as parse_args
@@ -113,7 +114,7 @@ def show3Dpose(vals, ax):
 def get_pose2D(path, output_dir, type):
 
     print('\nGenerating 2D pose...')
-    keypoints, scores = hrnet_pose(path, det_dim=416, num_peroson=1, gen_output=True, type=type)
+    keypoints, scores = hrnet_pose(path, det_dim=416, num_person=1, gen_output=True, type=type)
     keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
     re_kpts = revise_kpts(keypoints, scores, valid_frames)
     print('Generating 2D pose successful!')
@@ -278,8 +279,9 @@ def get_pose3D(path, output_dir, type='image'):
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    model_path = args.model_weights_path
-    print(model_path)
+    model_path = resolve_weights_path(args.model_weights_path, args.model_type)
+
+    print(f"Loading weights from: {model_path}")
     pre_dict = torch.load(model_path, map_location=device, weights_only=True)
     for name, key in model_dict.items():
         model_dict[name] = pre_dict[name]

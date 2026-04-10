@@ -354,7 +354,7 @@ def save_top_N_models(
 
 def back_to_ori_uv(cropped_uv, bb_box):
     """
-    for cropped uv, back to origial uv to help do the uvd->xyz operation
+    for cropped uv, back to original uv to help do the uvd->xyz operation
     :return:
     """
     N, T, V, _ = cropped_uv.size()
@@ -423,7 +423,7 @@ def project_to_2d(X, camera_params):
 
     Arguments:
     X -- 3D points in *camera space* to transform (N, *, 3)
-    camera_params -- intrinsic parameteres (N, 2+2+3+2=9)
+    camera_params -- intrinsic parameters (N, 2+2+3+2=9)
     """
     assert X.shape[-1] == 3  #  B,J,3
     assert len(camera_params.shape) == 2  # camera_params:[B,1,9]

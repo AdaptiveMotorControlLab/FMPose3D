@@ -306,7 +306,7 @@ def triangulate_3d_batch(points_2d_batch, cameras):
     num_cams, num_frames, num_joints, _ = points_2d_batch.shape  # (6, num_frames, 23, 2)
 
     print("num_cams,num_frames,num_joinits", points_2d_batch.shape)
-    # **1. compute projection matrics (6, 3, 4)**
+    # **1. compute projection matrices (6, 3, 4)**
     proj_matrices = np.array(
         [cam["intrinsic_matrix"] @ np.hstack((cam["R"], cam["T"])) for cam in cameras]
     )  # numpy array (6, 3, 4)
@@ -361,7 +361,7 @@ def triangulate_3d(points_2d, cameras):
     for i, cam in enumerate(cameras):
         K, dist, R, T = cam["intrinsic_matrix"], cam["distortion_coeffs"], cam["R"], cam["T"]
 
-        P = K @ np.hstack((R, T))  # projectio matrix
+        P = K @ np.hstack((R, T))  # projection matrix
         # print("Projection Matrix P:\n", P)
 
         proj_matrices.append(P)
@@ -628,7 +628,7 @@ def main():
     #             reprojected_2d = project_3d_to_2d(points_3d, cameras[i])
     #             # visualize_2d_on_video(video_files[i], frame_number, points_2d_frame[i], reprojected_2d, output_path)
 
-    # # test on trangulate 3D batch
+    # # test on triangulate 3D batch
     # left_frame_id = 10
     # right_frame_id = 60
 
