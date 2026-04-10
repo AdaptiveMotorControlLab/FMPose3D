@@ -15,7 +15,6 @@ import cv2
 import os
 import sys
 import random
-import pickle as pkl
 import argparse
 
 from fmpose3d.lib.yolov3.util import *
@@ -63,7 +62,7 @@ def write(x, img, colors):
 
 def arg_parse():
     """"
-    Parse arguements to the detect module
+    Parse arguments to the detect module
 
     """
     parser = argparse.ArgumentParser(description='YOLO v3 Cam Demo')
@@ -104,7 +103,7 @@ def load_model(args=None, CUDA=None, inp_dim=416):
     assert inp_dim % 32 == 0
     assert inp_dim > 32
 
-    # If there's a GPU availible, put the model on GPU
+    # If there's a GPU available, put the model on GPU
     if CUDA:
         model.cuda()
 
