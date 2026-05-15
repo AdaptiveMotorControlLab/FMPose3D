@@ -46,21 +46,6 @@ else:
     from fmpose3d.models import get_model
     CFM = get_model(args.model_type)
 
-try:
-    from deeplabcut.pose_estimation_pytorch.apis import (  # pyright: ignore[reportMissingImports]
-        superanimal_analyze_images,
-    )
-except ImportError:
-    raise ImportError(
-        "DeepLabCut is required for the animal demo. "
-        "Install it with: pip install \"fmpose3d[animals]\""
-    ) from None
-
-superanimal_name = "superanimal_quadruped"
-model_name = "hrnet_w32"
-detector_name = "fasterrcnn_resnet50_fpn_v2"
-max_individuals = 1
-
 def compute_limb_regularization_matrix(gt_3d):
     """
     Compute regularization matrix to align limb directions to vertical (0,0,1).
@@ -148,14 +133,13 @@ def apply_regularization(pose_3d, R):
 def get_pose2D(path, output_dir, type):
 
     print('\nGenerating 2D pose...')
-    
-    # Check if this is the special debug case for 000000119761_horse
+
+    # Hand-typed-pose debug bypass for one specific dev image.
     filename = Path(path).stem
     is_debug_case = "000000119761_horse" in filename
-    
+
     if is_debug_case:
         print(f"DEBUG MODE: Using provided 2D pose for {filename}")
-        # User provided 2D pose (26 keypoints, x, y coordinates, ignoring the last dimension)
         provided_pose = np.array([
             [361, 230], [361, 237], [363, 279], [257, 359], [251, 374],
             [164, 365], [68, 372], [99, 206], [247, 266], [253, 285],
@@ -163,90 +147,35 @@ def get_pose2D(path, output_dir, type):
             [250, 340], [128, 311], [76, 305], [313, 220], [48, 310],
             [351, 203], [352, 210], [340, 257], [340, 261], [373, 276],
             [55, 247]
-        ], dtype=np.float32)
-        
-        # Reshape to match expected format: (1, 26, 2) for single individual
-        provided_pose = provided_pose.reshape(1, 26, 2)
-        
-        # Create xy_preds dict with the provided pose
-        xy_preds = {path: provided_pose}
+        ], dtype=np.float32).reshape(1, 26, 2)
+        mapped_keypoints = {path: provided_pose}
         print(f"Using provided 2D pose with shape: {provided_pose.shape}")
     else:
-        # Normal prediction flow
-        predictions = superanimal_analyze_images(
-            superanimal_name,
-            model_name,
-            detector_name,
-            path,
-            max_individuals,
-            out_folder=output_dir
+        # Run the 2D pose estimator via the FMPose3D inference API.
+        # Empty --saved_2d_model_path -> auto-download the fine-tuned snapshot
+        # from Hugging Face. Non-empty path -> use that local file as-is.
+        from fmpose3d.common.config import SuperAnimalConfig
+        from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
+        from fmpose3d.utils.weights import resolve_weights_path
+
+        pose_snapshot_path = resolve_weights_path(
+            args.saved_2d_model_path, "sa_finetune_hrnet_w32.pt"
         )
-        print("predictions:", predictions)
-        
-        # get the 2D keypoints from the predictions
-        xy_preds = {}
-        # predictions is a dict: {image_path: {"bodyparts": (N, K, 3), "bboxes": ..., "bbox_scores": ...}}
-        for img_path, payload in predictions.items():
-            bodyparts = payload.get("bodyparts")
-            if bodyparts is None:
-                continue
-            # bodyparts shape: (num_individuals, num_keypoints, 3) -> [:, :, :2] keeps x,y
-            xy_preds[img_path] = bodyparts[..., :2]
+        cfg = SuperAnimalConfig(
+            pose_snapshot_path=pose_snapshot_path,
+            pytorch_config_path=args.pytorch_config_2d_path,
+        )
+        print(f"[2D] pose snapshot = {cfg.pose_snapshot_path}")
 
-    print("2D keypoints (x,y) by image:")
-    for img_path, xy in xy_preds.items():
-        print(f"{img_path}: shape {xy.shape}")
-    
-    # For debug case, the provided pose is already in Animal3D format (26 keypoints)
-    # So we skip the mapping step
-    if is_debug_case:
-        print("DEBUG MODE: Skipping keypoint mapping (already in Animal3D format)")
-        mapped_keypoints = xy_preds
-    else:
-        # now map the keypoints to a different set of keypoints (used in Animal3D)
-        # keypoint mapping from quadruped80K super keypotints to animal3d keypoints
-        keypoint_mapping = {"quadruped80k":[10, 5, -1, 26, 29, 30, 35, 22, 24, 27, 31, 32, -1, -1, 25, 28, 33, 34, 15, 23, 11, 6, 4, 3, 0, -1]}
-        
-        # for the keypoint_mapping, -1 indicates that there is no corresponding keypoint in the source set, but we can interpolate 
-        # for index 2, we can interpolate between keypoints 3 and 4 in the source set to get a better estimate of the missing keypoint
-        # for index 25, we can interpolate between keypoints 22 and 23 in the source set
-        # for index 12, we can interpolate between keypoints 24 and 19 in the source set
-        # for index 13, we can interpolate between keypoints 27 and 19 in the source set
-        
-        # Define interpolation rules for -1 indices: {target_idx: (source_idx1, source_idx2)}
-        interpolation_rules = {
-            2: (3, 4),      # interpolate between source keypoints 3 and 4
-            12: (24, 19),   # interpolate between source keypoints 24 and 19
-            13: (27, 19),   # interpolate between source keypoints 27 and 19
-            25: (22, 23),   # interpolate between source keypoints 22 and 23
-        }
-        
-        # map the keypoints
-        mapped_keypoints = {}
-        mapping_indices = keypoint_mapping["quadruped80k"]
+        img_bgr = cv2.imread(path)
+        if img_bgr is None:
+            raise FileNotFoundError(f"Failed to read image: {path}")
 
-        for img_path, xy in xy_preds.items():
-            # xy shape: (num_individuals, num_keypoints, 2)
-            num_individuals, num_keypoints, _ = xy.shape
-            num_target_keypoints = len(mapping_indices)
-            
-            # Initialize mapped array with NaN or zeros
-            mapped_xy = np.full((num_individuals, num_target_keypoints, 2), np.nan)
-            
-            for target_idx, source_idx in enumerate(mapping_indices):
-                if source_idx != -1 and source_idx < num_keypoints:
-                    # Copy the keypoint from source to target position
-                    mapped_xy[:, target_idx, :] = xy[:, source_idx, :]
-                elif source_idx == -1 and target_idx in interpolation_rules:
-                    # Perform interpolation for -1 indices
-                    src1, src2 = interpolation_rules[target_idx]
-                    if src1 < num_keypoints and src2 < num_keypoints:
-                        # Interpolate as the average of the two source keypoints
-                        mapped_xy[:, target_idx, :] = (xy[:, src1, :] + xy[:, src2, :]) / 2.0
-                        print(f"Interpolated keypoint {target_idx} from source keypoints {src1} and {src2}")
-            
-            mapped_keypoints[img_path] = mapped_xy
-            print(f"Mapped {img_path}: {xy.shape} -> {mapped_xy.shape}")
+        estimator = SuperAnimalEstimator(cfg)
+        # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
+        kpts, _scores, _mask = estimator.predict(img_bgr[None])
+        # Pack into the {img_path: (1, 26, 2)} format expected by the save/vis code below.
+        mapped_keypoints = {path: kpts[:, 0, :, :]}
 
     print('Generating 2D pose successful!')
 
@@ -259,7 +188,6 @@ def get_pose2D(path, output_dir, type):
         # Save in the same format as vis_in_the_wild.py for compatibility
         output_npz = output_dir_2D + 'keypoints.npz'
         np.savez_compressed(output_npz, reconstruction=mapped_xy)
-        print(f"Saved keypoints to {output_npz}")
         
         # Also save as npy for backup
         img_name = Path(img_path).stem
@@ -275,7 +203,6 @@ def get_pose2D(path, output_dir, type):
                 index=[f'keypoint_{i}' for i in range(mapped_xy.shape[1])]
             )
             df.to_csv(csv_file)
-            print(f"Saved individual {ind_idx} keypoints to {csv_file}")
         
         # Visualize mapped keypoints on image
         img = Image.open(img_path)
@@ -328,7 +255,6 @@ def get_pose2D(path, output_dir, type):
         plt.tight_layout()
         plt.savefig(vis_file, dpi=150, bbox_inches='tight')
         plt.close(fig)
-        print(f"Saved visualization to {vis_file}")
 
 
 def get_pose3D(path, output_dir, type='image'):
@@ -337,7 +263,6 @@ def get_pose3D(path, output_dir, type='image'):
     This function reads the 2D keypoints saved by get_pose2D and generates 3D poses.
     """
     print('\nGenerating 3D pose...')
-    print(f"args.n_joints: {args.n_joints}, args.out_joints: {args.out_joints}")
     
     ## Reload model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -346,19 +271,20 @@ def get_pose3D(path, output_dir, type='image'):
     model['CFM'] = CFM(args).to(device)
     
     model_dict = model['CFM'].state_dict()
-    model_path = args.saved_model_path
+    # Empty --saved_model_path -> auto-download fmpose3d_animals.pth from
+    # Hugging Face. Non-empty path is used as-is.
+    from fmpose3d.utils.weights import resolve_weights_path
+    model_path = resolve_weights_path(args.saved_model_path, f"{args.model_type}.pth")
     print(f"Loading model from: {model_path}")
     pre_dict = torch.load(model_path, map_location=device, weights_only=True)
     for name, key in model_dict.items():
         model_dict[name] = pre_dict[name]
     model['CFM'].load_state_dict(model_dict)
-    print("Model loaded successfully!")
-    
+
     model = model['CFM'].eval()
 
     ## Load input 2D keypoints
     keypoints = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)['reconstruction']
-    print(f"Loaded keypoints shape: {keypoints.shape}")
 
     ## Generate 3D poses
     if type == "image":
@@ -422,9 +348,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         return y_local
     
     ## Estimation (without TTA for better results)
-    print("input_2D.shape:", input_2D.shape)
-    print("input_2D:", input_2D[0, 0])
-    
     # Single inference without flip augmentation
     # Create 3D random noise with shape (1, 1, J, 3)
     y = torch.randn(input_2D.size(0), input_2D.size(1), input_2D.size(2), 3, device=device)
@@ -492,7 +415,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         output_dir_2D_img = output_dir + 'pose2D_on_image/'
         os.makedirs(output_dir_2D_img, exist_ok=True)
         cv2.imwrite(f'{output_dir_2D_img}{i:04d}_2d.png', img_copy)
-        print(f"Saved 2D pose on image to {output_dir_2D_img}{i:04d}_2d.png")
 
     ## Save 3D pose as npz
     output_dir_3D = output_dir + 'pose3D/'
@@ -644,5 +566,3 @@ if __name__ == "__main__":
         if args.type=="video":
             img2video(path, filename, output_dir)
             img2gif(path, filename, output_dir)
-
-        print('Generating demo successful!')
