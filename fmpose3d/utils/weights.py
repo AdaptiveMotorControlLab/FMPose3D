@@ -7,30 +7,31 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-"""Shared helpers for resolving / downloading FMPose3D model weights."""
+"""Shared helper for resolving / downloading FMPose3D model weights."""
 
 HF_REPO_ID: str = "MLAdaptiveIntelligence/FMPose3D"
 
 
-def resolve_weights_path(model_weights_path: str, model_type: str) -> str:
+def resolve_weights_path(local_path: str, filename: str) -> str:
     """Return a local weights path, downloading from Hugging Face Hub if needed.
 
     Parameters
     ----------
-    model_weights_path : str
-        User-supplied local path.  If falsy the weights are fetched from the
-        Hugging Face Hub automatically.
-    model_type : str
-        Model variant name used to derive the remote filename
-        (e.g. ``"fmpose3d_humans"`` -> ``fmpose3d_humans.pth``).
+    local_path : str
+        User-supplied local path. If falsy, ``filename`` is fetched from
+        the Hugging Face Hub (cached under ``~/.cache/huggingface``).
+    filename : str
+        The exact remote filename in the FMPose3D Hugging Face repo
+        (e.g. ``"fmpose3d_humans.pth"``, ``"fmpose3d_animals.pth"``,
+        ``"sa_finetune_hrnet_w32.pt"``).
 
     Returns
     -------
     str
         Absolute path to the weight file on disk.
     """
-    if model_weights_path:
-        return model_weights_path
+    if local_path:
+        return local_path
 
     try:
         from huggingface_hub import hf_hub_download
@@ -41,7 +42,6 @@ def resolve_weights_path(model_weights_path: str, model_type: str) -> str:
             "Or download the weights manually and pass the local path."
         ) from None
 
-    filename = f"{model_type}.pth"
     print(
         f"No local weights path specified. "
         f"Downloading '{filename}' from Hugging Face ({HF_REPO_ID})..."
