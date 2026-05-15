@@ -279,7 +279,7 @@ def get_pose3D(path, output_dir, type='image'):
     
     # if args.reload:
     model_dict = model['CFM'].state_dict()
-    model_path = resolve_weights_path(args.model_weights_path, args.model_type)
+    model_path = resolve_weights_path(args.model_weights_path, f"{args.model_type}.pth")
 
     print(f"Loading weights from: {model_path}")
     pre_dict = torch.load(model_path, map_location=device, weights_only=True)
