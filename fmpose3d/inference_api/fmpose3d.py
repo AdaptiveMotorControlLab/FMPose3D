@@ -256,6 +256,28 @@ class SuperAnimalEstimator:
         all_mapped: list[np.ndarray] = []
         all_scores: list[np.ndarray] = []
 
+        # Resolve pose snapshot: explicit local path > HF auto-download > empty (stock).
+        pose_snapshot_path = cfg.pose_snapshot_path
+        if not pose_snapshot_path and cfg.auto_download_finetuned:
+            from fmpose3d.utils.weights import resolve_weights_path
+            pose_snapshot_path = resolve_weights_path("", "sa_finetune_hrnet_w32.pt")
+
+        # Fine-tuned mode: non-empty resolved path swaps the stock 39-joint head
+        # for a custom DLC checkpoint that predicts the 26-joint Animal3D layout
+        # natively (no _map_keypoints needed).
+        is_finetuned = bool(pose_snapshot_path)
+        if is_finetuned:
+            from fmpose3d.animals.configs import SA_FINETUNE_HRNET_W32_YAML
+            customized_kwargs = dict(
+                customized_model_config=(
+                    cfg.pytorch_config_path or SA_FINETUNE_HRNET_W32_YAML
+                ),
+                customized_pose_checkpoint=pose_snapshot_path,
+                customized_detector_checkpoint=cfg.detector_snapshot_path or None,
+            )
+        else:
+            customized_kwargs = {}
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Write each frame as an image so DLC can read it.
             paths: list[str] = []
@@ -272,10 +294,12 @@ class SuperAnimalEstimator:
                 images=paths,
                 max_individuals=cfg.max_individuals,
                 out_folder=tmpdir,
-                progress_bar=False
+                progress_bar=False,
+                **customized_kwargs,
             )
             # predictions: {image_path: {"bodyparts": (N_ind, K, 3), ...}}
-            # Iterate in input order to keep frame alignment stable.
+            # In fine-tuned mode K == 26 already; in stock mode K == 39
+            # (quadruped80K) and is remapped via _map_keypoints/_map_scores.
             for img_path in paths:
                 payload = predictions.get(img_path) if isinstance(predictions, dict) else None
                 if payload is None and isinstance(predictions, dict) and len(predictions) == 1:
@@ -291,8 +315,12 @@ class SuperAnimalEstimator:
 
                 xy = bodyparts[..., :2]   # (N_ind, K, 2)
                 conf = bodyparts[..., 2]  # (N_ind, K)
-                mapped = self._map_keypoints(xy)
-                mapped_scores = self._map_scores(conf)
+                if is_finetuned:
+                    mapped = xy
+                    mapped_scores = conf
+                else:
+                    mapped = self._map_keypoints(xy)
+                    mapped_scores = self._map_scores(conf)
 
                 # Take only the first individual.
                 all_mapped.append(mapped[:1])
@@ -599,7 +627,13 @@ def _default_components(
     means adding one branch here (or turning this into a registry).
     """
     if model_cfg.model_type == SupportedModel.FMPOSE3D_ANIMALS:
-        return SuperAnimalEstimator(), AnimalPostProcessor()
+        # Default to fine-tuned + lazy HF auto-download so the animal API
+        # works out-of-the-box. Construction stays cheap (no network);
+        # the download fires on the first predict() call.
+        return (
+            SuperAnimalEstimator(SuperAnimalConfig(auto_download_finetuned=True)),
+            AnimalPostProcessor(),
+        )
     return HRNetEstimator(), HumanPostProcessor()
 
 
