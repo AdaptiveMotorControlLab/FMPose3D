@@ -32,7 +32,7 @@ class opts:
         self.parser.add_argument("--layers", default=3, type=int)
         self.parser.add_argument("--channel", default=512, type=int)
         self.parser.add_argument("--d_hid", default=1024, type=int)
-        self.parser.add_argument("--dataset", type=str, default="rat7m")
+        self.parser.add_argument("--dataset", type=str, default="animal3d")
         self.parser.add_argument("-k", "--keypoints", default="cpn_ft_h36m_dbb", type=str)
         self.parser.add_argument("--data_augmentation", type=bool, default=False)
         self.parser.add_argument("--reverse_augmentation", type=bool, default=False)
@@ -42,7 +42,7 @@ class opts:
         )
         self.parser.add_argument("--test_augmentation_FlowAug", type=str2bool, default=False)
         self.parser.add_argument("--crop_uv", type=int, default=0)
-        self.parser.add_argument("--root_path", type=str, default="Rat7M_data/")
+        self.parser.add_argument("--root_path", type=str, default="./dataset/")
         self.parser.add_argument("-a", "--actions", default="*", type=str)
         self.parser.add_argument("--downsample", default=1, type=int)
         self.parser.add_argument("--subset", default=1, type=float)
@@ -201,13 +201,6 @@ class opts:
                 self.opt.joints_left = [4, 5, 6, 11, 12, 13]
                 self.opt.joints_right = [1, 2, 3, 14, 15, 16]
 
-        elif self.opt.dataset == "rat7m":
-            # Rat7M dataset configuration
-            self.opt.n_joints = 20
-            self.opt.out_joints = 20
-            self.opt.joints_left = [8, 10, 11, 17, 18]  # HipL, ElbowL, ArmL, KneeL, ShinL
-            self.opt.joints_right = [9, 14, 15, 16, 19]  # HipR, ElbowR, ArmR, KneeR, ShinR
-            self.opt.root_joint = 4
         elif self.opt.dataset == "animal3d":
             # Animal3D dataset configuration
 
