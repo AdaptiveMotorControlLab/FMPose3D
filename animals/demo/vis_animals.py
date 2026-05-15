@@ -130,13 +130,12 @@ def apply_regularization(pose_3d, R):
     """
     return (R @ pose_3d.T).T
 
-def get_pose2D(path, output_dir, type):
+def build_2d_estimator():
+    """Build the 2D pose estimator once. Snapshot resolves lazily on first predict.
 
-    print('\nGenerating 2D pose...')
-
-    # Run the 2D pose estimator via the FMPose3D inference API.
-    # Empty --saved_2d_model_path -> auto-download the fine-tuned snapshot
-    # from Hugging Face. Non-empty path -> use that local file as-is.
+    Empty --saved_2d_model_path -> auto-download fine-tuned snapshot from HF.
+    Non-empty path -> use as a local override.
+    """
     from fmpose3d.common.config import SuperAnimalConfig
     from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
     from fmpose3d.utils.weights import resolve_weights_path
@@ -149,12 +148,17 @@ def get_pose2D(path, output_dir, type):
         pytorch_config_path=args.pytorch_config_2d_path,
     )
     print(f"[2D] pose snapshot = {cfg.pose_snapshot_path}")
+    return SuperAnimalEstimator(cfg)
+
+
+def get_pose2D(estimator, path, output_dir, type):
+
+    print('\nGenerating 2D pose...')
 
     img_bgr = cv2.imread(path)
     if img_bgr is None:
         raise FileNotFoundError(f"Failed to read image: {path}")
 
-    estimator = SuperAnimalEstimator(cfg)
     # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
     kpts, _scores, _mask = estimator.predict(img_bgr[None])
     # Pack into the {img_path: (1, 26, 2)} format expected by the save/vis code below.
@@ -240,36 +244,36 @@ def get_pose2D(path, output_dir, type):
         plt.close(fig)
 
 
-def get_pose3D(path, output_dir, type='image'):
+def build_3d_lifter():
+    """Build the 3D lifter once and return (model, device).
+
+    Empty --saved_model_path -> auto-download fmpose3d_animals.pth from HF.
+    Non-empty path is used as a local override.
+    """
+    from fmpose3d.utils.weights import resolve_weights_path
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = CFM(args).to(device)
+
+    model_path = resolve_weights_path(args.saved_model_path, f"{args.model_type}.pth")
+    print(f"[3D] lifter weights = {model_path}")
+    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
+    model_dict = model.state_dict()
+    for name in model_dict:
+        model_dict[name] = pre_dict[name]
+    model.load_state_dict(model_dict)
+    return model.eval()
+
+
+def get_pose3D(model, path, output_dir, type='image'):
     """
     Generate 3D pose from 2D keypoints using the model.
-    This function reads the 2D keypoints saved by get_pose2D and generates 3D poses.
+    Reads the 2D keypoints saved by get_pose2D and generates 3D poses.
     """
     print('\nGenerating 3D pose...')
-    
-    ## Reload model
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = {}
-    model['CFM'] = CFM(args).to(device)
-    
-    model_dict = model['CFM'].state_dict()
-    # Empty --saved_model_path -> auto-download fmpose3d_animals.pth from
-    # Hugging Face. Non-empty path is used as-is.
-    from fmpose3d.utils.weights import resolve_weights_path
-    model_path = resolve_weights_path(args.saved_model_path, f"{args.model_type}.pth")
-    print(f"Loading model from: {model_path}")
-    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
-    for name, key in model_dict.items():
-        model_dict[name] = pre_dict[name]
-    model['CFM'].load_state_dict(model_dict)
-
-    model = model['CFM'].eval()
-
-    ## Load input 2D keypoints
     keypoints = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)['reconstruction']
 
-    ## Generate 3D poses
     if type == "image":
         i = 0
         img = cv2.imread(path)
@@ -508,44 +512,46 @@ def img2gif(video_path, name, output_dir, duration=0.25):
 
 
 if __name__ == "__main__":
-    
+
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     path = args.path # file path or folder path
-    
-    # Check if path is a directory
+
+    # Build the 2D estimator and 3D lifter ONCE; reuse across all images/frames.
+    # This avoids redundant HF resolution and DLC/torch model reloads.
+    estimator_2d = build_2d_estimator()
+    model_3d = build_3d_lifter()
+
     if os.path.isdir(path):
-        # Get all image files in the directory
         image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']
         image_files = []
         for ext in image_extensions:
             image_files.extend(glob.glob(os.path.join(path, ext)))
         image_files.sort()
-        
+
         if len(image_files) == 0:
             print(f"No image files found in {path}")
             exit(0)
-        
+
         print(f"Found {len(image_files)} images in {path}")
-        
-        # Process each image
+
         for img_path in tqdm(image_files, desc="Processing images"):
             filename = img_path.split('/')[-1].split('.')[0]
             output_dir = './predictions/' + filename + '/'
-            
+
             print(f"\nProcessing: {img_path}")
-            get_pose2D(img_path, output_dir, args.type)
-            get_pose3D(img_path, output_dir, args.type)
-        
+            get_pose2D(estimator_2d, img_path, output_dir, args.type)
+            get_pose3D(model_3d, img_path, output_dir, args.type)
+
         print(f'\nAll {len(image_files)} images processed successfully!')
     else:
         # Single file processing
         filename = path.split('/')[-1].split('.')[0]
         output_dir = './predictions/' + filename + '/'
 
-        get_pose2D(path, output_dir, args.type)
-        get_pose3D(path, output_dir, args.type)
+        get_pose2D(estimator_2d, path, output_dir, args.type)
+        get_pose3D(model_3d, path, output_dir, args.type)
 
-        if args.type=="video":
+        if args.type == "video":
             img2video(path, filename, output_dir)
             img2gif(path, filename, output_dir)
