@@ -247,8 +247,8 @@ if __name__ == '__main__':
     train_paths = args.train_dataset_path if isinstance(args.train_dataset_path, list) else [args.train_dataset_path]
     test_paths = args.test_dataset_path if isinstance(args.test_dataset_path, list) else [args.test_dataset_path]
 
-    # Rat7M doesn't have action labels, use placeholder for error calculation
-    actions = ['rat_motion']
+    # Animal3D doesn't have per-clip action labels; use a single placeholder bucket for error aggregation.
+    actions = ['animal_motion']
 
     if args.train:
         train_datasets = [TrainDataset(is_train=True, json_file=p, root_joint=args.root_joint) for p in train_paths]
