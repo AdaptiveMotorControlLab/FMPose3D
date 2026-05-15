@@ -4,8 +4,6 @@ gpu_id=1
 sample_steps=3
 batch_size=1
 sh_file='vis_animals.sh'
-# n_joints=26
-# out_joints=26
 
 model_type='fmpose3d_animals'
 # model_path=''  # set to a local file path to override the registry
