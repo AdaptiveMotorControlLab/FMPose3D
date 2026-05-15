@@ -69,13 +69,13 @@ class TestDatasetConfig:
 
     def test_custom_values(self):
         cfg = DatasetConfig(
-            dataset="rat7m",
-            root_path="Rat7M_data/",
+            dataset="animal3d",
+            root_path="dataset/",
             joints_left=[8, 10, 11],
             joints_right=[9, 14, 15],
         )
-        assert cfg.dataset == "rat7m"
-        assert cfg.root_path == "Rat7M_data/"
+        assert cfg.dataset == "animal3d"
+        assert cfg.root_path == "dataset/"
         assert cfg.joints_left == [8, 10, 11]
 
 
@@ -261,9 +261,9 @@ class TestPipelineConfig:
             out_channels=3,
             frames=3,
             # DatasetConfig
-            dataset="rat7m",
+            dataset="animal3d",
             keypoints="cpn",
-            root_path="Rat7M_data/",
+            root_path="dataset/",
             actions="*",
             downsample=1,
             subset=1.0,
@@ -343,7 +343,7 @@ class TestPipelineConfig:
         # Verify a sample from each group
         assert cfg.model_cfg.layers == 5
         assert cfg.model_cfg.channel == 256
-        assert cfg.dataset_cfg.dataset == "rat7m"
+        assert cfg.dataset_cfg.dataset == "animal3d"
         assert cfg.dataset_cfg.joints_left == [8, 10]
         assert cfg.training_cfg.train is True
         assert cfg.training_cfg.nepoch == 100
