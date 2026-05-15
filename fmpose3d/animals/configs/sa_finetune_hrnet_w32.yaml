@@ -1,0 +1,220 @@
+# DeepLabCut pytorch_config for FMPose3D's 2D animal pose model:
+# SuperAnimal-Quadruped HRNet-w32 backbone fine-tuned on Animal3D, with
+# the heatmap head re-trained for the 26-joint Animal3D output layout.
+#
+# Loaded by fmpose3d.inference_api.SuperAnimalEstimator and passed to
+# DLC's `superanimal_analyze_images(..., customized_model_config=<this yaml>,
+# customized_pose_checkpoint=<sa_finetune_hrnet_w32.pt>)`. Only the pose
+# model is fine-tuned; the bounding-box detector (Faster R-CNN) is the
+# stock SuperAnimal-Quadruped one resolved by DLC at runtime.
+data:
+  bbox_margin: 20
+  colormode: RGB
+  inference:
+    normalize_images: true
+    top_down_crop:
+      width: 256
+      height: 256
+    auto_padding:
+      pad_width_divisor: 32
+      pad_height_divisor: 32
+  train:
+    affine:
+      p: 0.5
+      rotation: 30
+      scaling:
+      - 1.0
+      - 1.0
+      translation: 0
+    gaussian_noise: 12.75
+    motion_blur: true
+    normalize_images: true
+    top_down_crop:
+      width: 256
+      height: 256
+    auto_padding:
+      pad_width_divisor: 32
+      pad_height_divisor: 32
+detector:
+  data:
+    colormode: RGB
+    inference:
+      normalize_images: true
+    train:
+      affine:
+        p: 0.5
+        rotation: 30
+        scaling:
+        - 1.0
+        - 1.0
+        translation: 40
+      collate:
+        type: ResizeFromDataSizeCollate
+        min_scale: 0.4
+        max_scale: 1.0
+        min_short_side: 128
+        max_short_side: 1152
+        multiple_of: 32
+        to_square: false
+      hflip: true
+      normalize_images: true
+  device: auto
+  model:
+    type: FasterRCNN
+    freeze_bn_stats: true
+    freeze_bn_weights: false
+    variant: fasterrcnn_resnet50_fpn_v2
+  runner:
+    type: DetectorTrainingRunner
+    key_metric: test.mAP@50:95
+    key_metric_asc: true
+    eval_interval: 10
+    optimizer:
+      type: AdamW
+      params:
+        lr: 0.0001
+    scheduler:
+      type: LRListScheduler
+      params:
+        milestones:
+        - 160
+        lr_list:
+        - - 1e-05
+    snapshots:
+      max_snapshots: 5
+      save_epochs: 25
+      save_optimizer_state: false
+  train_settings:
+    batch_size: 1
+    dataloader_workers: 0
+    dataloader_pin_memory: false
+    display_iters: 500
+    epochs: 250
+device: auto
+inference:
+  multithreading:
+    enabled: true
+    queue_length: 4
+    timeout: 30.0
+  compile:
+    enabled: false
+    backend: inductor
+  autocast:
+    enabled: false
+metadata:
+  project_path: ""
+  pose_config_path: ""
+  bodyparts:
+  - left_eye
+  - right_eye
+  - chin
+  - left_front_paw
+  - right_front_paw
+  - left_back_paw
+  - right_back_paw
+  - tail_base
+  - left_front_thigh
+  - right_front_thigh
+  - left_back_thigh
+  - right_back_thigh
+  - left_shoulder
+  - right_shoulder
+  - left_front_knee
+  - right_front_knee
+  - left_back_knee
+  - right_back_knee
+  - neck_base
+  - tail_mid
+  - left_ear_base
+  - right_ear_base
+  - left_mouth_corner
+  - right_mouth_corner
+  - nose
+  - tail_tip_first
+  unique_bodyparts: []
+  individuals:
+  - individual000
+  with_identity: false
+method: td
+model:
+  backbone:
+    type: HRNet
+    model_name: hrnet_w32
+    freeze_bn_stats: true
+    freeze_bn_weights: false
+    interpolate_branches: false
+    increased_channel_count: false
+  backbone_output_channels: 32
+  heads:
+    bodypart:
+      type: HeatmapHead
+      weight_init: normal
+      predictor:
+        type: HeatmapPredictor
+        apply_sigmoid: false
+        clip_scores: true
+        location_refinement: true
+        locref_std: 7.2801
+      target_generator:
+        type: HeatmapGaussianGenerator
+        num_heatmaps: 26
+        pos_dist_thresh: 17
+        heatmap_mode: KEYPOINT
+        gradient_masking: true
+        background_weight: 0.0
+        generate_locref: true
+        locref_std: 7.2801
+      criterion:
+        heatmap:
+          type: WeightedMSECriterion
+          weight: 1.0
+        locref:
+          type: WeightedHuberCriterion
+          weight: 0.05
+      heatmap_config:
+        channels:
+        - 32
+        kernel_size: []
+        strides: []
+        final_conv:
+          out_channels: 26
+          kernel_size: 1
+      locref_config:
+        channels:
+        - 32
+        kernel_size: []
+        strides: []
+        final_conv:
+          out_channels: 52
+          kernel_size: 1
+net_type: hrnet_w32
+runner:
+  type: PoseTrainingRunner
+  gpus:
+  key_metric: test.mAP
+  key_metric_asc: true
+  eval_interval: 10
+  optimizer:
+    type: AdamW
+    params:
+      lr: 0.0001
+  scheduler:
+    type: LRListScheduler
+    params:
+      lr_list:
+      - - 1e-05
+      - - 1e-06
+      milestones:
+      - 160
+      - 190
+  snapshots:
+    max_snapshots: 5
+    save_epochs: 10
+    save_optimizer_state: false
+train_settings:
+  batch_size: 64
+  dataloader_workers: 8
+  dataloader_pin_memory: false
+  display_iters: 500
+  epochs: 200
+  seed: 42
