@@ -78,6 +78,14 @@ class opts:
         )
         self.parser.add_argument("--saved_model_path", type=str, default="")
 
+        # 2D pose model overrides (consumed by animal demo vis_animals.py).
+        # --saved_2d_model_path: empty -> auto-download the fine-tuned snapshot
+        #   from Hugging Face on first run; non-empty -> use as a local override.
+        # --pytorch_config_2d_path: DLC architecture yaml; empty -> use the
+        #   bundled fmpose3d/animals/configs/sa_finetune_hrnet_w32.yaml.
+        self.parser.add_argument("--saved_2d_model_path", type=str, default="")
+        self.parser.add_argument("--pytorch_config_2d_path", type=str, default="")
+
         self.parser.add_argument("--n_joints", type=int, default=26)
         self.parser.add_argument("--out_joints", type=int, default=26)
         self.parser.add_argument("--out_all", type=int, default=1)
