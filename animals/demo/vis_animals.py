@@ -134,48 +134,31 @@ def get_pose2D(path, output_dir, type):
 
     print('\nGenerating 2D pose...')
 
-    # Hand-typed-pose debug bypass for one specific dev image.
-    filename = Path(path).stem
-    is_debug_case = "000000119761_horse" in filename
+    # Run the 2D pose estimator via the FMPose3D inference API.
+    # Empty --saved_2d_model_path -> auto-download the fine-tuned snapshot
+    # from Hugging Face. Non-empty path -> use that local file as-is.
+    from fmpose3d.common.config import SuperAnimalConfig
+    from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
+    from fmpose3d.utils.weights import resolve_weights_path
 
-    if is_debug_case:
-        print(f"DEBUG MODE: Using provided 2D pose for {filename}")
-        provided_pose = np.array([
-            [361, 230], [361, 237], [363, 279], [257, 359], [251, 374],
-            [164, 365], [68, 372], [99, 206], [247, 266], [253, 285],
-            [127, 275], [101, 285], [267, 217], [268, 229], [273, 318],
-            [250, 340], [128, 311], [76, 305], [313, 220], [48, 310],
-            [351, 203], [352, 210], [340, 257], [340, 261], [373, 276],
-            [55, 247]
-        ], dtype=np.float32).reshape(1, 26, 2)
-        mapped_keypoints = {path: provided_pose}
-        print(f"Using provided 2D pose with shape: {provided_pose.shape}")
-    else:
-        # Run the 2D pose estimator via the FMPose3D inference API.
-        # Empty --saved_2d_model_path -> auto-download the fine-tuned snapshot
-        # from Hugging Face. Non-empty path -> use that local file as-is.
-        from fmpose3d.common.config import SuperAnimalConfig
-        from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
-        from fmpose3d.utils.weights import resolve_weights_path
+    pose_snapshot_path = resolve_weights_path(
+        args.saved_2d_model_path, "sa_finetune_hrnet_w32.pt"
+    )
+    cfg = SuperAnimalConfig(
+        pose_snapshot_path=pose_snapshot_path,
+        pytorch_config_path=args.pytorch_config_2d_path,
+    )
+    print(f"[2D] pose snapshot = {cfg.pose_snapshot_path}")
 
-        pose_snapshot_path = resolve_weights_path(
-            args.saved_2d_model_path, "sa_finetune_hrnet_w32.pt"
-        )
-        cfg = SuperAnimalConfig(
-            pose_snapshot_path=pose_snapshot_path,
-            pytorch_config_path=args.pytorch_config_2d_path,
-        )
-        print(f"[2D] pose snapshot = {cfg.pose_snapshot_path}")
+    img_bgr = cv2.imread(path)
+    if img_bgr is None:
+        raise FileNotFoundError(f"Failed to read image: {path}")
 
-        img_bgr = cv2.imread(path)
-        if img_bgr is None:
-            raise FileNotFoundError(f"Failed to read image: {path}")
-
-        estimator = SuperAnimalEstimator(cfg)
-        # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
-        kpts, _scores, _mask = estimator.predict(img_bgr[None])
-        # Pack into the {img_path: (1, 26, 2)} format expected by the save/vis code below.
-        mapped_keypoints = {path: kpts[:, 0, :, :]}
+    estimator = SuperAnimalEstimator(cfg)
+    # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
+    kpts, _scores, _mask = estimator.predict(img_bgr[None])
+    # Pack into the {img_path: (1, 26, 2)} format expected by the save/vis code below.
+    mapped_keypoints = {path: kpts[:, 0, :, :]}
 
     print('Generating 2D pose successful!')
 
