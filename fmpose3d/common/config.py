@@ -249,9 +249,17 @@ class SuperAnimalConfig(Pose2DConfig):
     """DeepLabCut SuperAnimal 2D pose detector configuration.
 
     Uses the DeepLabCut ``superanimal_analyze_images`` API to detect
-    animal keypoints in the quadruped80K format, then maps them to the
-    Animal3D 26-keypoint layout expected by the ``fmpose3d_animals``
-    3D lifter.
+    animal keypoints. Supports two modes:
+
+    * **Fine-tuned.** Predicts the 26-joint Animal3D layout natively
+      (no remap). Activated by either ``auto_download_finetuned=True``
+      (used by :meth:`FMPose3DInference.for_animals` — snapshot is
+      auto-downloaded from Hugging Face on first predict) or by setting
+      ``pose_snapshot_path`` to a local ``.pt`` file.
+    * **Stock SA.** Runs the published ``superanimal_quadruped`` weights
+      (39 keypoints) and remaps to the 26-joint Animal3D layout via
+      :meth:`SuperAnimalEstimator._map_keypoints`. Active when the bare
+      ``SuperAnimalConfig()`` default is used (all paths/flag empty).
 
     Attributes
     ----------
@@ -263,12 +271,37 @@ class SuperAnimalConfig(Pose2DConfig):
         Object detector used for animal bounding boxes.
     max_individuals : int
         Maximum number of individuals to detect per image (default 1).
+    pytorch_config_path : str
+        Path to a DLC ``pytorch_config.yaml`` describing a fine-tuned
+        model. When empty, the packaged default
+        (:data:`fmpose3d.animals.configs.SA_FINETUNE_HRNET_W32_YAML`)
+        is used. Only consulted in fine-tuned mode.
+    pose_snapshot_path : str
+        Path to a fine-tuned pose ``.pt`` checkpoint. **Non-empty value
+        activates fine-tuned mode.** Empty → stock SA, unless
+        ``auto_download_finetuned`` is True.
+    detector_snapshot_path : str
+        Path to a custom Faster R-CNN checkpoint. When empty, DLC
+        resolves the stock SA detector from its modelzoo.
+    auto_download_finetuned : bool
+        When True and ``pose_snapshot_path`` is empty, the FMPose3D
+        fine-tuned snapshot is downloaded from Hugging Face on first
+        :meth:`SuperAnimalEstimator.predict` call (cached under
+        ``~/.cache/huggingface``). This is what
+        :meth:`FMPose3DInference.for_animals` uses as its default so the
+        animal pipeline runs out-of-the-box without manual downloads.
+        Standalone ``SuperAnimalConfig()`` keeps it False so that
+        stock SA + 39→26 remap remains the explicit, no-network default.
     """
     pose2d_model: str = "superanimal"
     superanimal_name: str = "superanimal_quadruped"
     sa_model_name: str = "hrnet_w32"
     detector_name: str = "fasterrcnn_resnet50_fpn_v2"
     max_individuals: int = 1
+    pytorch_config_path: str = ""
+    pose_snapshot_path: str = ""
+    detector_snapshot_path: str = ""
+    auto_download_finetuned: bool = False
 
 
 @dataclass
