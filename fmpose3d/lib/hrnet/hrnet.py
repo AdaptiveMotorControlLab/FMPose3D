@@ -196,11 +196,11 @@ class HRNetPose2d:
         """Instantiate HRNet and load checkpoint weights."""
         from fmpose3d.lib.hrnet.lib.models import pose_hrnet
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = pose_hrnet.get_pose_net(config, is_train=False)
-        if torch.cuda.is_available():
-            model = model.cuda()
+        model = model.to(device)
 
-        state_dict = torch.load(config.OUTPUT_DIR, weights_only=True)
+        state_dict = torch.load(config.OUTPUT_DIR, map_location=device, weights_only=True)
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
             new_state_dict[k] = v
@@ -258,8 +258,8 @@ class HRNetPose2d:
             )
             inputs = inputs[:, [2, 1, 0]]
 
-            if torch.cuda.is_available():
-                inputs = inputs.cuda()
+            device = next(self._pose_model.parameters()).device
+            inputs = inputs.to(device)
             output = self._pose_model(inputs)
 
             preds, maxvals = get_final_preds(
@@ -277,4 +277,3 @@ class HRNetPose2d:
             scores[i] = score.squeeze()
 
         return kpts, scores
-
