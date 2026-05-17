@@ -31,7 +31,7 @@ FMPose3D creates a 3D pose from a single 2D image. It leverages fast Flow Matchi
 
 ### Set up an environment
 
-Make sure you have Python 3.10+. You can set this up with:
+Make sure you have Python 3.10. The installation and demos are tested with Python 3.10. You can set this up with:
 ```bash
 conda create -n fmpose_3d python=3.10
 conda activate fmpose_3d
@@ -44,6 +44,8 @@ For the animal pipeline, install the optional DeepLabCut dependency:
 ```bash
 pip install "fmpose3d[animals]"
 ```
+
+> **PyTorch/CUDA note.** FMPose3D pins `torch>=2.4.1,<2.5` and `torchvision>=0.19.1,<0.20`, which use CUDA 12.1 wheels by default on Linux. If your driver does not support CUDA 12.1, or if you need a specific CUDA build, install PyTorch first using the matching command from [pytorch.org](https://pytorch.org/get-started/locally/), then install `fmpose3d`.
 
 ## Demos
 
@@ -108,7 +110,7 @@ FMPose3D also ships a high-level Python API for end-to-end 3D pose estimation fr
 
 ## Experiments on non-human animals
 
-For animal training/testing and demo scripts, see [animals/README.md](animals/README.md).
+For animal training/testing and demo scripts, see [animals/README.md](animals/README.md). The animal demo **auto-downloads both checkpoints** (a 26-joint SuperAnimal-Quadruped fine-tuned on Animal3D for 2D pose, and the FMPose3D animal flow-matching lifter for 3D) from [Hugging Face](https://huggingface.co/MLAdaptiveIntelligence/FMPose3D) on first run — no manual setup needed.
 
 ## Citation 
 
