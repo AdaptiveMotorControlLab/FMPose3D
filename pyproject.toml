@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fmpose3d"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10,<3.13"
 dynamic = ["version"]
 license = {text = "Apache 2.0"}
 authors = [
@@ -24,8 +24,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=2.4.1",
-    "torchvision>=0.19.1",
+    # Pinned to torch 2.4.x: PyPI's Linux wheel for this range depends on
+    # CUDA 12.1 runtime packages. Newer torch releases may pull newer CUDA
+    # runtimes by default, so keep this bound to avoid surprising NVIDIA
+    # driver requirements for users.
+    "torch>=2.4.1,<2.5",
+    "torchvision>=0.19.1,<0.20",
     "timm>=1.0.0",
     "einops>=0.4.0",
     "numpy>=1.18.5,<2.0",
@@ -77,4 +81,4 @@ markers = [
 [tool.codespell]
 skip = '.git,*.pdf,*.svg,*.css,*.txt,*.pth'
 check-hidden = true
-ignore-words-list = 'fmpose,mpjpe,uvd,xyz,hm36,cpn,dbb'
+ignore-words-list = 'fmpose,mpjpe,uvd,xyz,hm36,cpn,dbb,mot'
