@@ -336,4 +336,3 @@ if __name__=="__main__":
     print(f"    - Head: {graph_animal.head}")
     print(f"    - Tail: {graph_animal.tail}")
     print(f"  Distance to center (joint 18): {graph_animal.dist_center}")
-    print(f"  Distance to center (joint 4): {graph_rat.dist_center}")
