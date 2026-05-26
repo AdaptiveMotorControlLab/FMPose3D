@@ -23,6 +23,8 @@ import matplotlib.gridspec as gridspec
 import imageio
 from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
+from fmpose3d.common.config import SuperAnimalConfig
+from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -131,23 +133,19 @@ def apply_regularization(pose_3d, R):
     return (R @ pose_3d.T).T
 
 def build_2d_estimator():
-    """Build the 2D pose estimator once. Snapshot resolves lazily on first predict.
+    """Build the 2D pose estimator once.
 
-    Empty --saved_2d_model_path -> auto-download fine-tuned snapshot from HF.
+    Empty --saved_2d_model_path -> auto-download fine-tuned snapshot from HF
+    on first predict.
     Non-empty path -> use as a local override.
     """
-    from fmpose3d.common.config import SuperAnimalConfig
-    from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
-    from fmpose3d.utils.weights import resolve_weights_path
-
-    pose_snapshot_path = resolve_weights_path(
-        args.saved_2d_model_path, "sa_finetune_hrnet_w32.pt"
-    )
     cfg = SuperAnimalConfig(
-        pose_snapshot_path=pose_snapshot_path,
+        pose_snapshot_path=args.saved_2d_model_path,
         pytorch_config_path=args.pytorch_config_2d_path,
+        auto_download_finetuned=True,
     )
-    print(f"[2D] pose snapshot = {cfg.pose_snapshot_path}")
+    snapshot = cfg.pose_snapshot_path or "auto-download from HF on first predict"
+    print(f"[2D] pose snapshot = {snapshot}")
     return SuperAnimalEstimator(cfg)
 
 
