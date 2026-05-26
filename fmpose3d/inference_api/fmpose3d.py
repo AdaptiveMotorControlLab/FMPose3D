@@ -19,8 +19,8 @@ from typing import Callable, Sequence, Tuple, Union
 import numpy as np
 import torch
 
+from fmpose3d.animals.configs import SA_FINETUNE_HRNET_W32_YAML
 from fmpose3d.common.camera import camera_to_world, normalize_screen_coordinates
-from fmpose3d.common.utils import euler_sample
 from fmpose3d.common.config import (
     FMPose3DConfig,
     HRNetConfig,
@@ -28,6 +28,7 @@ from fmpose3d.common.config import (
     SupportedModel,
     SuperAnimalConfig,
 )
+from fmpose3d.common.utils import euler_sample
 from fmpose3d.models import get_model
 
 #: Progress callback signature: ``(current_step, total_steps) -> None``.
@@ -221,6 +222,17 @@ class SuperAnimalEstimator:
     def __init__(self, cfg: SuperAnimalConfig | None = None) -> None:
         self.cfg = cfg or SuperAnimalConfig()
         self._resolved_pose_snapshot_path: str | None = None
+        self._is_finetuned = bool(
+            self.cfg.pose_snapshot_path or self.cfg.auto_download_finetuned
+        )
+        self._customized_kwargs_base = {
+            "customized_model_config": (
+                self.cfg.pytorch_config_path or SA_FINETUNE_HRNET_W32_YAML
+            ),
+            "customized_detector_checkpoint": (
+                self.cfg.detector_snapshot_path or None
+            ),
+        }
 
     def setup_runtime(self) -> None:
         """No-op -- DeepLabCut loads models on first call."""
@@ -260,30 +272,17 @@ class SuperAnimalEstimator:
         all_mapped: list[np.ndarray] = []
         all_scores: list[np.ndarray] = []
 
-        # Resolve pose snapshot: explicit local path > HF auto-download > empty (stock).
-        pose_snapshot_path = cfg.pose_snapshot_path
-        if not pose_snapshot_path and cfg.auto_download_finetuned:
-            if self._resolved_pose_snapshot_path is None:
-                self._resolved_pose_snapshot_path = resolve_weights_path(
-                    "", "sa_finetune_hrnet_w32.pt"
-                )
-            pose_snapshot_path = self._resolved_pose_snapshot_path
-
-        # Fine-tuned mode: non-empty resolved path swaps the stock 39-joint head
-        # for a custom DLC checkpoint that predicts the 26-joint Animal3D layout
-        # natively (no _map_keypoints needed).
-        is_finetuned = bool(pose_snapshot_path)
+        is_finetuned = self._is_finetuned
         if is_finetuned:
-            from fmpose3d.animals.configs import SA_FINETUNE_HRNET_W32_YAML
-            customized_kwargs = dict(
-                customized_model_config=(
-                    cfg.pytorch_config_path or SA_FINETUNE_HRNET_W32_YAML
-                ),
-                customized_pose_checkpoint=pose_snapshot_path,
-                customized_detector_checkpoint=cfg.detector_snapshot_path or None,
-            )
+            customized_kwargs = {
+                **self._customized_kwargs_base,
+                "customized_pose_checkpoint": self._get_pose_snapshot_path(),
+            }
         else:
             customized_kwargs = {}
+
+        # Fine-tuned mode swaps the stock 39-joint head for a custom DLC
+        # checkpoint that predicts the 26-joint Animal3D layout natively.
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Write each frame as an image so DLC can read it.
@@ -339,6 +338,18 @@ class SuperAnimalEstimator:
         kpts, scores = self._validate_predictions(kpts, scores, num_frames=num_frames)
         valid_frames_mask = self._compute_valid_frames_mask(kpts, scores)
         return kpts, scores, valid_frames_mask
+
+    # ------------------------------------------------------------------ #
+
+    def _get_pose_snapshot_path(self) -> str:
+        """Return the fine-tuned pose checkpoint path, resolving HF once."""
+        if self.cfg.pose_snapshot_path:
+            return self.cfg.pose_snapshot_path
+        if self._resolved_pose_snapshot_path is None:
+            self._resolved_pose_snapshot_path = resolve_weights_path(
+                "", "sa_finetune_hrnet_w32.pt"
+            )
+        return self._resolved_pose_snapshot_path
 
     # ------------------------------------------------------------------ #
 
