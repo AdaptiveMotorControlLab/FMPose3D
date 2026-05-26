@@ -34,7 +34,10 @@ from fmpose3d.models import get_model
 ProgressCallback = Callable[[int, int], None]
 
 
-from fmpose3d.utils.weights import HF_REPO_ID as _HF_REPO_ID
+from fmpose3d.utils.weights import (
+    HF_REPO_ID as _HF_REPO_ID,
+    resolve_weights_path,
+)
 
 # Default camera-to-world rotation quaternion (from the demo script).
 _DEFAULT_CAM_ROTATION = np.array(
@@ -217,6 +220,7 @@ class SuperAnimalEstimator:
 
     def __init__(self, cfg: SuperAnimalConfig | None = None) -> None:
         self.cfg = cfg or SuperAnimalConfig()
+        self._resolved_pose_snapshot_path: str | None = None
 
     def setup_runtime(self) -> None:
         """No-op -- DeepLabCut loads models on first call."""
@@ -259,8 +263,11 @@ class SuperAnimalEstimator:
         # Resolve pose snapshot: explicit local path > HF auto-download > empty (stock).
         pose_snapshot_path = cfg.pose_snapshot_path
         if not pose_snapshot_path and cfg.auto_download_finetuned:
-            from fmpose3d.utils.weights import resolve_weights_path
-            pose_snapshot_path = resolve_weights_path("", "sa_finetune_hrnet_w32.pt")
+            if self._resolved_pose_snapshot_path is None:
+                self._resolved_pose_snapshot_path = resolve_weights_path(
+                    "", "sa_finetune_hrnet_w32.pt"
+                )
+            pose_snapshot_path = self._resolved_pose_snapshot_path
 
         # Fine-tuned mode: non-empty resolved path swaps the stock 39-joint head
         # for a custom DLC checkpoint that predicts the 26-joint Animal3D layout
