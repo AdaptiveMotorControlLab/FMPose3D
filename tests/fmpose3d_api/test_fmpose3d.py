@@ -926,10 +926,10 @@ class TestSuperAnimalFinetunedPrediction:
             f"stock mode must not forward customized_* kwargs, got: {list(captured)}"
         )
 
-    def test_auto_download_finetuned_resolves_via_hf_at_predict_time(self):
+    def test_auto_download_finetuned_resolves_via_hf_once_at_predict_time(self):
         """auto_download_finetuned=True with empty pose_snapshot_path triggers
-        a lazy HF resolution on the first predict() call. The resolved path
-        is forwarded to DLC as customized_pose_checkpoint."""
+        a lazy HF resolution on the first predict() call only. The resolved
+        path is reused and forwarded to DLC as customized_pose_checkpoint."""
         pytest.importorskip("deeplabcut")
 
         cfg = SuperAnimalConfig(auto_download_finetuned=True)
@@ -937,20 +937,23 @@ class TestSuperAnimalFinetunedPrediction:
         estimator = SuperAnimalEstimator(cfg)
         frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
         fake_bp = np.random.rand(1, 26, 3).astype("float32")
-        captured: dict = {}
+        captured: list[dict] = []
 
         def spy(*_, **kwargs):
-            captured.update(kwargs)
+            captured.append(kwargs)
             return {kwargs["images"][0]: {"bodyparts": fake_bp}}
 
         with patch(
-            "fmpose3d.utils.weights.resolve_weights_path",
+            "fmpose3d.inference_api.fmpose3d.resolve_weights_path",
             return_value="/hf/cache/sa_finetune_hrnet_w32.pt",
         ) as mock_resolver, patch(
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
             side_effect=spy,
         ):
             estimator.predict(frames)
+            estimator.predict(frames)
 
         mock_resolver.assert_called_once_with("", "sa_finetune_hrnet_w32.pt")
-        assert captured["customized_pose_checkpoint"] == "/hf/cache/sa_finetune_hrnet_w32.pt"
+        assert len(captured) == 2
+        assert captured[0]["customized_pose_checkpoint"] == "/hf/cache/sa_finetune_hrnet_w32.pt"
+        assert captured[1]["customized_pose_checkpoint"] == "/hf/cache/sa_finetune_hrnet_w32.pt"
