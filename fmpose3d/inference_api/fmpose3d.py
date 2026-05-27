@@ -934,8 +934,6 @@ class FMPose3DInference:
             inference_cfg=inference_cfg,
             model_weights_path=model_weights_path,
             device=device,
-            estimator_2d=SuperAnimalEstimator(),
-            postprocessor=AnimalPostProcessor(),
         )
 
     def setup_runtime(self) -> None:
