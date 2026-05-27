@@ -363,6 +363,8 @@ class TestFMPose3DInferenceInit:
         assert animal_api.model_cfg.n_joints == 26
         assert isinstance(animal_api._estimator_2d, SuperAnimalEstimator)
         assert isinstance(animal_api._postprocessor, AnimalPostProcessor)
+        assert animal_api._estimator_2d.cfg.auto_download_finetuned is True
+        assert animal_api._estimator_2d.cfg.pose_snapshot_path == ""
         assert animal_api.inference_cfg.test_augmentation is False
 
     def test_custom_component_injection(self):
