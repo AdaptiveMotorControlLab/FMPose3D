@@ -5,9 +5,9 @@ Official implementation of the paper:
 "FMPose3D: monocular 3D Pose Estimation via Flow Matching"
 by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
-"""
 
-"""Bundled DLC ``pytorch_config.yaml`` files for the animal 2D detector.
+
+Bundled DLC ``pytorch_config.yaml`` files for the animal 2D detector.
 
 These yamls describe FMPose3D's fine-tuned SuperAnimal-Quadruped variants
 and are loaded by :class:`fmpose3d.inference_api.SuperAnimalEstimator` when
