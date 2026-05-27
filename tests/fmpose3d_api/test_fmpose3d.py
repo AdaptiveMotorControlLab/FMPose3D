@@ -768,7 +768,9 @@ class TestSuperAnimalPrediction:
         with patch(
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
-            mock_fn.return_value = {"frame.png": {"bodyparts": None}}
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                path: {"bodyparts": None} for path in kwargs["images"]
+            }
             kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 2, 26, 2)
@@ -789,7 +791,9 @@ class TestSuperAnimalPrediction:
         with patch(
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
-            mock_fn.return_value = {"frame.png": {"bodyparts": fake_bp}}
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                kwargs["images"][0]: {"bodyparts": fake_bp}
+            }
             kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 1, 26, 2)
@@ -860,7 +864,9 @@ class TestSuperAnimalFinetunedPrediction:
              patch(
                  "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
              ) as mock_fn:
-            mock_fn.return_value = {"frame.png": {"bodyparts": fake_bp}}
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                kwargs["images"][0]: {"bodyparts": fake_bp}
+            }
             kpts, scores, mask = estimator.predict(frames)
 
         spy_map.assert_not_called()
