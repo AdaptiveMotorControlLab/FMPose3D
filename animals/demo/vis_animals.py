@@ -158,9 +158,9 @@ def get_pose2D(estimator, path, output_dir, type):
         raise FileNotFoundError(f"Failed to read image: {path}")
 
     # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
-    kpts, _scores, _mask = estimator.predict(img_bgr[None])
-    # Pack into the {img_path: (1, 26, 2)} format expected by the save/vis code below.
-    mapped_keypoints = {path: kpts[:, 0, :, :]}
+    kpts, scores, valid_frames_mask = estimator.predict(img_bgr[None])
+    # Pack into the per-image format expected by the save/vis code below.
+    mapped_keypoints = {path: (kpts[:, 0, :, :], scores[:, 0, :], bool(valid_frames_mask[0]))}
 
     print('Generating 2D pose successful!')
 
@@ -169,10 +169,15 @@ def get_pose2D(estimator, path, output_dir, type):
     os.makedirs(output_dir_2D, exist_ok=True)
 
     # Get the first (and likely only) mapped keypoints
-    for img_path, mapped_xy in mapped_keypoints.items():
+    for img_path, (mapped_xy, mapped_scores, frame_valid) in mapped_keypoints.items():
         # Save in the same format as vis_in_the_wild.py for compatibility
         output_npz = output_dir_2D + 'keypoints.npz'
-        np.savez_compressed(output_npz, reconstruction=mapped_xy)
+        np.savez_compressed(
+            output_npz,
+            reconstruction=mapped_xy,
+            scores=mapped_scores,
+            valid_frames_mask=np.array([frame_valid], dtype=bool),
+        )
         
         # Also save as npy for backup
         img_name = Path(img_path).stem
@@ -187,6 +192,7 @@ def get_pose2D(estimator, path, output_dir, type):
                 columns=['x', 'y'],
                 index=[f'keypoint_{i}' for i in range(mapped_xy.shape[1])]
             )
+            df["score"] = mapped_scores[ind_idx]
             df.to_csv(csv_file)
         
         # Visualize mapped keypoints on image
@@ -201,9 +207,10 @@ def get_pose2D(estimator, path, output_dir, type):
         
         for ind_idx in range(mapped_xy.shape[0]):
             keypoints = mapped_xy[ind_idx]
+            keypoint_scores = mapped_scores[ind_idx]
             
             # Plot keypoints
-            valid_mask = ~np.isnan(keypoints[:, 0])
+            valid_mask = frame_valid & (keypoint_scores > 0) & np.all(np.isfinite(keypoints), axis=1)
             if np.any(valid_mask):
                 ax.scatter(
                     keypoints[valid_mask, 0],
@@ -270,12 +277,21 @@ def get_pose3D(model, path, output_dir, type='image'):
     """
     print('\nGenerating 3D pose...')
 
-    keypoints = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)['reconstruction']
+    keypoint_data = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)
+    keypoints = keypoint_data['reconstruction']
+    scores = keypoint_data['scores'] if 'scores' in keypoint_data.files else None
+    valid_frames_mask = (
+        keypoint_data['valid_frames_mask']
+        if 'valid_frames_mask' in keypoint_data.files
+        else None
+    )
 
     if type == "image":
         i = 0
         img = cv2.imread(path)
-        get_3D_pose_from_image(args, keypoints, i, img, model, output_dir)
+        get_3D_pose_from_image(
+            args, keypoints, i, img, model, output_dir, scores, valid_frames_mask
+        )
     elif type == "video":
         cap = cv2.VideoCapture(path)
         video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -283,13 +299,17 @@ def get_pose3D(model, path, output_dir, type='image'):
             ret, img = cap.read()
             if not ret:
                 break
-            get_3D_pose_from_image(args, keypoints, i, img, model, output_dir)
+            get_3D_pose_from_image(
+                args, keypoints, i, img, model, output_dir, scores, valid_frames_mask
+            )
         cap.release()
 
     print('Generating 3D pose successful!')
 
 
-def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
+def get_3D_pose_from_image(
+    args, keypoints, i, img, model, output_dir, scores=None, valid_frames_mask=None
+):
     """
     Generate 3D pose for a single image frame.
     Adapted from vis_in_the_wild.py for animal pose estimation.
@@ -301,9 +321,36 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         input_2D_no = keypoints[i] if keypoints.ndim > 2 else keypoints
         if input_2D_no.ndim == 2:
             input_2D_no = np.expand_dims(input_2D_no, axis=0)
+        if scores is not None:
+            if scores.ndim == 3:
+                frame_scores = scores[:, i, :]
+            elif scores.ndim == 2:
+                frame_scores = scores
+            else:
+                frame_scores = np.expand_dims(scores, axis=0)
+        else:
+            frame_scores = None
     else:
         input_2D_no = keypoints[0][i]
         input_2D_no = np.expand_dims(input_2D_no, axis=0)
+        if scores is not None:
+            if scores.ndim == 3:
+                frame_scores = np.expand_dims(scores[0][i], axis=0)
+            elif scores.ndim == 2:
+                frame_scores = np.expand_dims(scores[i], axis=0)
+            else:
+                frame_scores = np.expand_dims(scores, axis=0)
+        else:
+            frame_scores = None
+
+    if valid_frames_mask is None:
+        frame_valid = True
+    else:
+        frame_valid = bool(valid_frames_mask[i]) if i < len(valid_frames_mask) else False
+
+    if not frame_valid:
+        print(f"Skipping 3D pose for frame {i:04d}: no valid 2D pose detection.")
+        return
     
     # Save original 2D coordinates for visualization (before normalization)
     input_2D_original = input_2D_no.copy()
@@ -386,12 +433,23 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         # Use original 2D coordinates (before normalization)
         vals = input_2D_original[args.pad] if input_2D_original.shape[0] > args.pad else input_2D_original[0]
         vals = np.reshape(vals, (26, 2))
+        if frame_scores is not None:
+            scores_for_vis = frame_scores[args.pad] if frame_scores.shape[0] > args.pad else frame_scores[0]
+            valid_joints = (
+                frame_valid
+                & (scores_for_vis > 0)
+                & np.all(np.isfinite(vals), axis=1)
+            )
+        else:
+            valid_joints = frame_valid & np.all(np.isfinite(vals), axis=1)
         
         # Animal skeleton connections (26 joints)
         I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
         J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
         
         for j in np.arange(len(I)):
+            if not (valid_joints[I[j]] and valid_joints[J[j]]):
+                continue
             pt1 = (int(vals[I[j], 0]), int(vals[I[j], 1]))
             pt2 = (int(vals[J[j], 0]), int(vals[J[j], 1]))
             cv2.line(img_copy, pt1, pt2, (240, 176, 0), 2, cv2.LINE_AA)  # Anti-aliasing
