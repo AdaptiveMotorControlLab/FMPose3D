@@ -25,6 +25,7 @@ from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
 from fmpose3d.common.config import SuperAnimalConfig
 from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
+from fmpose3d.utils.weights import resolve_weights_path
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -255,8 +256,6 @@ def build_3d_lifter():
     Empty --saved_model_path -> auto-download fmpose3d_animals.pth from HF.
     Non-empty path is used as a local override.
     """
-    from fmpose3d.utils.weights import resolve_weights_path
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = CFM(args).to(device)
 
