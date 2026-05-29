@@ -5,9 +5,9 @@ Official implementation of the paper:
 "FMPose3D: monocular 3D Pose Estimation via Flow Matching"
 by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
-"""
 
-"""Shared helper for resolving / downloading FMPose3D model weights."""
+Shared helper for resolving / downloading FMPose3D model weights.
+"""
 
 HF_REPO_ID: str = "MLAdaptiveIntelligence/FMPose3D"
 
