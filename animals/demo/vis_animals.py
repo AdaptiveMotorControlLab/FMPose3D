@@ -243,7 +243,7 @@ def get_pose2D(estimator, path, output_dir, type):
 
 
 def build_3d_lifter():
-    """Build the 3D lifter once and return (model, device).
+    """Build the 3D lifter once and return the eval model.
 
     Empty --saved_model_path -> auto-download fmpose3d_animals.pth from HF.
     Non-empty path is used as a local override.
