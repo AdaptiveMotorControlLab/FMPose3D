@@ -18,6 +18,7 @@ import torch.optim as optim
 from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.animals.common.utils import *
 from fmpose3d.animals.common.animal3d_dataset import TrainDataset
+from fmpose3d.utils.weights import resolve_weights_path
 import time
 
 args = parse_args().parse()
@@ -210,7 +211,7 @@ if __name__ == '__main__':
 
         if args.train==False:
             # create a new folder for the test results
-            args.folder_dir = os.path.dirname(args.saved_model_path)
+            args.folder_dir = os.path.dirname(args.saved_model_path) if args.saved_model_path else './checkpoint'
             args.checkpoint = os.path.join(args.folder_dir, 'test_results_' + args.create_time)
 
         if not os.path.exists(args.checkpoint):
@@ -247,8 +248,8 @@ if __name__ == '__main__':
     train_paths = args.train_dataset_path if isinstance(args.train_dataset_path, list) else [args.train_dataset_path]
     test_paths = args.test_dataset_path if isinstance(args.test_dataset_path, list) else [args.test_dataset_path]
 
-    # Rat7M doesn't have action labels, use placeholder for error calculation
-    actions = ['rat_motion']
+    # Animal3D doesn't have per-clip action labels; use a single placeholder bucket for error aggregation.
+    actions = ['animal_motion']
 
     if args.train:
         train_datasets = [TrainDataset(is_train=True, json_file=p, root_joint=args.root_joint) for p in train_paths]
@@ -268,9 +269,8 @@ if __name__ == '__main__':
 
     if args.reload:
         model_dict = model['CFM'].state_dict()
-        # Prefer explicit saved_model_path; otherwise fallback to previous_dir glob
-        model_path = args.saved_model_path
-        print(model_path)
+        model_path = resolve_weights_path(args.saved_model_path, f"{args.model_type}.pth")
+        print(f"Loading weights from: {model_path}")
         pre_dict = torch.load(model_path, weights_only=True, map_location=device)
         for name, key in model_dict.items():
             model_dict[name] = pre_dict[name]
@@ -348,4 +348,3 @@ if __name__ == '__main__':
     print(args.checkpoint)
     logging.info(args.checkpoint)
     
-

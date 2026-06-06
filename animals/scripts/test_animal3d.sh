@@ -11,8 +11,11 @@ n_joints=26
 out_joints=26
 epochs=300
 model_type='fmpose3d_animals'
-# model_path='' # set to a local file path to override the registry
-saved_model_path='./pre_trained_models/fmpose3d_animals/fmpose3d_animals_pretrained_weights.pth'
+model_path='' # set to a local file path to override the registry
+# By default, weights are automatically downloaded from Hugging Face Hub.
+# To use local weights instead, uncomment the line below:
+# saved_model_path='./pre_trained_models/fmpose3d_animals/fmpose3d_animals_pretrained_weights.pth'
+saved_model_path=''
 
 # root path denotes the path to the original dataset
 root_path="./dataset/"
@@ -47,4 +50,4 @@ python ./scripts/main_animal3d.py \
   --lr_decay_large ${lr_decay_large} \
   --train_dataset_path ${train_dataset_paths[@]} \
   --test_dataset_path ${test_dataset_paths[@]} \
-  --saved_model_path ${saved_model_path}
+  --saved_model_path "${saved_model_path}"

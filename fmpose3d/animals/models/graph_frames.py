@@ -19,7 +19,6 @@ class Graph():
         layout (string): must be one of the follow candidates
         - 'hm36_gt': Ground truth structure of Human3.6M, with 17 joints per frame
         - 'animal3d': Skeleton structure for Animal3D dataset, with 26 joints per frame
-        - 'rat7m': Skeleton structure for Rat7M dataset, with 20 joints per frame
 
         max_hop (int): the maximal distance between two connected nodes
         dilation (int): controls the spacing between the kernel points
@@ -48,7 +47,6 @@ class Graph():
         :return: get the distance of each node to center
         For hm36_gt: center is joint 7
         For animal3d: center is joint 18 (neck, root joint)
-        For rat7m: center is joint 4 (SpineM, root joint)
         """
         dist_center = np.zeros(self.num_node)
         if layout == 'hm36_gt':
@@ -338,17 +336,3 @@ if __name__=="__main__":
     print(f"    - Head: {graph_animal.head}")
     print(f"    - Tail: {graph_animal.tail}")
     print(f"  Distance to center (joint 18): {graph_animal.dist_center}")
-    
-    # Test Rat7M skeleton
-    print("\nTesting Rat7M skeleton (20 joints):")
-    graph_rat = Graph('rat7m', 'spatial', 1)
-    print(f"  Adjacency matrix shape: {graph_rat.A.shape}")
-    print(f"  Center joint: {graph_rat.center}")
-    print(f"  Number of nodes: {graph_rat.num_node}")
-    print(f"  Body parts:")
-    print(f"    - Left front leg: {graph_rat.left_front}")
-    print(f"    - Right front leg: {graph_rat.right_front}")
-    print(f"    - Left hind leg: {graph_rat.left_hind}")
-    print(f"    - Right hind leg: {graph_rat.right_hind}")
-    print(f"    - Spine: {graph_rat.spine}")
-    print(f"  Distance to center (joint 4): {graph_rat.dist_center}")

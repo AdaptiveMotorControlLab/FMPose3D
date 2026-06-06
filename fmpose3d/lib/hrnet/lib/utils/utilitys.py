@@ -14,7 +14,6 @@ import json
 import torchvision.transforms as transforms
 from fmpose3d.lib.hrnet.lib.utils.transforms import *
 
-from fmpose3d.lib.hrnet.lib.utils.coco_h36m import coco_h36m
 import numpy as np
 
 joint_pairs = [[0, 1], [1, 3], [0, 2], [2, 4],

@@ -225,7 +225,10 @@ Default 2D estimator for the human pipeline. Wraps HRNet + YOLO with a COCO → 
 
 #### `SuperAnimalEstimator(cfg: SuperAnimalConfig | None)`
 
-2D estimator for the animal pipeline. Uses DeepLabCut SuperAnimal and maps quadruped80K keypoints to the 26-joint Animal3D layout.
+2D estimator for the animal pipeline. Produces the 26-joint Animal3D keypoint layout via DeepLabCut SuperAnimal. Supports two modes:
+
+- **Fine-tuned** (default when accessed via `FMPose3DInference.for_animals()`): runs an FMPose3D fine-tuned SA-Quadruped HRNet-w32 snapshot that natively outputs 26 joints. The snapshot is auto-downloaded from [Hugging Face](https://huggingface.co/MLAdaptiveIntelligence/FMPose3D) on the first predict call when `cfg.auto_download_finetuned=True`.
+- **Stock SA** (low-level opt-in): runs the published `superanimal_quadruped` weights (39 keypoints) and remaps to 26 joints via `_map_keypoints`. Activated by `SuperAnimalEstimator(SuperAnimalConfig())` with all paths/flags empty.
 
 If DeepLabCut is not installed, calling this estimator raises a clear `ImportError`
 with the recommended install command: `pip install "fmpose3d[animals]"`.

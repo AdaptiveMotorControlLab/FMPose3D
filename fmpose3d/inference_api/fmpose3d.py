@@ -19,8 +19,8 @@ from typing import Callable, Sequence, Tuple, Union
 import numpy as np
 import torch
 
+from fmpose3d.animals.configs import SA_FINETUNE_HRNET_W32_YAML
 from fmpose3d.common.camera import camera_to_world, normalize_screen_coordinates
-from fmpose3d.common.utils import euler_sample
 from fmpose3d.common.config import (
     FMPose3DConfig,
     HRNetConfig,
@@ -28,13 +28,17 @@ from fmpose3d.common.config import (
     SupportedModel,
     SuperAnimalConfig,
 )
+from fmpose3d.common.utils import euler_sample
 from fmpose3d.models import get_model
 
 #: Progress callback signature: ``(current_step, total_steps) -> None``.
 ProgressCallback = Callable[[int, int], None]
 
 
-from fmpose3d.utils.weights import HF_REPO_ID as _HF_REPO_ID
+from fmpose3d.utils.weights import (
+    HF_REPO_ID as _HF_REPO_ID,
+    resolve_weights_path,
+)
 
 # Default camera-to-world rotation quaternion (from the demo script).
 _DEFAULT_CAM_ROTATION = np.array(
@@ -217,6 +221,18 @@ class SuperAnimalEstimator:
 
     def __init__(self, cfg: SuperAnimalConfig | None = None) -> None:
         self.cfg = cfg or SuperAnimalConfig()
+        self._resolved_pose_snapshot_path: str | None = None
+        self._is_finetuned = bool(
+            self.cfg.pose_snapshot_path or self.cfg.auto_download_finetuned
+        )
+        self._customized_kwargs_base = {
+            "customized_model_config": (
+                self.cfg.pytorch_config_path or SA_FINETUNE_HRNET_W32_YAML
+            ),
+            "customized_detector_checkpoint": (
+                self.cfg.detector_snapshot_path or None
+            ),
+        }
 
     def setup_runtime(self) -> None:
         """No-op -- DeepLabCut loads models on first call."""
@@ -256,6 +272,18 @@ class SuperAnimalEstimator:
         all_mapped: list[np.ndarray] = []
         all_scores: list[np.ndarray] = []
 
+        is_finetuned = self._is_finetuned
+        if is_finetuned:
+            customized_kwargs = {
+                **self._customized_kwargs_base,
+                "customized_pose_checkpoint": self._get_pose_snapshot_path(),
+            }
+        else:
+            customized_kwargs = {}
+
+        # Fine-tuned mode swaps the stock 39-joint head for a custom DLC
+        # checkpoint that predicts the 26-joint Animal3D layout natively.
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Write each frame as an image so DLC can read it.
             paths: list[str] = []
@@ -272,10 +300,12 @@ class SuperAnimalEstimator:
                 images=paths,
                 max_individuals=cfg.max_individuals,
                 out_folder=tmpdir,
-                progress_bar=False
+                progress_bar=False,
+                **customized_kwargs,
             )
             # predictions: {image_path: {"bodyparts": (N_ind, K, 3), ...}}
-            # Iterate in input order to keep frame alignment stable.
+            # In fine-tuned mode K == 26 already; in stock mode K == 39
+            # (quadruped80K) and is remapped via _map_keypoints/_map_scores.
             for img_path in paths:
                 payload = predictions.get(img_path) if isinstance(predictions, dict) else None
                 if payload is None and isinstance(predictions, dict) and len(predictions) == 1:
@@ -291,8 +321,12 @@ class SuperAnimalEstimator:
 
                 xy = bodyparts[..., :2]   # (N_ind, K, 2)
                 conf = bodyparts[..., 2]  # (N_ind, K)
-                mapped = self._map_keypoints(xy)
-                mapped_scores = self._map_scores(conf)
+                if is_finetuned:
+                    mapped = xy
+                    mapped_scores = conf
+                else:
+                    mapped = self._map_keypoints(xy)
+                    mapped_scores = self._map_scores(conf)
 
                 # Take only the first individual.
                 all_mapped.append(mapped[:1])
@@ -304,6 +338,18 @@ class SuperAnimalEstimator:
         kpts, scores = self._validate_predictions(kpts, scores, num_frames=num_frames)
         valid_frames_mask = self._compute_valid_frames_mask(kpts, scores)
         return kpts, scores, valid_frames_mask
+
+    # ------------------------------------------------------------------ #
+
+    def _get_pose_snapshot_path(self) -> str:
+        """Return the fine-tuned pose checkpoint path, resolving HF once."""
+        if self.cfg.pose_snapshot_path:
+            return self.cfg.pose_snapshot_path
+        if self._resolved_pose_snapshot_path is None:
+            self._resolved_pose_snapshot_path = resolve_weights_path(
+                "", "sa_finetune_hrnet_w32.pt"
+            )
+        return self._resolved_pose_snapshot_path
 
     # ------------------------------------------------------------------ #
 
@@ -599,7 +645,13 @@ def _default_components(
     means adding one branch here (or turning this into a registry).
     """
     if model_cfg.model_type == SupportedModel.FMPOSE3D_ANIMALS:
-        return SuperAnimalEstimator(), AnimalPostProcessor()
+        # Default to fine-tuned + lazy HF auto-download so the animal API
+        # works out-of-the-box. Construction stays cheap (no network);
+        # the download fires on the first predict() call.
+        return (
+            SuperAnimalEstimator(SuperAnimalConfig(auto_download_finetuned=True)),
+            AnimalPostProcessor(),
+        )
     return HRNetEstimator(), HumanPostProcessor()
 
 
@@ -882,8 +934,6 @@ class FMPose3DInference:
             inference_cfg=inference_cfg,
             model_weights_path=model_weights_path,
             device=device,
-            estimator_2d=SuperAnimalEstimator(),
-            postprocessor=AnimalPostProcessor(),
         )
 
     def setup_runtime(self) -> None:

@@ -9,8 +9,10 @@ In this part, the FMPose3D model is trained on [Animal3D](https://xujiacong.gith
 
 This visualization script is designed for single-frame based model, allowing you to easily run 3D animal pose estimation on any single image.
 
-Before testing, make sure you have the pre-trained model ready.
-You may either use the model trained by your own or download ours from [here](https://drive.google.com/drive/folders/1kL4aOyWNq0o9zB0rSTRM8KYgkySVmUTk?usp=drive_link) and place it in the `./pre_trained_models` directory.
+Both pre-trained checkpoints are **auto-downloaded from [Hugging Face](https://huggingface.co/MLAdaptiveIntelligence/FMPose3D)** on first run and cached under `~/.cache/huggingface/`. No manual downloads required.
+
+- **3D lifter** (`fmpose3d_animals.pth`) — Animal3D 26-joint flow-matching 2D→3D lifter. Override: set `saved_model_path` in `vis_animals.sh` to a local `.pth`.
+- **2D pose model** (`sa_finetune_hrnet_w32.pt`) — SuperAnimal-Quadruped HRNet-w32 fine-tuned on Animal3D for the 26-joint Animal3D output layout. Override: set `saved_2d_model_path` in `vis_animals.sh` to a local `.pt`.
 
 Next, put your test images into folder `demo/images`. Then run the visualization script:
 ```bash
@@ -49,7 +51,7 @@ Place the downloaded files in the `dataset/` folder of this project:
 ## Training
 The training logs, checkpoints, and related files of each training time will be saved in the './checkpoint' folder.
 
-For trainig on the two datasets:
+For training on the two datasets:
 
 ```bash
 cd animals

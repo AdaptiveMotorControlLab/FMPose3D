@@ -36,7 +36,7 @@ from fmpose3d.inference_api.fmpose3d import (
     apply_limb_regularization,
     compute_limb_regularization_matrix,
 )
-from fmpose3d.common.config import FMPose3DConfig, InferenceConfig
+from fmpose3d.common.config import FMPose3DConfig, InferenceConfig, SuperAnimalConfig
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -336,6 +336,10 @@ class TestDefaultComponents:
         est, pp = _default_components(FMPose3DConfig(model_type="fmpose3d_animals"))
         assert isinstance(est, SuperAnimalEstimator)
         assert isinstance(pp, AnimalPostProcessor)
+        # Animals default to fine-tuned mode with lazy HF auto-download so the
+        # API works out-of-the-box. Construction itself stays cheap (no network).
+        assert est.cfg.auto_download_finetuned is True
+        assert est.cfg.pose_snapshot_path == ""
 
 
 # =========================================================================
@@ -359,6 +363,8 @@ class TestFMPose3DInferenceInit:
         assert animal_api.model_cfg.n_joints == 26
         assert isinstance(animal_api._estimator_2d, SuperAnimalEstimator)
         assert isinstance(animal_api._postprocessor, AnimalPostProcessor)
+        assert animal_api._estimator_2d.cfg.auto_download_finetuned is True
+        assert animal_api._estimator_2d.cfg.pose_snapshot_path == ""
         assert animal_api.inference_cfg.test_augmentation is False
 
     def test_custom_component_injection(self):
@@ -762,7 +768,9 @@ class TestSuperAnimalPrediction:
         with patch(
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
-            mock_fn.return_value = {"frame.png": {"bodyparts": None}}
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                path: {"bodyparts": None} for path in kwargs["images"]
+            }
             kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 2, 26, 2)
@@ -783,7 +791,9 @@ class TestSuperAnimalPrediction:
         with patch(
             "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
         ) as mock_fn:
-            mock_fn.return_value = {"frame.png": {"bodyparts": fake_bp}}
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                kwargs["images"][0]: {"bodyparts": fake_bp}
+            }
             kpts, scores, mask = estimator.predict(frames)
 
         assert kpts.shape == (1, 1, 26, 2)
@@ -791,3 +801,167 @@ class TestSuperAnimalPrediction:
         np.testing.assert_array_equal(mask, np.array([True]))
         # target[24] ← source[0] → (0*3, 0*3+1) = (0.0, 1.0)
         np.testing.assert_allclose(kpts[0, 0, 24], fake_bp[0, 0, :2])
+
+
+# =========================================================================
+# Unit tests — SuperAnimalEstimator fine-tuned mode (mocked DLC)
+# =========================================================================
+
+
+class TestSuperAnimalFinetunedPrediction:
+    """Fine-tuned mode covers two activation paths:
+
+    * ``cfg.pose_snapshot_path`` is non-empty (explicit local override).
+    * ``cfg.auto_download_finetuned=True`` with empty ``pose_snapshot_path``
+      (lazy HF auto-download on first predict).
+
+    Both forward ``customized_*`` kwargs to DLC's ``superanimal_analyze_images``
+    and skip the 39->26 keypoint remap.
+    """
+
+    def test_finetuned_forwards_customized_kwargs(self):
+        """pose_snapshot_path set → customized_* kwargs piped to DLC; empty
+        pytorch_config_path falls back to the packaged default yaml; empty
+        detector_snapshot_path forwards None so DLC resolves the stock detector.
+        """
+        pytest.importorskip("deeplabcut")
+        from fmpose3d.animals.configs import SA_FINETUNE_HRNET_W32_YAML
+
+        cfg = SuperAnimalConfig(pose_snapshot_path="/fake/snapshot.pt")
+        estimator = SuperAnimalEstimator(cfg)
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+        fake_bp = np.random.rand(1, 26, 3).astype("float32")
+
+        captured: dict = {}
+
+        def spy(*_, **kwargs):
+            captured.update(kwargs)
+            return {kwargs["images"][0]: {"bodyparts": fake_bp}}
+
+        with patch(
+            "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
+            side_effect=spy,
+        ):
+            estimator.predict(frames)
+
+        assert captured["customized_pose_checkpoint"] == "/fake/snapshot.pt"
+        assert captured["customized_model_config"] == SA_FINETUNE_HRNET_W32_YAML
+        assert captured["customized_detector_checkpoint"] is None
+
+    def test_finetuned_skips_remap(self):
+        """26-joint DLC output passes through unchanged; the stock-SA
+        ``_map_keypoints`` / ``_map_scores`` helpers must not be called."""
+        pytest.importorskip("deeplabcut")
+
+        cfg = SuperAnimalConfig(pose_snapshot_path="/fake/snapshot.pt")
+        estimator = SuperAnimalEstimator(cfg)
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+        # 26-joint output — what a fine-tuned snapshot natively produces.
+        fake_bp = np.arange(78, dtype="float32").reshape(1, 26, 3)
+
+        with patch.object(SuperAnimalEstimator, "_map_keypoints") as spy_map, \
+             patch.object(SuperAnimalEstimator, "_map_scores") as spy_scores, \
+             patch(
+                 "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
+             ) as mock_fn:
+            mock_fn.side_effect = lambda *_, **kwargs: {
+                kwargs["images"][0]: {"bodyparts": fake_bp}
+            }
+            kpts, scores, mask = estimator.predict(frames)
+
+        spy_map.assert_not_called()
+        spy_scores.assert_not_called()
+        assert kpts.shape == (1, 1, 26, 2)
+        assert scores.shape == (1, 1, 26)
+        np.testing.assert_array_equal(mask, np.array([True]))
+        # Output is the raw bodyparts xy / conf, not a remap.
+        np.testing.assert_allclose(kpts[0, 0], fake_bp[0, :, :2])
+        np.testing.assert_allclose(scores[0, 0], fake_bp[0, :, 2])
+
+    def test_finetuned_custom_paths_override_packaged_defaults(self):
+        """Explicit pytorch_config_path / detector_snapshot_path override the
+        packaged defaults and are forwarded verbatim to DLC."""
+        pytest.importorskip("deeplabcut")
+
+        cfg = SuperAnimalConfig(
+            pose_snapshot_path="/fake/snapshot.pt",
+            pytorch_config_path="/custom/pytorch_config.yaml",
+            detector_snapshot_path="/custom/detector.pt",
+        )
+        estimator = SuperAnimalEstimator(cfg)
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+        fake_bp = np.random.rand(1, 26, 3).astype("float32")
+
+        captured: dict = {}
+
+        def spy(*_, **kwargs):
+            captured.update(kwargs)
+            return {kwargs["images"][0]: {"bodyparts": fake_bp}}
+
+        with patch(
+            "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
+            side_effect=spy,
+        ):
+            estimator.predict(frames)
+
+        assert captured["customized_pose_checkpoint"] == "/fake/snapshot.pt"
+        assert captured["customized_model_config"] == "/custom/pytorch_config.yaml"
+        assert captured["customized_detector_checkpoint"] == "/custom/detector.pt"
+
+    def test_stock_mode_does_not_forward_customized_kwargs(self):
+        """Default config (empty pose_snapshot_path, auto_download_finetuned=False)
+        → no customized_* kwargs; DLC runs with stock SuperAnimal-Quadruped
+        weights and the 39->26 remap path is taken downstream."""
+        pytest.importorskip("deeplabcut")
+
+        estimator = SuperAnimalEstimator()  # default config (stock SA mode)
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+        fake_bp = np.random.rand(1, 40, 3).astype("float32")  # 40-joint stock output
+
+        captured: dict = {}
+
+        def spy(*_, **kwargs):
+            captured.update(kwargs)
+            return {kwargs["images"][0]: {"bodyparts": fake_bp}}
+
+        with patch(
+            "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
+            side_effect=spy,
+        ):
+            estimator.predict(frames)
+
+        assert not any(k.startswith("customized_") for k in captured), (
+            f"stock mode must not forward customized_* kwargs, got: {list(captured)}"
+        )
+
+    def test_auto_download_finetuned_resolves_via_hf_once_at_predict_time(self):
+        """auto_download_finetuned=True with empty pose_snapshot_path triggers
+        a lazy HF resolution on the first predict() call only. The resolved
+        path is reused and forwarded to DLC as customized_pose_checkpoint."""
+        pytest.importorskip("deeplabcut")
+
+        cfg = SuperAnimalConfig(auto_download_finetuned=True)
+        assert cfg.pose_snapshot_path == ""  # trigger condition
+        estimator = SuperAnimalEstimator(cfg)
+        frames = np.random.randint(0, 255, (1, 64, 64, 3), dtype=np.uint8)
+        fake_bp = np.random.rand(1, 26, 3).astype("float32")
+        captured: list[dict] = []
+
+        def spy(*_, **kwargs):
+            captured.append(kwargs)
+            return {kwargs["images"][0]: {"bodyparts": fake_bp}}
+
+        with patch(
+            "fmpose3d.inference_api.fmpose3d.resolve_weights_path",
+            return_value="/hf/cache/sa_finetune_hrnet_w32.pt",
+        ) as mock_resolver, patch(
+            "deeplabcut.pose_estimation_pytorch.apis.superanimal_analyze_images",
+            side_effect=spy,
+        ):
+            estimator.predict(frames)
+            estimator.predict(frames)
+
+        mock_resolver.assert_called_once_with("", "sa_finetune_hrnet_w32.pt")
+        assert len(captured) == 2
+        assert captured[0]["customized_pose_checkpoint"] == "/hf/cache/sa_finetune_hrnet_w32.pt"
+        assert captured[1]["customized_pose_checkpoint"] == "/hf/cache/sa_finetune_hrnet_w32.pt"

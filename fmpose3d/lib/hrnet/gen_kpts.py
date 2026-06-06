@@ -82,11 +82,11 @@ def reset_config(args):
 
 # load model
 def model_load(config):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = pose_hrnet.get_pose_net(config, is_train=False)
-    if torch.cuda.is_available():
-        model = model.cuda()
+    model = model.to(device)
 
-    state_dict = torch.load(config.OUTPUT_DIR, weights_only=True)
+    state_dict = torch.load(config.OUTPUT_DIR, map_location=device, weights_only=True)
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -133,8 +133,8 @@ def gen_from_image(args, frame, people_sort, human_model, pose_model, det_dim=41
 
         inputs = inputs[:, [2, 1, 0]]
 
-        if torch.cuda.is_available():
-            inputs = inputs.cuda()
+        device = next(pose_model.parameters()).device
+        inputs = inputs.to(device)
         output = pose_model(inputs)
 
         # compute coordinate

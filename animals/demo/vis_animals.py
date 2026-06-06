@@ -23,6 +23,9 @@ import matplotlib.gridspec as gridspec
 import imageio
 from fmpose3d.animals.common.arguments import opts as parse_args
 from fmpose3d.common.camera import normalize_screen_coordinates, camera_to_world
+from fmpose3d.common.config import SuperAnimalConfig
+from fmpose3d.inference_api.fmpose3d import SuperAnimalEstimator
+from fmpose3d.utils.weights import resolve_weights_path
 
 args = parse_args().parse()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -45,21 +48,6 @@ else:
     # Load model from registered model registry
     from fmpose3d.models import get_model
     CFM = get_model(args.model_type)
-
-try:
-    from deeplabcut.pose_estimation_pytorch.apis import (  # pyright: ignore[reportMissingImports]
-        superanimal_analyze_images,
-    )
-except ImportError:
-    raise ImportError(
-        "DeepLabCut is required for the animal demo. "
-        "Install it with: pip install \"fmpose3d[animals]\""
-    ) from None
-
-superanimal_name = "superanimal_quadruped"
-model_name = "hrnet_w32"
-detector_name = "fasterrcnn_resnet50_fpn_v2"
-max_individuals = 1
 
 def compute_limb_regularization_matrix(gt_3d):
     """
@@ -145,108 +133,35 @@ def apply_regularization(pose_3d, R):
     """
     return (R @ pose_3d.T).T
 
-def get_pose2D(path, output_dir, type):
+def build_2d_estimator():
+    """Build the 2D pose estimator once.
+
+    Empty --saved_2d_model_path -> auto-download fine-tuned snapshot from HF
+    on first predict.
+    Non-empty path -> use as a local override.
+    """
+    cfg = SuperAnimalConfig(
+        pose_snapshot_path=args.saved_2d_model_path,
+        pytorch_config_path=args.pytorch_config_2d_path,
+        auto_download_finetuned=True,
+    )
+    snapshot = cfg.pose_snapshot_path or "auto-download from HF on first predict"
+    print(f"[2D] pose snapshot = {snapshot}")
+    return SuperAnimalEstimator(cfg)
+
+
+def get_pose2D(estimator, path, output_dir, type):
 
     print('\nGenerating 2D pose...')
-    
-    # Check if this is the special debug case for 000000119761_horse
-    filename = Path(path).stem
-    is_debug_case = "000000119761_horse" in filename
-    
-    if is_debug_case:
-        print(f"DEBUG MODE: Using provided 2D pose for {filename}")
-        # User provided 2D pose (26 keypoints, x, y coordinates, ignoring the last dimension)
-        provided_pose = np.array([
-            [361, 230], [361, 237], [363, 279], [257, 359], [251, 374],
-            [164, 365], [68, 372], [99, 206], [247, 266], [253, 285],
-            [127, 275], [101, 285], [267, 217], [268, 229], [273, 318],
-            [250, 340], [128, 311], [76, 305], [313, 220], [48, 310],
-            [351, 203], [352, 210], [340, 257], [340, 261], [373, 276],
-            [55, 247]
-        ], dtype=np.float32)
-        
-        # Reshape to match expected format: (1, 26, 2) for single individual
-        provided_pose = provided_pose.reshape(1, 26, 2)
-        
-        # Create xy_preds dict with the provided pose
-        xy_preds = {path: provided_pose}
-        print(f"Using provided 2D pose with shape: {provided_pose.shape}")
-    else:
-        # Normal prediction flow
-        predictions = superanimal_analyze_images(
-            superanimal_name,
-            model_name,
-            detector_name,
-            path,
-            max_individuals,
-            out_folder=output_dir
-        )
-        print("predictions:", predictions)
-        
-        # get the 2D keypoints from the predictions
-        xy_preds = {}
-        # predictions is a dict: {image_path: {"bodyparts": (N, K, 3), "bboxes": ..., "bbox_scores": ...}}
-        for img_path, payload in predictions.items():
-            bodyparts = payload.get("bodyparts")
-            if bodyparts is None:
-                continue
-            # bodyparts shape: (num_individuals, num_keypoints, 3) -> [:, :, :2] keeps x,y
-            xy_preds[img_path] = bodyparts[..., :2]
 
-    print("2D keypoints (x,y) by image:")
-    for img_path, xy in xy_preds.items():
-        print(f"{img_path}: shape {xy.shape}")
-    
-    # For debug case, the provided pose is already in Animal3D format (26 keypoints)
-    # So we skip the mapping step
-    if is_debug_case:
-        print("DEBUG MODE: Skipping keypoint mapping (already in Animal3D format)")
-        mapped_keypoints = xy_preds
-    else:
-        # now map the keypoints to a different set of keypoints (used in Animal3D)
-        # keypoint mapping from quadruped80K super keypotints to animal3d keypoints
-        keypoint_mapping = {"quadruped80k":[10, 5, -1, 26, 29, 30, 35, 22, 24, 27, 31, 32, -1, -1, 25, 28, 33, 34, 15, 23, 11, 6, 4, 3, 0, -1]}
-        
-        # for the keypoint_mapping, -1 indicates that there is no corresponding keypoint in the source set, but we can interpolate 
-        # for index 2, we can interpolate between keypoints 3 and 4 in the source set to get a better estimate of the missing keypoint
-        # for index 25, we can interpolate between keypoints 22 and 23 in the source set
-        # for index 12, we can interpolate between keypoints 24 and 19 in the source set
-        # for index 13, we can interpolate between keypoints 27 and 19 in the source set
-        
-        # Define interpolation rules for -1 indices: {target_idx: (source_idx1, source_idx2)}
-        interpolation_rules = {
-            2: (3, 4),      # interpolate between source keypoints 3 and 4
-            12: (24, 19),   # interpolate between source keypoints 24 and 19
-            13: (27, 19),   # interpolate between source keypoints 27 and 19
-            25: (22, 23),   # interpolate between source keypoints 22 and 23
-        }
-        
-        # map the keypoints
-        mapped_keypoints = {}
-        mapping_indices = keypoint_mapping["quadruped80k"]
+    img_bgr = cv2.imread(path)
+    if img_bgr is None:
+        raise FileNotFoundError(f"Failed to read image: {path}")
 
-        for img_path, xy in xy_preds.items():
-            # xy shape: (num_individuals, num_keypoints, 2)
-            num_individuals, num_keypoints, _ = xy.shape
-            num_target_keypoints = len(mapping_indices)
-            
-            # Initialize mapped array with NaN or zeros
-            mapped_xy = np.full((num_individuals, num_target_keypoints, 2), np.nan)
-            
-            for target_idx, source_idx in enumerate(mapping_indices):
-                if source_idx != -1 and source_idx < num_keypoints:
-                    # Copy the keypoint from source to target position
-                    mapped_xy[:, target_idx, :] = xy[:, source_idx, :]
-                elif source_idx == -1 and target_idx in interpolation_rules:
-                    # Perform interpolation for -1 indices
-                    src1, src2 = interpolation_rules[target_idx]
-                    if src1 < num_keypoints and src2 < num_keypoints:
-                        # Interpolate as the average of the two source keypoints
-                        mapped_xy[:, target_idx, :] = (xy[:, src1, :] + xy[:, src2, :]) / 2.0
-                        print(f"Interpolated keypoint {target_idx} from source keypoints {src1} and {src2}")
-            
-            mapped_keypoints[img_path] = mapped_xy
-            print(f"Mapped {img_path}: {xy.shape} -> {mapped_xy.shape}")
+    # predict() returns (kpts (1, N, 26, 2), scores (1, N, 26), valid_mask (N,)).
+    kpts, scores, valid_frames_mask = estimator.predict(img_bgr[None])
+    # Pack into the per-image format expected by the save/vis code below.
+    mapped_keypoints = {path: (kpts[:, 0, :, :], scores[:, 0, :], bool(valid_frames_mask[0]))}
 
     print('Generating 2D pose successful!')
 
@@ -255,11 +170,15 @@ def get_pose2D(path, output_dir, type):
     os.makedirs(output_dir_2D, exist_ok=True)
 
     # Get the first (and likely only) mapped keypoints
-    for img_path, mapped_xy in mapped_keypoints.items():
+    for img_path, (mapped_xy, mapped_scores, frame_valid) in mapped_keypoints.items():
         # Save in the same format as vis_in_the_wild.py for compatibility
         output_npz = output_dir_2D + 'keypoints.npz'
-        np.savez_compressed(output_npz, reconstruction=mapped_xy)
-        print(f"Saved keypoints to {output_npz}")
+        np.savez_compressed(
+            output_npz,
+            reconstruction=mapped_xy,
+            scores=mapped_scores,
+            valid_frames_mask=np.array([frame_valid], dtype=bool),
+        )
         
         # Also save as npy for backup
         img_name = Path(img_path).stem
@@ -274,8 +193,8 @@ def get_pose2D(path, output_dir, type):
                 columns=['x', 'y'],
                 index=[f'keypoint_{i}' for i in range(mapped_xy.shape[1])]
             )
+            df["score"] = mapped_scores[ind_idx]
             df.to_csv(csv_file)
-            print(f"Saved individual {ind_idx} keypoints to {csv_file}")
         
         # Visualize mapped keypoints on image
         img = Image.open(img_path)
@@ -289,9 +208,10 @@ def get_pose2D(path, output_dir, type):
         
         for ind_idx in range(mapped_xy.shape[0]):
             keypoints = mapped_xy[ind_idx]
+            keypoint_scores = mapped_scores[ind_idx]
             
             # Plot keypoints
-            valid_mask = ~np.isnan(keypoints[:, 0])
+            valid_mask = frame_valid & (keypoint_scores > 0) & np.all(np.isfinite(keypoints), axis=1)
             if np.any(valid_mask):
                 ax.scatter(
                     keypoints[valid_mask, 0],
@@ -328,43 +248,49 @@ def get_pose2D(path, output_dir, type):
         plt.tight_layout()
         plt.savefig(vis_file, dpi=150, bbox_inches='tight')
         plt.close(fig)
-        print(f"Saved visualization to {vis_file}")
 
 
-def get_pose3D(path, output_dir, type='image'):
+def build_3d_lifter():
+    """Build the 3D lifter once and return the eval model.
+
+    Empty --saved_model_path -> auto-download fmpose3d_animals.pth from HF.
+    Non-empty path is used as a local override.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = CFM(args).to(device)
+
+    model_path = resolve_weights_path(args.saved_model_path, f"{args.model_type}.pth")
+    print(f"[3D] lifter weights = {model_path}")
+    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
+    model_dict = model.state_dict()
+    for name in model_dict:
+        model_dict[name] = pre_dict[name]
+    model.load_state_dict(model_dict)
+    return model.eval()
+
+
+def get_pose3D(model, path, output_dir, type='image'):
     """
     Generate 3D pose from 2D keypoints using the model.
-    This function reads the 2D keypoints saved by get_pose2D and generates 3D poses.
+    Reads the 2D keypoints saved by get_pose2D and generates 3D poses.
     """
     print('\nGenerating 3D pose...')
-    print(f"args.n_joints: {args.n_joints}, args.out_joints: {args.out_joints}")
-    
-    ## Reload model
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = {}
-    model['CFM'] = CFM(args).to(device)
-    
-    model_dict = model['CFM'].state_dict()
-    model_path = args.saved_model_path
-    print(f"Loading model from: {model_path}")
-    pre_dict = torch.load(model_path, map_location=device, weights_only=True)
-    for name, key in model_dict.items():
-        model_dict[name] = pre_dict[name]
-    model['CFM'].load_state_dict(model_dict)
-    print("Model loaded successfully!")
-    
-    model = model['CFM'].eval()
+    keypoint_data = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)
+    keypoints = keypoint_data['reconstruction']
+    scores = keypoint_data['scores'] if 'scores' in keypoint_data.files else None
+    valid_frames_mask = (
+        keypoint_data['valid_frames_mask']
+        if 'valid_frames_mask' in keypoint_data.files
+        else None
+    )
 
-    ## Load input 2D keypoints
-    keypoints = np.load(output_dir + 'input_2D/keypoints.npz', allow_pickle=True)['reconstruction']
-    print(f"Loaded keypoints shape: {keypoints.shape}")
-
-    ## Generate 3D poses
     if type == "image":
         i = 0
         img = cv2.imread(path)
-        get_3D_pose_from_image(args, keypoints, i, img, model, output_dir)
+        get_3D_pose_from_image(
+            args, keypoints, i, img, model, output_dir, scores, valid_frames_mask
+        )
     elif type == "video":
         cap = cv2.VideoCapture(path)
         video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -372,13 +298,17 @@ def get_pose3D(path, output_dir, type='image'):
             ret, img = cap.read()
             if not ret:
                 break
-            get_3D_pose_from_image(args, keypoints, i, img, model, output_dir)
+            get_3D_pose_from_image(
+                args, keypoints, i, img, model, output_dir, scores, valid_frames_mask
+            )
         cap.release()
 
     print('Generating 3D pose successful!')
 
 
-def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
+def get_3D_pose_from_image(
+    args, keypoints, i, img, model, output_dir, scores=None, valid_frames_mask=None
+):
     """
     Generate 3D pose for a single image frame.
     Adapted from vis_in_the_wild.py for animal pose estimation.
@@ -390,9 +320,36 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         input_2D_no = keypoints[i] if keypoints.ndim > 2 else keypoints
         if input_2D_no.ndim == 2:
             input_2D_no = np.expand_dims(input_2D_no, axis=0)
+        if scores is not None:
+            if scores.ndim == 3:
+                frame_scores = scores[:, i, :]
+            elif scores.ndim == 2:
+                frame_scores = scores
+            else:
+                frame_scores = np.expand_dims(scores, axis=0)
+        else:
+            frame_scores = None
     else:
         input_2D_no = keypoints[0][i]
         input_2D_no = np.expand_dims(input_2D_no, axis=0)
+        if scores is not None:
+            if scores.ndim == 3:
+                frame_scores = np.expand_dims(scores[0][i], axis=0)
+            elif scores.ndim == 2:
+                frame_scores = np.expand_dims(scores[i], axis=0)
+            else:
+                frame_scores = np.expand_dims(scores, axis=0)
+        else:
+            frame_scores = None
+
+    if valid_frames_mask is None:
+        frame_valid = True
+    else:
+        frame_valid = bool(valid_frames_mask[i]) if i < len(valid_frames_mask) else False
+
+    if not frame_valid:
+        print(f"Skipping 3D pose for frame {i:04d}: no valid 2D pose detection.")
+        return
     
     # Save original 2D coordinates for visualization (before normalization)
     input_2D_original = input_2D_no.copy()
@@ -422,9 +379,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         return y_local
     
     ## Estimation (without TTA for better results)
-    print("input_2D.shape:", input_2D.shape)
-    print("input_2D:", input_2D[0, 0])
-    
     # Single inference without flip augmentation
     # Create 3D random noise with shape (1, 1, J, 3)
     y = torch.randn(input_2D.size(0), input_2D.size(1), input_2D.size(2), 3, device=device)
@@ -478,12 +432,23 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         # Use original 2D coordinates (before normalization)
         vals = input_2D_original[args.pad] if input_2D_original.shape[0] > args.pad else input_2D_original[0]
         vals = np.reshape(vals, (26, 2))
+        if frame_scores is not None:
+            scores_for_vis = frame_scores[args.pad] if frame_scores.shape[0] > args.pad else frame_scores[0]
+            valid_joints = (
+                frame_valid
+                & (scores_for_vis > 0)
+                & np.all(np.isfinite(vals), axis=1)
+            )
+        else:
+            valid_joints = frame_valid & np.all(np.isfinite(vals), axis=1)
         
         # Animal skeleton connections (26 joints)
         I = np.array([24, 24, 1, 0, 24, 2, 2, 24, 18, 18, 12, 13, 8, 9, 14, 15, 18, 7, 7, 10, 11, 16, 17, 7, 25])
         J = np.array([0, 1, 21, 20, 2, 22, 23, 18, 12, 13, 8, 9, 14, 15, 3, 4, 7, 10, 11, 16, 17, 5, 6, 25, 19])
         
         for j in np.arange(len(I)):
+            if not (valid_joints[I[j]] and valid_joints[J[j]]):
+                continue
             pt1 = (int(vals[I[j], 0]), int(vals[I[j], 1]))
             pt2 = (int(vals[J[j], 0]), int(vals[J[j], 1]))
             cv2.line(img_copy, pt1, pt2, (240, 176, 0), 2, cv2.LINE_AA)  # Anti-aliasing
@@ -492,7 +457,6 @@ def get_3D_pose_from_image(args, keypoints, i, img, model, output_dir):
         output_dir_2D_img = output_dir + 'pose2D_on_image/'
         os.makedirs(output_dir_2D_img, exist_ok=True)
         cv2.imwrite(f'{output_dir_2D_img}{i:04d}_2d.png', img_copy)
-        print(f"Saved 2D pose on image to {output_dir_2D_img}{i:04d}_2d.png")
 
     ## Save 3D pose as npz
     output_dir_3D = output_dir + 'pose3D/'
@@ -603,46 +567,46 @@ def img2gif(video_path, name, output_dir, duration=0.25):
 
 
 if __name__ == "__main__":
-    
+
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     path = args.path # file path or folder path
-    
-    # Check if path is a directory
+
+    # Build the 2D estimator and 3D lifter ONCE; reuse across all images/frames.
+    # This avoids redundant HF resolution and DLC/torch model reloads.
+    estimator_2d = build_2d_estimator()
+    model_3d = build_3d_lifter()
+
     if os.path.isdir(path):
-        # Get all image files in the directory
         image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']
         image_files = []
         for ext in image_extensions:
             image_files.extend(glob.glob(os.path.join(path, ext)))
         image_files.sort()
-        
+
         if len(image_files) == 0:
             print(f"No image files found in {path}")
             exit(0)
-        
+
         print(f"Found {len(image_files)} images in {path}")
-        
-        # Process each image
+
         for img_path in tqdm(image_files, desc="Processing images"):
             filename = img_path.split('/')[-1].split('.')[0]
             output_dir = './predictions/' + filename + '/'
-            
+
             print(f"\nProcessing: {img_path}")
-            get_pose2D(img_path, output_dir, args.type)
-            get_pose3D(img_path, output_dir, args.type)
-        
+            get_pose2D(estimator_2d, img_path, output_dir, args.type)
+            get_pose3D(model_3d, img_path, output_dir, args.type)
+
         print(f'\nAll {len(image_files)} images processed successfully!')
     else:
         # Single file processing
         filename = path.split('/')[-1].split('.')[0]
         output_dir = './predictions/' + filename + '/'
 
-        get_pose2D(path, output_dir, args.type)
-        get_pose3D(path, output_dir, args.type)
+        get_pose2D(estimator_2d, path, output_dir, args.type)
+        get_pose3D(model_3d, path, output_dir, args.type)
 
-        if args.type=="video":
+        if args.type == "video":
             img2video(path, filename, output_dir)
             img2gif(path, filename, output_dir)
-
-        print('Generating demo successful!')
