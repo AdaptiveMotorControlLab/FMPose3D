@@ -11,6 +11,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!3dhp_test/lib/
+!3dhp_test/lib/*.py
 lib64/
 parts/
 sdist/
