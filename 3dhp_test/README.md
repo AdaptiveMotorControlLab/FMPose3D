@@ -1,14 +1,18 @@
-# MPI-INF-3DHP Test Data
+# MPI-INF-3DHP Test Evaluation
 
-`3dhp_test/infer_3dhp.py` expects a processed MPI-INF-3DHP test file at:
+This folder contains the MPI-INF-3DHP test-set evaluation entrypoint for FMPose3D.
+
+## Dataset Preparation
+
+`infer_3dhp.py` expects a processed MPI-INF-3DHP test file at:
 
 ```bash
 3dhp_test/dataset/data_test_3dhp.npz
 ```
 
-The `.npz` file is not committed to this repository. Generate it from the official MPI-INF-3DHP test set annotations with `prepare_3dhp_test_npz.py`.
+The `.npz` file is not committed to this repository. Generate it from the official MPI-INF-3DHP test set annotations with `dataset/prepare_3dhp_test_npz.py`.
 
-## Get the official dataset
+### Get the official dataset
 
 Get MPI-INF-3DHP from the [official dataset website](https://vcai.mpi-inf.mpg.de/3dhp-dataset/) and follow its license and access instructions. The official package includes download scripts under `source/`; read the included `README.txt`, edit `source/conf.ig` as instructed, then run the test-set downloader:
 
@@ -44,7 +48,7 @@ for subject in TS1 TS2 TS3 TS4 TS5 TS6; do
 done
 ```
 
-## Generate `data_test_3dhp.npz`
+### Generate `data_test_3dhp.npz`
 
 Run from the repository root:
 
@@ -69,6 +73,32 @@ data = {
 ```
 
 `ThreeDHPTestDataset` then applies the valid-frame mask, maps the 28-joint 3DHP layout to the 17-joint FMPose3D layout, converts 3D from millimeters to meters, root-centers joints 1-16 around joint 0, and normalizes the 2D coordinates.
+
+## Model and Weights
+
+By default, the 3DHP test uses the packaged human FMPose3D lifting model (`model_type=fmpose3d_humans`) and leaves `model_weights_path` empty so weights are downloaded automatically from Hugging Face Hub.
+
+`test_3dhp.sh` exposes the model and weights near the top of the script:
+
+```bash
+model_type="fmpose3d_humans"
+model_weights_path=""
+model_path=""
+```
+
+To use local weights, set `model_weights_path` to your own checkpoint or to the human pretrained weights we provide on [Google Drive](https://drive.google.com/drive/folders/1aRZ6t_6IxSfM1nCTFOUXcYVaOk-5koGA?usp=sharing):
+
+```bash
+model_weights_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/FMpose3D_pretrained_weights.pth"
+```
+
+To use a local model definition instead of the packaged registry model, set `model_path` to a Python file containing class `Model`:
+
+```bash
+model_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/model_GAMLP.py"
+```
+
+When both `model_path` and `model_weights_path` are set, make sure the local model architecture matches the checkpoint.
 
 ## Acknowledgement
 
