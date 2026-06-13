@@ -11,7 +11,6 @@ batch_size=1024
 saved_model_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/FMpose3D_pretrained_weights.pth"
 
 num_hypothesis_list=1
-topk=6
 subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
 
 folder_name=s_${eval_sample_steps}_S${subjects_test}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
@@ -28,7 +27,6 @@ python3 "${SCRIPT_DIR}/infer_3dhp.py" \
     --dataset-path "${SCRIPT_DIR}/dataset/data_test_3dhp.npz" \
     --saved-model-path "${saved_model_path}" \
     --num-hypothesis-list "${num_hypothesis_list}" \
-    --topk "${topk}" \
     --folder-name "${folder_name}" \
     --test-augmentation True \
     --test-augmentation-flip-hypothesis True \
