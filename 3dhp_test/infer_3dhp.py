@@ -30,6 +30,7 @@ for path in (ROOT, REPO_ROOT):
 
 from fmpose3d.aggregation_methods import aggregation_RPEA_joint_level
 from fmpose3d.models import get_model
+from fmpose3d.utils.weights import resolve_weights_path
 
 from lib.camera import camera_params_for_subject
 from lib.dataset_3dhp import ThreeDHPTestDataset
@@ -53,12 +54,17 @@ def parse_args():
     parser.add_argument("--dataset-path", type=Path, default=ROOT / "dataset" / "data_test_3dhp.npz")
     parser.add_argument(
         "--model-path",
-        type=Path,
-        default=None,
+        type=str,
+        default="",
         help="Optional path to a Model definition. Defaults to the package FMPose3D human model.",
     )
     parser.add_argument("--model-type", default="fmpose3d_humans", type=str)
-    parser.add_argument("--saved-model-path", type=Path, default=ROOT / "pretrained" / "fmpose3d_h36m" / "FMpose3D_pretrained_weights.pth")
+    parser.add_argument(
+        "--model-weights-path",
+        default="",
+        type=str,
+        help="Local checkpoint path. Empty downloads the weights for --model-type from Hugging Face.",
+    )
     parser.add_argument("--results-dir", type=Path, default=ROOT / "results")
     parser.add_argument("--folder-name", type=str, default="")
     parser.add_argument("--gpu", default="0", type=str)
@@ -105,7 +111,7 @@ def configure_reproducibility(seed):
 
 
 def load_model_class(model_path, model_type):
-    if model_path is None:
+    if not model_path:
         return get_model(model_type)
     model_path = Path(model_path).resolve()
     spec = importlib.util.spec_from_file_location(model_path.stem, model_path)
@@ -342,8 +348,9 @@ def main():
     model_cls = load_model_class(args.model_path, args.model_type)
     model = model_cls(args).to(args.device)
 
-    print(args.saved_model_path)
-    pre_dict = torch.load(args.saved_model_path, map_location=args.device, weights_only=True)
+    model_weights_path = resolve_weights_path(args.model_weights_path, args.model_type)
+    print(model_weights_path)
+    pre_dict = torch.load(model_weights_path, map_location=args.device, weights_only=True)
     model_dict = model.state_dict()
     state_dict = {k: v for k, v in pre_dict.items() if k in model_dict.keys()}
     model_dict.update(state_dict)
