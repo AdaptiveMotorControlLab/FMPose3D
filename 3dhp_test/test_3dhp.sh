@@ -8,9 +8,20 @@ layers=5
 gpu_id=0
 eval_sample_steps=3
 batch_size=1024
-saved_model_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/FMpose3D_pretrained_weights.pth"
 
-num_hypothesis_list=1
+model_type="fmpose3d_humans"
+
+# By default, weights are automatically downloaded from Hugging Face Hub.
+# To use local weights instead, uncomment the line below:
+# model_weights_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/FMpose3D_pretrained_weights.pth"
+model_weights_path=""
+
+# By default, use the packaged FMPose3D human model definition. To use a local
+# model definition instead, uncomment the line below:
+# model_path="${SCRIPT_DIR}/pretrained/fmpose3d_h36m/model_GAMLP.py"
+model_path=""
+
+num_hypothesis_list=10
 subjects_test=TS1,TS2,TS3,TS4,TS5,TS6
 
 folder_name=s_${eval_sample_steps}_S${subjects_test}_h${num_hypothesis_list}_$(date +%Y%m%d_%H%M%S)
@@ -25,7 +36,9 @@ python3 "${SCRIPT_DIR}/infer_3dhp.py" \
     --token-dim 256 \
     --eval-sample-steps "${eval_sample_steps}" \
     --dataset-path "${SCRIPT_DIR}/dataset/data_test_3dhp.npz" \
-    --saved-model-path "${saved_model_path}" \
+    --model-type "${model_type}" \
+    --model-weights-path "${model_weights_path}" \
+    --model-path "${model_path}" \
     --num-hypothesis-list "${num_hypothesis_list}" \
     --folder-name "${folder_name}" \
     --test-augmentation True \
