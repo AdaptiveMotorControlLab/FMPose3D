@@ -76,7 +76,7 @@ def mpjpe_by_action_p2(predicted, target, action, action_error_sum):
     else:
         for i in range(num):
             action_name = _action_name(action[i])
-            action_error_sum[action_name]["p2"].update(np.mean(dist), 1)
+            action_error_sum[action_name]["p2"].update(float(dist[i]), 1)
     return action_error_sum
 
 
