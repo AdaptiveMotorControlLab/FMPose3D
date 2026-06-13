@@ -137,13 +137,3 @@ def p_mpjpe(predicted, target):
     predicted_aligned = a * np.matmul(predicted, r) + t
 
     return np.mean(np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1), axis=len(target.shape) - 2)
-
-
-def p_mpjpe_action(predicted, target):
-    assert predicted.shape == target.shape
-    predicted_np = predicted.detach().cpu().numpy()
-    target_np = target.detach().cpu().numpy()
-    n, t, v, c = predicted_np.shape
-    predicted_np = predicted_np.reshape(n * t, v, c)
-    target_np = target_np.reshape(n * t, v, c)
-    return p_mpjpe(predicted_np, target_np).reshape(n, t)
