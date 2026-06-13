@@ -7,11 +7,6 @@ by Ti Wang, Xiaohang Yu, and Mackenzie Weygandt Mathis
 Licensed under Apache 2.0
 """
 
-import hashlib
-
-import torch
-from torch.autograd import Variable
-
 
 class AccumLoss(object):
     def __init__(self):
@@ -25,16 +20,6 @@ class AccumLoss(object):
         self.sum += val
         self.count += n
         self.avg = self.sum / self.count
-
-
-def get_variable(split, target):
-    out = []
-    for item in target:
-        if split == "train":
-            out.append(Variable(item, requires_grad=False).contiguous().type(torch.cuda.FloatTensor))
-        else:
-            out.append(Variable(item).contiguous().cuda().type(torch.cuda.FloatTensor))
-    return out
 
 
 def define_error_list(actions):
@@ -53,10 +38,3 @@ def define_actions_3dhp(action="*", train=False):
     if train:
         return ["Seq1", "Seq2"]
     return ["Seq1"]
-
-
-def deterministic_random(min_value, max_value, data):
-    digest = hashlib.sha256(data.encode()).digest()
-    raw_value = int.from_bytes(digest[:4], byteorder="little", signed=False)
-    return int(raw_value / (2**32 - 1) * (max_value - min_value)) + min_value
-
