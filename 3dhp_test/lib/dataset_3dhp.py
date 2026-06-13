@@ -93,20 +93,17 @@ class ThreeDHPTestDataset(Dataset):
         pose_3d = self._data[subject]["positions_3d"][frame_idx : frame_idx + 1].copy()
 
         input_2d = pose_2d[None, ...]
-        input_2d_gt = pose_2d[None, ...]
 
         if self.test_augmentation:
             flip_2d = pose_2d.copy()
             flip_2d[:, :, 0] *= -1
             flip_2d[:, self.kps_left + self.kps_right] = flip_2d[:, self.kps_right + self.kps_left]
             input_2d = np.concatenate((input_2d, flip_2d[None, ...]), axis=0)
-            input_2d_gt = np.concatenate((input_2d_gt, flip_2d[None, ...]), axis=0)
 
         return (
             np.zeros(9, dtype=np.float32),
             pose_3d,
             input_2d.astype(np.float32),
-            input_2d_gt.astype(np.float32),
             "Seq1",
             subject,
             0,
