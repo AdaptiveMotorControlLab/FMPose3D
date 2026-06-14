@@ -11,6 +11,7 @@ import importlib.util
 from pathlib import Path
 
 import torch
+from torch import nn
 
 from fmpose3d.models import get_model
 from fmpose3d.utils.weights import resolve_weights_path
@@ -48,6 +49,37 @@ def test_3dhp_imports_common_weight_resolver():
     infer_3dhp = load_infer_3dhp_module()
 
     assert infer_3dhp.resolve_weights_path is resolve_weights_path
+
+
+def test_3dhp_weight_loading_rejects_partial_checkpoints(tmp_path):
+    infer_3dhp = load_infer_3dhp_module()
+    model = nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 1))
+    checkpoint_path = tmp_path / "partial.pth"
+    torch.save({"0.weight": model.state_dict()["0.weight"]}, checkpoint_path)
+
+    try:
+        infer_3dhp.load_model_weights(model, checkpoint_path, torch.device("cpu"))
+    except RuntimeError as exc:
+        assert "incompatible" in str(exc)
+    else:
+        raise AssertionError("partial checkpoint should fail strict model loading")
+
+
+def test_3dhp_actions_argument_allows_only_default_bucket():
+    infer_3dhp = load_infer_3dhp_module()
+
+    assert infer_3dhp.define_actions_3dhp("*", train=False) == ["Seq1"]
+
+
+def test_3dhp_actions_argument_rejects_action_filtering():
+    infer_3dhp = load_infer_3dhp_module()
+
+    try:
+        infer_3dhp.define_actions_3dhp("Seq1", train=False)
+    except ValueError as exc:
+        assert "do not include action labels" in str(exc)
+    else:
+        raise AssertionError("3DHP action filtering should fail")
 
 
 def test_p_mpjpe_mixed_actions_uses_per_sample_errors():
