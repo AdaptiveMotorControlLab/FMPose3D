@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument("--token-dim", default=256, type=int)
     parser.add_argument("--n-joints", default=17, type=int)
     parser.add_argument("--dataset", default="3dhp_valid", type=str)
-    parser.add_argument("--actions", default="*", type=str)
+    parser.add_argument("--actions", default="*", type=str, help="3DHP test annotations do not include action labels; only '*' is supported.")
     parser.add_argument("--subjects-test", default="TS1,TS2,TS3,TS4,TS5,TS6", type=str)
     parser.add_argument("--eval-sample-steps", default="2", type=str)
     parser.add_argument("--num-hypothesis-list", default="1", type=str)
