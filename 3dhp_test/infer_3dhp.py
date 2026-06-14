@@ -124,6 +124,14 @@ def load_model_class(model_path, model_type):
     return module.Model
 
 
+def load_model_weights(model, model_weights_path, device):
+    pre_dict = torch.load(model_weights_path, map_location=device, weights_only=True)
+    try:
+        model.load_state_dict(pre_dict, strict=True)
+    except RuntimeError as exc:
+        raise RuntimeError(f"Checkpoint {model_weights_path} is incompatible with {model.__class__.__name__}") from exc
+
+
 def get_device(gpu):
     if gpu in {"", "-1", "cpu", "none", "None"}:
         return torch.device("cpu")
@@ -353,11 +361,7 @@ def main():
 
     model_weights_path = resolve_weights_path(args.model_weights_path, args.model_type)
     print(model_weights_path)
-    pre_dict = torch.load(model_weights_path, map_location=args.device, weights_only=True)
-    model_dict = model.state_dict()
-    state_dict = {k: v for k, v in pre_dict.items() if k in model_dict.keys()}
-    model_dict.update(state_dict)
-    model.load_state_dict(model_dict)
+    load_model_weights(model, model_weights_path, args.device)
     print("model loaded successfully!")
 
     actions = define_actions_3dhp(args.actions, train=False)
