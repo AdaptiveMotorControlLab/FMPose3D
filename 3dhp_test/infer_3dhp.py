@@ -224,7 +224,7 @@ def test(actions, dataloader, model, args, hypothesis_num=1):
     print(f"Testing with {hypothesis_num} hypothesis(es), eval_steps: {eval_steps}")
     print(f"{'=' * 80}\n")
 
-    for i, data in enumerate(tqdm(dataloader, 0)):
+    for i, data in enumerate(tqdm(dataloader)):
         _, gt_3d, input_2d, action, subject, _ = data
         input_2d = input_2d.contiguous().to(args.device, dtype=torch.float32)
         gt_3d = gt_3d.contiguous().to(args.device, dtype=torch.float32)
