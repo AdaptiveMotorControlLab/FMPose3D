@@ -115,10 +115,13 @@ def load_model_class(model_path, model_type):
         return get_model(model_type)
     model_path = Path(model_path).resolve()
     spec = importlib.util.spec_from_file_location(model_path.stem, model_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load model definition from {model_path}")
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
-    return getattr(module, "Model")
+    if not hasattr(module, "Model"):
+        raise AttributeError(f"Model definition file {model_path} does not define a Model class")
+    return module.Model
 
 
 def get_device(gpu):
