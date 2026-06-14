@@ -49,7 +49,7 @@ def str2bool(value):
     raise argparse.ArgumentTypeError(f"Expected boolean value, got {value}")
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Clean 3DHP inference with processed test npz.")
     parser.add_argument("--dataset-path", type=Path, default=ROOT / "dataset" / "data_test_3dhp.npz")
     parser.add_argument(
@@ -70,7 +70,7 @@ def parse_args():
     parser.add_argument("--gpu", default="0", type=str)
     parser.add_argument("--workers", default=8, type=int)
     parser.add_argument("--batch-size", default=1024, type=int)
-    parser.add_argument("--frames", default=1, type=int)
+    parser.add_argument("--frames", default=1, type=int, choices=[1], help="3DHP test evaluation uses single-frame samples; only 1 is supported.")
     parser.add_argument("--layers", default=5, type=int)
     parser.add_argument("--channel", default=512, type=int)
     parser.add_argument("--d-hid", default=1024, type=int)
@@ -87,7 +87,7 @@ def parse_args():
     parser.add_argument("--test-augmentation-flip-hypothesis", default=True, type=str2bool)
     parser.add_argument("--max-batches", default=0, type=int, help="Smoke test limit. 0 means full evaluation.")
     parser.add_argument("--manual-seed", default=1, type=int)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     args.pad = (args.frames - 1) // 2
     args.root_joint = 0
