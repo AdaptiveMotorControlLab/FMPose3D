@@ -11,6 +11,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!3dhp_test/lib/
+!3dhp_test/lib/*.py
 lib64/
 parts/
 sdist/
@@ -45,6 +47,9 @@ htmlcov/
 *.pkl
 *.h5
 *.ckpt
+animals/checkpoint/
+animals/dataset/animal3d/
+animals/dataset/control_animal3dlatest/
 
 # Excluded directories
 pre_trained_models/
