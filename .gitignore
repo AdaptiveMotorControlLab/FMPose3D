@@ -47,6 +47,9 @@ htmlcov/
 *.pkl
 *.h5
 *.ckpt
+animals/checkpoint/
+animals/dataset/animal3d/
+animals/dataset/control_animal3dlatest/
 
 # Excluded directories
 pre_trained_models/
