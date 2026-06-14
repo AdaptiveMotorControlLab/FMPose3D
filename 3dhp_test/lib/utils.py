@@ -35,6 +35,6 @@ def define_error_list(actions):
 
 
 def define_actions_3dhp(action="*", train=False):
-    if train:
-        return ["Seq1", "Seq2"]
-    return ["Seq1"]
+    if action != "*":
+        raise ValueError("MPI-INF-3DHP test annotations do not include action labels; use --actions '*'.")
+    return ["Seq1", "Seq2"] if train else ["Seq1"]
