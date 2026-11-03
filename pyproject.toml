@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fmpose3d"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10"
 dynamic = ["version"]
 license = {text = "Apache 2.0"}
 authors = [
@@ -20,16 +20,21 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
-    # Capped below torch 2.11: PyPI's default Linux wheels for 2.4-2.10 bring a
-    # CUDA 12.x runtime, which any driver >= R525 can run. torch 2.11+ switches
-    # to CUDA 13 and needs an R580+ driver, so lifting this would silently break
-    # GPU support for users on older drivers. torchvision is paired accordingly.
-    "torch>=2.4.1,<2.11",
-    "torchvision>=0.19.1,<0.26",
+    # No upper bound: torch 2.15 gives the same results as 2.10. From 2.11 on,
+    # PyPI's default Linux wheels bring a CUDA 13 runtime, which needs an R580+
+    # driver. On an older driver torch warns ("The NVIDIA driver on your
+    # system is too old") and runs on the CPU; installing a CUDA 12 build of
+    # torch first keeps the GPU (see the README).
+    "torch>=2.4.1",
+    "torchvision>=0.19.1",
     "timm>=1.0.0",
     "einops>=0.4.0",
     "numpy>=1.18.5",
