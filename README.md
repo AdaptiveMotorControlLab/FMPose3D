@@ -31,7 +31,7 @@ FMPose3D creates a 3D pose from a single 2D image. It leverages fast Flow Matchi
 
 ### Set up an environment
 
-Make sure you have Python 3.10. The installation and demos are tested with Python 3.10. You can set this up with:
+Make sure you have Python 3.10 or newer. The installation and demos are tested with Python 3.10. You can set this up with:
 ```bash
 conda create -n fmpose_3d python=3.10
 conda activate fmpose_3d
@@ -45,7 +45,7 @@ For the animal pipeline, install the optional DeepLabCut dependency:
 pip install "fmpose3d[animals]"
 ```
 
-> **PyTorch/CUDA note.** FMPose3D pins `torch>=2.4.1,<2.5` and `torchvision>=0.19.1,<0.20`, which use CUDA 12.1 wheels by default on Linux. If your driver does not support CUDA 12.1, or if you need a specific CUDA build, install PyTorch first using the matching command from [pytorch.org](https://pytorch.org/get-started/locally/), then install `fmpose3d`.
+> **PyTorch/CUDA note.** FMPose3D needs `torch>=2.4.1` and `torchvision>=0.19.1`, and is tested up to torch 2.15. From torch 2.11 on, the default Linux wheels on PyPI bring a CUDA 13 runtime, which needs NVIDIA driver 580 or newer. With an older driver, torch warns that the driver is too old and runs on the CPU. On such a machine, or if you need another CUDA build, first install PyTorch from the matching index on [pytorch.org](https://pytorch.org/get-started/locally/), for example `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126`, then install `fmpose3d`.
 
 ## Demos
 
